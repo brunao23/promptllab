@@ -35,8 +35,26 @@ const n8nFetch = async (endpoint: string, config: N8nApiConfig, options: Request
         return response.json();
     } catch (error: any) {
         if (error instanceof TypeError && error.message === 'Failed to fetch') {
+            // Detecta o domínio atual para dar instruções mais específicas
+            const currentOrigin = typeof window !== 'undefined' ? window.location.origin : 'este site';
+            const errorDetails = {
+                message: 'Erro de CORS (Cross-Origin Resource Sharing)',
+                currentOrigin: currentOrigin,
+                n8nUrl: config.url,
+                solution: `Configure o CORS no seu N8N para permitir requisições de: ${currentOrigin}`
+            };
+            
             throw new Error(
-                'Falha na conexão (Failed to fetch). Isso geralmente é um problema de CORS. Verifique se a sua instância n8n está configurada para aceitar requisições deste domínio.'
+                `❌ Erro de CORS: A instância N8N em "${config.url}" não está permitindo requisições de "${currentOrigin}".\n\n` +
+                `📋 SOLUÇÃO:\n` +
+                `1. Acesse seu servidor/container onde o N8N está rodando\n` +
+                `2. Adicione a variável de ambiente:\n` +
+                `   N8N_CORS_ALLOW_ORIGIN=${currentOrigin}\n\n` +
+                `   Ou para permitir todos os domínios (menos seguro):\n` +
+                `   N8N_CORS_ALLOW_ORIGIN=*\n\n` +
+                `3. Reinicie o N8N após adicionar a variável\n\n` +
+                `💡 Se estiver usando Docker, adicione no docker-compose.yml ou use:\n` +
+                `   docker run -e N8N_CORS_ALLOW_ORIGIN=${currentOrigin} ...`
             );
         }
         throw error;
