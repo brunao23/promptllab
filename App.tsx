@@ -1,16 +1,29 @@
 import React from 'react';
-import { Header } from './components/Header';
-// FIX: The error "is not a module" is resolved by creating the PromptManager component file and ensuring the relative path is correct.
-import { PromptManager } from './components/PromptManager';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { HomePage } from './pages/HomePage';
+import { Login } from './pages/Login';
+import { Register } from './pages/Register';
+import { Dashboard } from './pages/Dashboard';
+import { ProtectedRoute } from './components/ProtectedRoute';
 
 function App() {
   return (
-    <div className="bg-slate-900 h-screen w-screen flex flex-col overflow-hidden">
-      <Header />
-      <main className="flex-grow overflow-hidden">
-        <PromptManager />
-      </main>
-    </div>
+    <Router>
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Router>
   );
 }
 
