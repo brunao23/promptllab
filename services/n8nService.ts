@@ -16,15 +16,38 @@ const n8nFetch = async (endpoint: string, config: N8nApiConfig, options: Request
         'Authorization': `Bearer ${config.apiKey}`,
     };
 
+    // Logs para debug
+    console.log('🔵 [N8N Service] Iniciando requisição:', {
+        endpoint,
+        method: options.method || 'GET',
+        url: apiUrl,
+        hasApiKey: !!config.apiKey,
+        apiKeyLength: config.apiKey?.length || 0
+    });
+
     try {
         const response = await fetch(apiUrl, { ...options, headers });
+        
+        console.log('🟢 [N8N Service] Resposta recebida:', {
+            status: response.status,
+            statusText: response.statusText,
+            ok: response.ok,
+            headers: Object.fromEntries(response.headers.entries())
+        });
 
         if (!response.ok) {
             let errorMessage = `Erro na API do n8n: ${response.status} ${response.statusText}`;
             try {
                 const errorBody = await response.json();
                 errorMessage = errorBody.message || errorMessage;
-            } catch (e) {}
+                console.error('🔴 [N8N Service] Erro na resposta:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    errorBody
+                });
+            } catch (e) {
+                console.error('🔴 [N8N Service] Erro ao parsear resposta de erro:', e);
+            }
             throw new Error(errorMessage);
         }
         
@@ -32,8 +55,24 @@ const n8nFetch = async (endpoint: string, config: N8nApiConfig, options: Request
             return null;
         }
 
-        return response.json();
+        const data = await response.json();
+        console.log('✅ [N8N Service] Requisição bem-sucedida:', {
+            endpoint,
+            dataSize: JSON.stringify(data).length,
+            hasData: !!data
+        });
+        return data;
     } catch (error: any) {
+        console.error('🔴 [N8N Service] Erro na requisição:', {
+            endpoint,
+            url: apiUrl,
+            method: options.method || 'GET',
+            errorType: error?.constructor?.name,
+            errorMessage: error?.message,
+            errorStack: error?.stack,
+            error: error
+        });
+
         if (error instanceof TypeError && error.message === 'Failed to fetch') {
             // Detecta o domínio atual para dar instruções mais específicas
             const currentOrigin = typeof window !== 'undefined' ? window.location.origin : 'este site';
@@ -41,8 +80,11 @@ const n8nFetch = async (endpoint: string, config: N8nApiConfig, options: Request
                 message: 'Erro de CORS (Cross-Origin Resource Sharing)',
                 currentOrigin: currentOrigin,
                 n8nUrl: config.url,
+                apiUrl: apiUrl,
                 solution: `Configure o CORS no seu N8N para permitir requisições de: ${currentOrigin}`
             };
+            
+            console.error('🚨 [N8N Service] ERRO DE CORS DETECTADO:', errorDetails);
             
             throw new Error(
                 `❌ Erro de CORS: A instância N8N em "${config.url}" não está permitindo requisições de "${currentOrigin}".\n\n` +
@@ -62,14 +104,37 @@ const n8nFetch = async (endpoint: string, config: N8nApiConfig, options: Request
 };
 
 export const fetchWorkflows = async (config: N8nApiConfig): Promise<N8nWorkflow[]> => {
-    const response = await n8nFetch('/workflows', config);
-    return response.data;
+    console.log('📋 [N8N Service] Buscando workflows...');
+    try {
+        const response = await n8nFetch('/workflows', config);
+        const workflows = response.data || [];
+        console.log('✅ [N8N Service] Workflows encontrados:', {
+            count: workflows.length,
+            workflows: workflows.map((w: any) => ({ id: w.id, name: w.name, active: w.active }))
+        });
+        return workflows;
+    } catch (error) {
+        console.error('❌ [N8N Service] Erro ao buscar workflows:', error);
+        throw error;
+    }
 };
 
 // n8n não tem um endpoint para buscar nós de um workflow, então buscamos o workflow inteiro
 export const fetchWorkflowDetails = async (config: N8nApiConfig, workflowId: string): Promise<{ nodes: N8nNode[] }> => {
-    const response = await n8nFetch(`/workflows/${workflowId}`, config);
-    return response; // A resposta da API já contém a estrutura com os nós
+    console.log('📋 [N8N Service] Buscando detalhes do workflow:', { workflowId });
+    try {
+        const response = await n8nFetch(`/workflows/${workflowId}`, config);
+        const nodes = response.nodes || [];
+        console.log('✅ [N8N Service] Detalhes do workflow encontrados:', {
+            workflowId,
+            nodeCount: nodes.length,
+            nodeTypes: nodes.map((n: any) => n.type)
+        });
+        return response; // A resposta da API já contém a estrutura com os nós
+    } catch (error) {
+        console.error('❌ [N8N Service] Erro ao buscar detalhes do workflow:', { workflowId, error });
+        throw error;
+    }
 };
 
 // Função auxiliar para atualizar um valor em um objeto usando uma chave aninhada
@@ -124,6 +189,13 @@ export const updateNodeParameter = async (
     parameterKey: string,
     promptContent: string
 ): Promise<void> => {
+    console.log('📝 [N8N Service] Atualizando parâmetro do node:', {
+        workflowId,
+        nodeId,
+        parameterKey,
+        promptContentLength: promptContent.length
+    });
+    
     // 1. Obter o estado atual do workflow
     const workflow = await n8nFetch(`/workflows/${workflowId}`, config);
 
@@ -146,8 +218,23 @@ export const updateNodeParameter = async (
     }
 
     // 3. Enviar o workflow modificado de volta via PUT
-    await n8nFetch(`/workflows/${workflowId}`, config, {
-        method: 'PUT',
-        body: JSON.stringify(updatedWorkflow),
-    });
+    try {
+        await n8nFetch(`/workflows/${workflowId}`, config, {
+            method: 'PUT',
+            body: JSON.stringify(updatedWorkflow),
+        });
+        console.log('✅ [N8N Service] Parâmetro atualizado com sucesso:', {
+            workflowId,
+            nodeId,
+            parameterKey
+        });
+    } catch (error) {
+        console.error('❌ [N8N Service] Erro ao atualizar parâmetro:', {
+            workflowId,
+            nodeId,
+            parameterKey,
+            error
+        });
+        throw error;
+    }
 };

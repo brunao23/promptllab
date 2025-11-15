@@ -40,33 +40,61 @@ export const N8nIntegration: React.FC<N8nIntegrationProps> = ({ config, setConfi
     };
 
     const handleConnect = async () => {
+        console.log('🔵 [N8N Integration] Iniciando conexão...', {
+            url: config.url,
+            hasApiKey: !!config.apiKey,
+            apiKeyLength: config.apiKey?.length || 0
+        });
+
         if (!config.url || !config.apiKey) {
-            setError("URL da instância e Chave de API são obrigatórios.");
+            const errorMsg = "URL da instância e Chave de API são obrigatórios.";
+            console.error('❌ [N8N Integration]', errorMsg);
+            setError(errorMsg);
             return;
         }
+        
         setIsLoading(true);
         setError(null);
         setSuccessMessage(null);
         resetSelections();
+        
         try {
+            console.log('🔄 [N8N Integration] Buscando workflows...');
             const fetchedWorkflows = await fetchWorkflows(config);
+            console.log('✅ [N8N Integration] Workflows recebidos:', {
+                count: fetchedWorkflows.length,
+                workflows: fetchedWorkflows
+            });
+            
             setWorkflows(fetchedWorkflows);
-            setSuccessMessage(`✅ Conectado com sucesso! ${fetchedWorkflows.length} workflow(s) encontrado(s).`);
+            const successMsg = `✅ Conectado com sucesso! ${fetchedWorkflows.length} workflow(s) encontrado(s).`;
+            console.log('✅ [N8N Integration]', successMsg);
+            setSuccessMessage(successMsg);
         } catch (e: any) {
             // Preserva a mensagem de erro detalhada
             const errorMessage = e.message || "Falha ao conectar com a API do n8n.";
+            console.error('❌ [N8N Integration] Erro ao conectar:', {
+                error: e,
+                errorMessage,
+                url: config.url,
+                currentOrigin: typeof window !== 'undefined' ? window.location.origin : 'N/A',
+                errorStack: e?.stack
+            });
+            
             setError(errorMessage);
             
             // Se for erro de CORS, mostra mensagem adicional
             if (errorMessage.includes('CORS') || errorMessage.includes('Failed to fetch')) {
-                console.error('Erro de CORS detectado:', {
+                console.error('🚨 [N8N Integration] Erro de CORS detectado:', {
                     currentOrigin: typeof window !== 'undefined' ? window.location.origin : 'N/A',
                     n8nUrl: config.url,
-                    error: e
+                    error: e,
+                    errorType: e?.constructor?.name
                 });
             }
         } finally {
             setIsLoading(false);
+            console.log('🔄 [N8N Integration] Conexão finalizada');
         }
     };
 
@@ -77,15 +105,28 @@ export const N8nIntegration: React.FC<N8nIntegrationProps> = ({ config, setConfi
             return;
         }
         const fetchNodes = async () => {
+            console.log('🔵 [N8N Integration] Buscando nodes do workflow:', { workflowId: selectedWorkflowId });
             setIsLoading(true);
             setError(null);
             try {
                 const workflowDetails = await fetchWorkflowDetails(config, selectedWorkflowId);
+                const nodes = workflowDetails.nodes || [];
+                console.log('✅ [N8N Integration] Nodes encontrados:', {
+                    workflowId: selectedWorkflowId,
+                    count: nodes.length,
+                    nodes: nodes.map((n: any) => ({ id: n.id, name: n.name, type: n.type }))
+                });
                 // Mostra TODOS os nodes - o usuário pode escolher qualquer um
                 // Nodes de IA são comuns: gemini, openAi, anthropic, mistral, etc.
-                setNodes(workflowDetails.nodes || []);
+                setNodes(nodes);
             } catch (e: any) {
-                setError(e.message || "Falha ao buscar os nós do workflow.");
+                const errorMsg = e.message || "Falha ao buscar os nós do workflow.";
+                console.error('❌ [N8N Integration] Erro ao buscar nodes:', {
+                    workflowId: selectedWorkflowId,
+                    error: e,
+                    errorMessage: errorMsg
+                });
+                setError(errorMsg);
             } finally {
                 setIsLoading(false);
             }
@@ -147,29 +188,64 @@ export const N8nIntegration: React.FC<N8nIntegrationProps> = ({ config, setConfi
         }
         const selectedNode = nodes.find(n => n.id === selectedNodeId);
         if (selectedNode) {
+            console.log('🔵 [N8N Integration] Buscando campos de prompt do node:', {
+                nodeId: selectedNodeId,
+                nodeName: selectedNode.name,
+                nodeType: selectedNode.type,
+                parameters: selectedNode.parameters
+            });
+            
             // Busca campos de prompt em toda a estrutura de parâmetros
             const promptFields = findPromptFields(selectedNode.parameters);
             
             // Remove duplicatas e ordena
             const uniqueFields = [...new Set(promptFields)].sort();
             
+            console.log('✅ [N8N Integration] Campos de prompt encontrados:', {
+                nodeId: selectedNodeId,
+                count: uniqueFields.length,
+                fields: uniqueFields
+            });
+            
             setNodeParameters(uniqueFields);
         }
     }, [selectedNodeId, nodes, findPromptFields]);
 
     const handleUpdateNode = async () => {
+        console.log('🔵 [N8N Integration] Iniciando atualização do node...', {
+            workflowId: selectedWorkflowId,
+            nodeId: selectedNodeId,
+            parameterKey: selectedParameterKey,
+            promptContentLength: promptContent.length
+        });
+
         if (!selectedWorkflowId || !selectedNodeId || !selectedParameterKey) {
-            setError("Selecione um workflow, um nó e um campo para atualizar.");
+            const errorMsg = "Selecione um workflow, um nó e um campo para atualizar.";
+            console.error('❌ [N8N Integration]', errorMsg);
+            setError(errorMsg);
             return;
         }
+        
         setIsUpdating(true);
         setError(null);
         setSuccessMessage(null);
+        
         try {
             await updateNodeParameter(config, selectedWorkflowId, selectedNodeId, selectedParameterKey, promptContent);
-            setSuccessMessage(`Nó "${nodes.find(n => n.id === selectedNodeId)?.name}" atualizado com sucesso!`);
+            const nodeName = nodes.find(n => n.id === selectedNodeId)?.name;
+            const successMsg = `Nó "${nodeName}" atualizado com sucesso!`;
+            console.log('✅ [N8N Integration]', successMsg);
+            setSuccessMessage(successMsg);
         } catch (e: any) {
-            setError(e.message || "Falha ao atualizar o nó no n8n.");
+            const errorMsg = e.message || "Falha ao atualizar o nó no n8n.";
+            console.error('❌ [N8N Integration] Erro ao atualizar node:', {
+                workflowId: selectedWorkflowId,
+                nodeId: selectedNodeId,
+                parameterKey: selectedParameterKey,
+                error: e,
+                errorMessage: errorMsg
+            });
+            setError(errorMsg);
         } finally {
             setIsUpdating(false);
         }
