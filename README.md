@@ -43,7 +43,6 @@
 - 💬 **Chat Interativo**: Converse com seus prompts para validar respostas
 - 📄 **Análise de Documentos**: Extraia informações de documentos para criar prompts
 - 🎤 **Assistente por Voz**: Preencha formulários usando comandos de voz
-- 🔗 **Integração N8N**: Conecte seus prompts com workflows automatizados
 
 ---
 
@@ -101,7 +100,6 @@
 
 ### 🔗 Integrações
 
-- **Integração N8N**: Conecte seus prompts com workflows N8N
 - **API Gemini**: Integração nativa com Google Gemini API
 - **Exportação PDF**: Exporte prompts e documentação em PDF
 
@@ -306,7 +304,6 @@ labprompt/
 │   ├── HistoryPanel.tsx         # Painel de histórico
 │   ├── InputSection.tsx         # Seção de input
 │   ├── JsonDisplay.tsx          # Exibição JSON
-│   ├── N8nIntegration.tsx       # Integração N8N
 │   ├── OutputDisplay.tsx        # Exibição de output
 │   ├── PasteModal.tsx           # Modal de colar
 │   ├── PromptInputForm.tsx      # Formulário de input
@@ -314,8 +311,7 @@ labprompt/
 │   ├── PromptOptimizer.tsx      # Otimizador de prompts
 │   └── TabbedPanel.tsx          # Painel com abas
 ├── services/                     # Serviços
-│   ├── geminiService.ts         # Serviço Gemini API
-│   └── n8nService.ts            # Serviço N8N
+│   └── geminiService.ts         # Serviço Gemini API
 ├── App.tsx                       # Componente principal
 ├── constants.ts                  # Constantes
 ├── index.html                    # HTML principal

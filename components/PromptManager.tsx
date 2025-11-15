@@ -16,11 +16,6 @@ import type { GenerateContentResponse } from '@google/genai';
 
 declare const jspdf: any;
 
-interface N8nConfig {
-    url: string;
-    apiKey: string;
-}
-
 export const PromptManager: React.FC = () => {
     const [versionHistory, setVersionHistory] = useState<PromptVersion[]>([]);
     const [activeVersion, setActiveVersion] = useState<PromptVersion | null>(null);
@@ -51,26 +46,6 @@ export const PromptManager: React.FC = () => {
     const [assistantError, setAssistantError] = useState<string | null>(null);
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const audioChunksRef = useRef<Blob[]>([]);
-
-    // n8n State
-    const [n8nConfig, setN8nConfig] = useState<N8nConfig>({
-        url: '',
-        apiKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyNDY4MTY1Ny00ZTA4LTQzZGMtOWUyYi03ZThkMWJhOGZiYzgiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwiaWF0IjoxNzYzMTc1NTczfQ.YmsWG6QNaIEvaMWX5M8yww6XoJyzcddpSshhfxe1cZQ',
-    });
-
-    // Load n8n config from localStorage on initial render
-    useEffect(() => {
-        const savedN8nConfig = localStorage.getItem('n8nConfig');
-        if (savedN8nConfig) {
-            setN8nConfig(JSON.parse(savedN8nConfig));
-        }
-    }, []);
-
-    // Save n8n config to localStorage whenever it changes
-    useEffect(() => {
-        localStorage.setItem('n8nConfig', JSON.stringify(n8nConfig));
-    }, [n8nConfig]);
-
 
     useEffect(() => {
         const checkApiKey = async () => {
@@ -552,8 +527,6 @@ export const PromptManager: React.FC = () => {
                     isLoading={isLoading}
                     onGenerateExamples={handleGenerateExamples}
                     isGeneratingExamples={isGeneratingExamples}
-                    n8nConfig={n8nConfig}
-                    setN8nConfig={setN8nConfig}
                     activePromptContent={activeVersion?.content ?? ''}
                 />
             </div>

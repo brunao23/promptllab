@@ -73,18 +73,3 @@ export interface Fluxo {
   ativarGuardrails: boolean;
 }
 
-// N8N Integration Types
-export interface N8nWorkflow {
-  id: string;
-  name: string;
-  active: boolean;
-}
-
-export interface N8nNode {
-  parameters: Record<string, any>;
-  name: string;
-  type: string;
-  typeVersion: number;
-  position: [number, number];
-  id: string;
-}

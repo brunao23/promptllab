@@ -8,13 +8,6 @@ import { FluxoItem } from './FluxoItem';
 import { VariavelDinamicaItem } from './VariavelDinamicaItem';
 import { FerramentaItem } from './FerramentaItem';
 import { DocumentUploader } from './DocumentUploader';
-import { N8nIntegration } from './N8nIntegration';
-
-interface N8nConfig {
-    url: string;
-    apiKey: string;
-}
-
 interface PromptInputFormProps {
   formData: PromptData;
   setFormData: React.Dispatch<React.SetStateAction<PromptData>>;
@@ -22,8 +15,6 @@ interface PromptInputFormProps {
   isLoading: boolean;
   onGenerateExamples: () => void;
   isGeneratingExamples: boolean;
-  n8nConfig: N8nConfig;
-  setN8nConfig: React.Dispatch<React.SetStateAction<N8nConfig>>;
   activePromptContent: string;
 }
 
@@ -37,8 +28,6 @@ export const PromptInputForm: React.FC<PromptInputFormProps> = ({
   isLoading, 
   onGenerateExamples,
   isGeneratingExamples,
-  n8nConfig,
-  setN8nConfig,
   activePromptContent
 }) => {
   const [isUploading, setIsUploading] = useState(false);
@@ -243,14 +232,6 @@ export const PromptInputForm: React.FC<PromptInputFormProps> = ({
                     <span>Complexo</span>
                 </div>
             </div>
-        </InputSection>
-
-        <InputSection title="11. Integração n8n">
-            <N8nIntegration
-                config={n8nConfig}
-                setConfig={setN8nConfig}
-                promptContent={activePromptContent}
-            />
         </InputSection>
         
         <div className="pt-4 sticky bottom-0 bg-slate-800 -mx-4 px-4 pb-4">
