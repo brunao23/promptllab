@@ -156,35 +156,36 @@ export const PromptManager: React.FC = () => {
                             
                             // Carregar mensagens de chat da versão ativa ANTES de inicializar o chat
                             try {
-                            console.log('💬 Carregando mensagens de chat da versão:', latestVersion.id);
-                            const messages = await getChatMessages(latestVersion.id);
-                            console.log('✅ Mensagens de chat carregadas:', messages?.length || 0);
-                            
-                            // Definir mensagens ANTES de inicializar o chat
-                            if (messages && messages.length > 0) {
-                                console.log('💬 Restaurando histórico completo de chat:', messages.length, 'mensagens');
-                                setChatMessages(messages);
-                                console.log('💬 Histórico de chat restaurado com sucesso');
-                            } else {
+                                console.log('💬 Carregando mensagens de chat da versão:', latestVersion.id);
+                                const messages = await getChatMessages(latestVersion.id);
+                                console.log('✅ Mensagens de chat carregadas:', messages?.length || 0);
+                                
+                                // Definir mensagens ANTES de inicializar o chat
+                                if (messages && messages.length > 0) {
+                                    console.log('💬 Restaurando histórico completo de chat:', messages.length, 'mensagens');
+                                    setChatMessages(messages);
+                                    console.log('💬 Histórico de chat restaurado com sucesso');
+                                } else {
+                                    setChatMessages([]);
+                                    console.log('ℹ️ Nenhuma mensagem de chat encontrada para esta versão');
+                                }
+                                
+                                // Reiniciar chat com o prompt da versão ativa DEPOIS de carregar as mensagens
+                                if (latestVersion.content) {
+                                    console.log('🔄 Inicializando chat com conteúdo da versão...');
+                                    startChat(latestVersion.content);
+                                    console.log('✅ Chat inicializado com prompt da versão ativa');
+                                    console.log('📋 Conteúdo do prompt carregado:', latestVersion.content.substring(0, 100) + '...');
+                                } else {
+                                    console.warn('⚠️ Versão não tem conteúdo para inicializar o chat');
+                                }
+                            } catch (err: any) {
+                                console.error('❌ Erro ao carregar mensagens de chat:', err);
                                 setChatMessages([]);
-                                console.log('ℹ️ Nenhuma mensagem de chat encontrada para esta versão');
-                            }
-                            
-                            // Reiniciar chat com o prompt da versão ativa DEPOIS de carregar as mensagens
-                            if (latestVersion.content) {
-                                console.log('🔄 Inicializando chat com conteúdo da versão...');
-                                startChat(latestVersion.content);
-                                console.log('✅ Chat inicializado com prompt da versão ativa');
-                                console.log('📋 Conteúdo do prompt carregado:', latestVersion.content.substring(0, 100) + '...');
-                            } else {
-                                console.warn('⚠️ Versão não tem conteúdo para inicializar o chat');
-                            }
-                        } catch (err: any) {
-                            console.error('❌ Erro ao carregar mensagens de chat:', err);
-                            setChatMessages([]);
-                            // Mesmo com erro, tentar inicializar o chat
-                            if (latestVersion.content) {
-                                startChat(latestVersion.content);
+                                // Mesmo com erro, tentar inicializar o chat
+                                if (latestVersion.content) {
+                                    startChat(latestVersion.content);
+                                }
                             }
                         }
                     } else {
