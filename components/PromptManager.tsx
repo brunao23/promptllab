@@ -77,44 +77,56 @@ export const PromptManager: React.FC = () => {
                 }
 
                 // Carregar prompts do usuário
+                console.log('📥 Carregando prompts do usuário...');
                 const prompts = await getUserPrompts();
+                console.log('✅ Prompts carregados:', prompts?.length || 0);
                 
                 if (prompts && prompts.length > 0) {
                     // Carregar o prompt mais recente
                     const latestPrompt = prompts[0];
+                    console.log('📋 Carregando prompt:', latestPrompt.id);
                     setCurrentPromptId(latestPrompt.id);
                     
                     // Carregar dados do prompt
                     const { promptData } = await getPrompt(latestPrompt.id);
+                    console.log('✅ Dados do prompt carregados');
                     setFormData(promptData);
                     
                     // Carregar versões do prompt
+                    console.log('📜 Carregando versões do prompt...');
                     const versions = await getPromptVersions(latestPrompt.id);
+                    console.log('✅ Versões carregadas:', versions?.length || 0);
                     setVersionHistory(versions);
                     
                     // Carregar versão ativa (mais recente)
                     if (versions && versions.length > 0) {
                         const latestVersion = versions[0];
+                        console.log('✅ Versão ativa carregada:', latestVersion.id);
                         setActiveVersion(latestVersion);
                         
                         // Carregar mensagens de chat da versão ativa
                         try {
+                            console.log('💬 Carregando mensagens de chat...');
                             const messages = await getChatMessages(latestVersion.id);
+                            console.log('✅ Mensagens carregadas:', messages?.length || 0);
                             setChatMessages(messages);
                             
                             // Reiniciar chat com o prompt da versão ativa
                             if (latestVersion.content) {
                                 startChat(latestVersion.content);
                             }
-                        } catch (err) {
-                            console.warn('Erro ao carregar mensagens de chat:', err);
+                        } catch (err: any) {
+                            console.warn('⚠️ Erro ao carregar mensagens de chat:', err);
                             setChatMessages([]);
                         }
                     }
+                } else {
+                    console.log('ℹ️ Nenhum prompt encontrado. Usuário pode começar criando um novo.');
                 }
             } catch (err: any) {
-                console.error('Erro ao carregar dados do usuário:', err);
-                // Não mostrar erro para o usuário, apenas continuar com dados vazios
+                console.error('❌ Erro ao carregar dados do usuário:', err);
+                setError(`Erro ao carregar dados: ${err.message || 'Erro desconhecido'}`);
+                // Continuar com dados vazios
             } finally {
                 setIsLoadingData(false);
             }
@@ -125,7 +137,7 @@ export const PromptManager: React.FC = () => {
 
     // Auto-save do formData quando muda (debounced)
     useEffect(() => {
-        if (currentPromptId && hasUnsavedChanges && !isLoadingData) {
+        if (hasUnsavedChanges && !isLoadingData) {
             // Limpar timeout anterior
             if (autoSaveTimeoutRef.current) {
                 clearTimeout(autoSaveTimeoutRef.current);
@@ -134,10 +146,24 @@ export const PromptManager: React.FC = () => {
             // Aguardar 3 segundos após a última mudança antes de salvar
             autoSaveTimeoutRef.current = setTimeout(async () => {
                 try {
-                    await createPrompt(formData, `Prompt ${new Date().toLocaleDateString('pt-BR')}`);
+                    let promptId = currentPromptId;
+                    
+                    if (!promptId) {
+                        // Criar novo prompt se não existe
+                        const newPrompt = await createPrompt(formData, `Prompt ${new Date().toLocaleDateString('pt-BR')}`);
+                        promptId = newPrompt.id;
+                        setCurrentPromptId(promptId);
+                        console.log('✅ Novo prompt criado no auto-save:', promptId);
+                    } else {
+                        // Atualizar prompt existente (criar novo registro)
+                        await createPrompt(formData, `Prompt ${new Date().toLocaleDateString('pt-BR')}`);
+                        console.log('✅ Prompt atualizado no auto-save:', promptId);
+                    }
+                    
                     setHasUnsavedChanges(false);
-                } catch (err) {
-                    console.error('Erro no auto-save:', err);
+                } catch (err: any) {
+                    console.error('❌ Erro no auto-save:', err);
+                    // Não mostrar erro para o usuário no auto-save
                 }
             }, 3000);
         }
@@ -298,33 +324,44 @@ export const PromptManager: React.FC = () => {
         setIsLoading(true);
         setError(null);
         try {
-            // Salvar ou atualizar prompt no banco
+            // Salvar ou criar prompt no banco
             let promptId = currentPromptId;
             if (!promptId) {
                 // Criar novo prompt
+                console.log('📝 Criando novo prompt no banco...');
                 const newPrompt = await createPrompt(formData);
                 promptId = newPrompt.id;
                 setCurrentPromptId(promptId);
+                console.log('✅ Novo prompt criado:', promptId);
             } else {
-                // Atualizar prompt existente
+                // Criar novo registro de prompt (histórico)
+                console.log('📝 Atualizando prompt no banco:', promptId);
                 await createPrompt(formData, `Prompt ${new Date().toLocaleDateString('pt-BR')}`);
+                console.log('✅ Prompt atualizado');
             }
 
+            console.log('🤖 Gerando conteúdo do prompt...');
             const promptContent = await createFinalPrompt(formData);
             
             // Criar versão no banco
+            console.log('💾 Salvando versão no banco...');
             const newVersion = await createPromptVersion(promptId, {
                 content: promptContent,
                 format: formData.formatoSaida,
                 masterFormat: formData.masterPromptFormat,
                 sourceData: formData,
             });
+            console.log('✅ Versão salva:', newVersion.id);
 
             setVersionHistory(prev => [...prev, newVersion]);
             setActiveVersion(newVersion);
             setHasUnsavedChanges(false);
+            
+            // Reiniciar chat
+            startChat(promptContent);
         } catch (e: any) {
-            setError(e.message || "Ocorreu um erro desconhecido.");
+            console.error('❌ Erro ao gerar prompt:', e);
+            setError(e.message || "Ocorreu um erro desconhecido. Verifique o console para mais detalhes.");
         } finally {
             setIsLoading(false);
         }
@@ -624,33 +661,55 @@ export const PromptManager: React.FC = () => {
     };
 
 
-    const loadExternalPrompt = (content: string, sourceName: string) => {
-        // Tenta detectar se é JSON
-        let detectedMasterFormat: 'markdown' | 'json' = 'markdown';
+    const loadExternalPrompt = async (content: string, sourceName: string) => {
         try {
-            JSON.parse(content);
-            detectedMasterFormat = 'json';
-        } catch (e) {}
+            // Tenta detectar se é JSON
+            let detectedMasterFormat: 'markdown' | 'json' = 'markdown';
+            try {
+                JSON.parse(content);
+                detectedMasterFormat = 'json';
+            } catch (e) {}
 
-        const importedSourceData: PromptData = {
-            ...INITIAL_PROMPT_DATA,
-            persona: sourceName,
-            objetivo: 'Prompt importado externamente.',
-            contexto: `Conteúdo carregado via ${sourceName}.`,
-            masterPromptFormat: detectedMasterFormat
-        };
+            const importedSourceData: PromptData = {
+                ...INITIAL_PROMPT_DATA,
+                persona: sourceName,
+                objetivo: 'Prompt importado externamente.',
+                contexto: `Conteúdo carregado via ${sourceName}.`,
+                masterPromptFormat: detectedMasterFormat
+            };
 
-        const newVersion: PromptVersion = {
-            id: crypto.randomUUID(),
-            version: versionHistory.length + 1,
-            content: content,
-            format: 'markdown', // Assume formato de saída padrão se desconhecido
-            masterFormat: detectedMasterFormat,
-            timestamp: new Date().toLocaleString('pt-BR'),
-            sourceData: importedSourceData
-        };
-        setVersionHistory(prev => [...prev, newVersion]);
-        setActiveVersion(newVersion);
+            // Atualizar formData
+            setFormData(importedSourceData);
+            
+            // Salvar prompt no banco se não existir
+            let promptId = currentPromptId;
+            if (!promptId) {
+                const newPrompt = await createPrompt(importedSourceData, sourceName);
+                promptId = newPrompt.id;
+                setCurrentPromptId(promptId);
+            } else {
+                // Atualizar prompt existente
+                await createPrompt(importedSourceData, `Prompt Importado - ${new Date().toLocaleDateString('pt-BR')}`);
+            }
+
+            // Criar versão no banco
+            const newVersion = await createPromptVersion(promptId, {
+                content: content,
+                format: 'markdown',
+                masterFormat: detectedMasterFormat,
+                sourceData: importedSourceData,
+            });
+
+            setVersionHistory(prev => [...prev, newVersion]);
+            setActiveVersion(newVersion);
+            setHasUnsavedChanges(false);
+            
+            // Reiniciar chat com o novo prompt
+            startChat(content);
+        } catch (err: any) {
+            console.error('Erro ao carregar prompt externo:', err);
+            setError(err.message || 'Erro ao importar prompt. Verifique o console para mais detalhes.');
+        }
     };
 
     const handleImportClick = () => fileInputRef.current?.click();
@@ -659,9 +718,9 @@ export const PromptManager: React.FC = () => {
         const file = event.target.files?.[0];
         if (!file) return;
         const reader = new FileReader();
-        reader.onload = (e) => {
+        reader.onload = async (e) => {
             const content = e.target?.result as string;
-            if (content) loadExternalPrompt(content, 'Arquivo Importado');
+            if (content) await loadExternalPrompt(content, 'Arquivo Importado');
         };
         reader.onerror = (e) => setError("Falha ao ler o arquivo.");
         reader.readAsText(file);
@@ -669,7 +728,9 @@ export const PromptManager: React.FC = () => {
     };
 
     const handlePasteClick = () => setIsPasteModalOpen(true);
-    const handlePasteConfirm = (text: string) => loadExternalPrompt(text, 'Prompt Colado');
+    const handlePasteConfirm = async (text: string) => {
+        await loadExternalPrompt(text, 'Prompt Colado');
+    };
 
     const isUIBlocked = isLoading || isOptimizing;
 
