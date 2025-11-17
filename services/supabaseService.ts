@@ -129,7 +129,8 @@ export async function signIn(data: SignInData) {
     });
 
     if (error) {
-      console.error('❌ Erro ao fazer login:', error);
+      // Não fazer console.error aqui para evitar poluir o console
+      // O componente que chama deve tratar e exibir o erro
       throw error;
     }
 
@@ -158,7 +159,8 @@ export async function signIn(data: SignInData) {
 
     return { data: authData, error: null };
   } catch (err: any) {
-    console.error('❌ Erro ao fazer login:', err);
+    // Apenas retornar erro, não fazer console.error aqui
+    // O componente que chama deve tratar o erro
     return { data: null, error: err };
   }
 }
