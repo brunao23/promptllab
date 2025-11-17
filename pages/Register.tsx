@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { signUp, supabase } from '../services/supabaseService';
+import { signUp, resendConfirmationEmail, supabase } from '../services/supabaseService';
 import { 
   validateEmail, 
   validatePassword, 
@@ -194,6 +194,9 @@ export const Register: React.FC = () => {
             password: '',
             confirmPassword: ''
           });
+          
+          // Salvar email para permitir reenvio
+          setSavedEmail(sanitizedEmail);
         }
       } else {
         // Caso raro onde não há user retornado mas também não há erro
@@ -243,6 +246,32 @@ export const Register: React.FC = () => {
             {success && (
               <div className="bg-green-900/30 border border-green-700/50 rounded-lg p-4 text-green-200 text-sm whitespace-pre-line">
                 {success}
+                {savedEmail && (
+                  <div className="mt-4 pt-4 border-t border-green-700/50">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        setIsResending(true);
+                        setError(null);
+                        const result = await resendConfirmationEmail(savedEmail);
+                        if (result.error) {
+                          setError('Erro ao reenviar email: ' + (result.error.message || 'Tente novamente mais tarde.'));
+                        } else {
+                          setSuccess(
+                            '✅ Email de confirmação reenviado com sucesso!\n\n' +
+                            '📧 Verifique sua caixa de entrada e pasta de spam.\n\n' +
+                            'Se ainda não receber, verifique as configurações do Supabase.'
+                          );
+                        }
+                        setIsResending(false);
+                      }}
+                      disabled={isResending}
+                      className="w-full mt-2 py-2 px-4 bg-cyan-600 hover:bg-cyan-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-all text-sm"
+                    >
+                      {isResending ? 'Reenviando...' : '📧 Reenviar Email de Confirmação'}
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 

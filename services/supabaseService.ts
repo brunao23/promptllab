@@ -164,6 +164,32 @@ export async function signIn(data: SignInData) {
 }
 
 /**
+ * Reenvia email de confirmação
+ */
+export async function resendConfirmationEmail(email: string) {
+  try {
+    const { data, error } = await supabase.auth.resend({
+      type: 'signup',
+      email: email,
+      options: {
+        emailRedirectTo: 'https://labprompt.com.br/auth/callback',
+      },
+    });
+
+    if (error) {
+      console.error('❌ Erro ao reenviar email de confirmação:', error);
+      throw error;
+    }
+
+    console.log('✅ Email de confirmação reenviado com sucesso');
+    return { data, error: null };
+  } catch (err: any) {
+    console.error('❌ Erro ao reenviar email de confirmação:', err);
+    return { data: null, error: err };
+  }
+}
+
+/**
  * Faz logout do usuário atual
  */
 export async function signOut() {
