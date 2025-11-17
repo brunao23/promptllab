@@ -329,15 +329,29 @@ export const PromptManager: React.FC = () => {
             if (!promptId) {
                 // Criar novo prompt
                 console.log('📝 Criando novo prompt no banco...');
-                const newPrompt = await createPrompt(formData);
-                promptId = newPrompt.id;
-                setCurrentPromptId(promptId);
-                console.log('✅ Novo prompt criado:', promptId);
+                try {
+                    const newPrompt = await createPrompt(formData);
+                    promptId = newPrompt.id;
+                    setCurrentPromptId(promptId);
+                    console.log('✅ Novo prompt criado:', promptId);
+                } catch (promptError: any) {
+                    console.error('❌ ERRO ao criar prompt:', promptError);
+                    setError(`Erro ao salvar prompt no banco: ${promptError.message || 'Erro desconhecido'}. Verifique o console para mais detalhes.`);
+                    setIsLoading(false);
+                    return;
+                }
             } else {
                 // Criar novo registro de prompt (histórico)
                 console.log('📝 Atualizando prompt no banco:', promptId);
-                await createPrompt(formData, `Prompt ${new Date().toLocaleDateString('pt-BR')}`);
-                console.log('✅ Prompt atualizado');
+                try {
+                    await createPrompt(formData, `Prompt ${new Date().toLocaleDateString('pt-BR')}`);
+                    console.log('✅ Prompt atualizado');
+                } catch (promptError: any) {
+                    console.error('❌ ERRO ao atualizar prompt:', promptError);
+                    setError(`Erro ao atualizar prompt no banco: ${promptError.message || 'Erro desconhecido'}. Verifique o console para mais detalhes.`);
+                    setIsLoading(false);
+                    return;
+                }
             }
 
             console.log('🤖 Gerando conteúdo do prompt...');
@@ -345,13 +359,21 @@ export const PromptManager: React.FC = () => {
             
             // Criar versão no banco
             console.log('💾 Salvando versão no banco...');
-            const newVersion = await createPromptVersion(promptId, {
-                content: promptContent,
-                format: formData.formatoSaida,
-                masterFormat: formData.masterPromptFormat,
-                sourceData: formData,
-            });
-            console.log('✅ Versão salva:', newVersion.id);
+            let newVersion: PromptVersion;
+            try {
+                newVersion = await createPromptVersion(promptId, {
+                    content: promptContent,
+                    format: formData.formatoSaida,
+                    masterFormat: formData.masterPromptFormat,
+                    sourceData: formData,
+                });
+                console.log('✅ Versão salva:', newVersion.id);
+            } catch (versionError: any) {
+                console.error('❌ ERRO ao salvar versão:', versionError);
+                setError(`Erro ao salvar versão no banco: ${versionError.message || 'Erro desconhecido'}. Verifique o console para mais detalhes.`);
+                setIsLoading(false);
+                return;
+            }
 
             setVersionHistory(prev => [...prev, newVersion]);
             setActiveVersion(newVersion);

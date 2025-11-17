@@ -278,6 +278,13 @@ export async function createPrompt(promptData: PromptData, title?: string) {
     throw new Error('Tamanho do prompt deve estar entre 500 e 100000 caracteres');
   }
 
+  console.log('💾 Tentando salvar prompt no banco...', {
+    user_id: user.id,
+    title: sanitizedTitle.substring(0, 50),
+    hasPersona: !!personaValidation.sanitized,
+    hasObjetivo: !!objetivoValidation.sanitized,
+  });
+
   const { data, error } = await supabase
     .from('prompts')
     .insert({
@@ -296,14 +303,24 @@ export async function createPrompt(promptData: PromptData, title?: string) {
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    console.error('❌ ERRO ao salvar prompt no banco:', {
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code,
+    });
+    throw error;
+  }
+
+  console.log('✅ Prompt salvo com sucesso no banco:', data.id);
 
   // Criar relacionamentos (exemplos, variáveis, ferramentas, fluxos)
   const promptId = data.id;
 
   // Few-shot examples
   if (promptData.exemplos.length > 0) {
-    await supabase.from('few_shot_examples').insert(
+    const { error: examplesError } = await supabase.from('few_shot_examples').insert(
       promptData.exemplos.map((ex, index) => ({
         prompt_id: promptId,
         user_text: ex.user,
@@ -311,11 +328,16 @@ export async function createPrompt(promptData: PromptData, title?: string) {
         order_index: index,
       }))
     );
+    if (examplesError) {
+      console.error('❌ Erro ao salvar exemplos:', examplesError);
+      throw examplesError;
+    }
+    console.log('✅ Exemplos salvos:', promptData.exemplos.length);
   }
 
   // Variáveis dinâmicas
   if (promptData.variaveisDinamicas.length > 0) {
-    await supabase.from('variaveis_dinamicas').insert(
+    const { error: variaveisError } = await supabase.from('variaveis_dinamicas').insert(
       promptData.variaveisDinamicas.map((v, index) => ({
         prompt_id: promptId,
         chave: v.chave,
@@ -323,11 +345,16 @@ export async function createPrompt(promptData: PromptData, title?: string) {
         order_index: index,
       }))
     );
+    if (variaveisError) {
+      console.error('❌ Erro ao salvar variáveis:', variaveisError);
+      throw variaveisError;
+    }
+    console.log('✅ Variáveis salvas:', promptData.variaveisDinamicas.length);
   }
 
   // Ferramentas
   if (promptData.ferramentas.length > 0) {
-    await supabase.from('ferramentas').insert(
+    const { error: ferramentasError } = await supabase.from('ferramentas').insert(
       promptData.ferramentas.map((f, index) => ({
         prompt_id: promptId,
         nome: f.nome,
@@ -335,11 +362,16 @@ export async function createPrompt(promptData: PromptData, title?: string) {
         order_index: index,
       }))
     );
+    if (ferramentasError) {
+      console.error('❌ Erro ao salvar ferramentas:', ferramentasError);
+      throw ferramentasError;
+    }
+    console.log('✅ Ferramentas salvas:', promptData.ferramentas.length);
   }
 
   // Fluxos
   if (promptData.fluxos.length > 0) {
-    await supabase.from('fluxos').insert(
+    const { error: fluxosError } = await supabase.from('fluxos').insert(
       promptData.fluxos.map((f, index) => ({
         prompt_id: promptId,
         nome: f.nome,
@@ -352,6 +384,11 @@ export async function createPrompt(promptData: PromptData, title?: string) {
         order_index: index,
       }))
     );
+    if (fluxosError) {
+      console.error('❌ Erro ao salvar fluxos:', fluxosError);
+      throw fluxosError;
+    }
+    console.log('✅ Fluxos salvos:', promptData.fluxos.length);
   }
 
   return data;
@@ -488,6 +525,12 @@ export async function createPromptVersion(
 
   const nextVersionNumber = lastVersion ? lastVersion.version_number + 1 : 1;
 
+  console.log('💾 Tentando salvar versão no banco...', {
+    prompt_id: promptId,
+    version_number: nextVersionNumber,
+    content_length: contentValidation.sanitized?.length || 0,
+  });
+
   const { data, error } = await supabase
     .from('prompt_versions')
     .insert({
@@ -501,7 +544,17 @@ export async function createPromptVersion(
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    console.error('❌ ERRO ao salvar versão no banco:', {
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code,
+    });
+    throw error;
+  }
+
+  console.log('✅ Versão salva com sucesso no banco:', data.id);
 
   // Converter para formato PromptVersion
   const promptVersion: PromptVersion = {
