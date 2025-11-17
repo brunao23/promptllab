@@ -153,9 +153,9 @@ export const PromptManager: React.FC = () => {
                             
                             setActiveVersion(latestVersion);
                             console.log('✅ Versão ativa definida no estado');
-                        
-                        // Carregar mensagens de chat da versão ativa ANTES de inicializar o chat
-                        try {
+                            
+                            // Carregar mensagens de chat da versão ativa ANTES de inicializar o chat
+                            try {
                             console.log('💬 Carregando mensagens de chat da versão:', latestVersion.id);
                             const messages = await getChatMessages(latestVersion.id);
                             console.log('✅ Mensagens de chat carregadas:', messages?.length || 0);
