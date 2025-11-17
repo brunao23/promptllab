@@ -158,11 +158,21 @@ export const PromptManager: React.FC = () => {
                             
                             // DEFINIR versão ativa ANTES de carregar mensagens
                             console.log('💾 DEFININDO versão ativa no estado...');
-                            setActiveVersion(latestVersion);
+                            console.log('💾 Versão a ser definida:', JSON.stringify({ 
+                                id: latestVersion.id, 
+                                version: latestVersion.version,
+                                hasContent: !!latestVersion.content,
+                                contentLength: latestVersion.content?.length || 0,
+                            }, null, 2));
+                            setActiveVersion({ ...latestVersion }); // Usar spread para garantir nova referência
                             console.log('✅ Versão ativa definida no estado com sucesso');
                             
                             // CRÍTICO: Aguardar um pouco para garantir que o estado foi atualizado
-                            await new Promise(resolve => setTimeout(resolve, 100));
+                            // E forçar re-renderização dos componentes
+                            await new Promise(resolve => setTimeout(resolve, 200));
+                            
+                            // Verificar se o estado foi atualizado (será verificado no próximo render)
+                            console.log('🔍 Aguardando atualização do estado...');
                             
                             // Carregar mensagens de chat da versão ativa ANTES de inicializar o chat
                             try {
@@ -180,7 +190,8 @@ export const PromptManager: React.FC = () => {
                                     messages.forEach((msg, idx) => {
                                         console.log(`  [${idx}] ${msg.author}: ${msg.text?.substring(0, 50) || 'VAZIO'}...`);
                                     });
-                                    setChatMessages(messages);
+                                    console.log('💬 Definindo mensagens no estado...');
+                                    setChatMessages([...messages]); // Usar spread para garantir nova referência
                                     console.log('💬 Histórico de chat restaurado com sucesso no estado');
                                 } else {
                                     console.log('ℹ️ Nenhuma mensagem de chat encontrada para esta versão');
@@ -286,14 +297,40 @@ export const PromptManager: React.FC = () => {
     // Debug: Log quando versionHistory muda
     useEffect(() => {
         if (versionHistory.length > 0) {
-            console.log('📊 Histórico de versões atualizado:', {
+            console.log('📊 Histórico de versões atualizado no React:', {
                 total: versionHistory.length,
                 versoes: versionHistory.map(v => `v${v.version} (${v.id})`).join(', '),
             });
         } else {
-            console.log('📊 Histórico de versões está vazio');
+            console.log('📊 Histórico de versões está vazio no React');
         }
     }, [versionHistory]);
+
+    // Debug: Log quando activeVersion muda
+    useEffect(() => {
+        if (activeVersion) {
+            console.log('🎯 Versão ativa atualizada no React:', {
+                id: activeVersion.id,
+                version: activeVersion.version,
+                hasContent: !!activeVersion.content,
+                contentLength: activeVersion.content?.length || 0,
+            });
+        } else {
+            console.log('🎯 Versão ativa está null no React');
+        }
+    }, [activeVersion]);
+
+    // Debug: Log quando chatMessages muda
+    useEffect(() => {
+        if (chatMessages.length > 0) {
+            console.log('💬 Mensagens de chat atualizadas no React:', {
+                total: chatMessages.length,
+                mensagens: chatMessages.map(m => `${m.author}: ${m.text.substring(0, 30)}...`).join(', '),
+            });
+        } else {
+            console.log('💬 Mensagens de chat estão vazias no React');
+        }
+    }, [chatMessages]);
 
     // Auto-save do formData quando muda (debounced)
     useEffect(() => {
