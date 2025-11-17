@@ -9,17 +9,46 @@ import type { PromptData, PromptVersion, ChatMessage, FewShotExample, VariavelDi
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
+// Validação mais rigorosa das variáveis de ambiente
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('Variáveis de ambiente do Supabase não configuradas!');
-  console.error('Configure VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY no arquivo .env');
+  const errorMsg = '❌ ERRO: Variáveis de ambiente do Supabase não configuradas!\n' +
+    'Configure VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY no arquivo .env ou nas variáveis de ambiente da Vercel.\n' +
+    `URL atual: ${supabaseUrl || 'VAZIO'}\n` +
+    `Key atual: ${supabaseAnonKey ? supabaseAnonKey.substring(0, 20) + '...' : 'VAZIO'}`;
+  
+  console.error(errorMsg);
+  
+  // Em produção, não queremos quebrar a aplicação completamente
+  // Mas vamos criar um cliente com valores vazios para que os erros apareçam claramente
+  if (import.meta.env.PROD) {
+    console.error('⚠️ Aplicação em produção sem configuração do Supabase!');
+  }
 }
 
-export const supabase: SupabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-  },
-});
+// Criar cliente Supabase
+// Mesmo sem variáveis válidas, criamos o cliente para que os erros sejam claros nas chamadas
+export const supabase: SupabaseClient = createClient(
+  supabaseUrl || 'https://placeholder.supabase.co',
+  supabaseAnonKey || 'placeholder-key',
+  {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+    },
+  }
+);
+
+// Verificar se as credenciais são válidas ao inicializar
+if (supabaseUrl && supabaseAnonKey) {
+  console.log('✅ Supabase configurado:', {
+    url: supabaseUrl,
+    hasKey: !!supabaseAnonKey,
+  });
+} else {
+  console.warn('⚠️ Supabase não configurado corretamente. A autenticação pode falhar.');
+}
 
 // =====================================================
 // AUTENTICAÇÃO
