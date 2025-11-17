@@ -662,14 +662,33 @@ export async function getPromptVersions(promptId: string) {
     throw new Error('ID de prompt inválido');
   }
 
-  console.log('🔍 Buscando versões no banco para prompt_id:', promptId, 'user_id:', user.id);
+  console.log('🔍 [getPromptVersions] Buscando versões no banco para prompt_id:', promptId, 'user_id:', user.id);
   
-  // Primeiro verificar se o prompt pertence ao usuário
+  // Primeiro, verificar se existe profile para este usuário
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('id', user.id)
+    .single();
+
+  if (profileError) {
+    console.error('❌ [getPromptVersions] Erro ao verificar profile:', profileError);
+    throw profileError;
+  }
+
+  if (!profile) {
+    console.error('❌ [getPromptVersions] Profile não encontrado para user_id:', user.id);
+    throw new Error('Perfil do usuário não encontrado');
+  }
+
+  console.log('✅ [getPromptVersions] Profile encontrado:', profile.id);
+  
+  // Verificar se o prompt pertence ao usuário usando profile.id
   const { data: promptCheck, error: promptCheckError } = await supabase
     .from('prompts')
     .select('id')
     .eq('id', promptId)
-    .eq('user_id', user.id)
+    .eq('user_id', profile.id) // CRÍTICO: usar profile.id
     .single();
 
   if (promptCheckError) {
