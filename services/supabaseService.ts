@@ -278,8 +278,27 @@ export async function createPrompt(promptData: PromptData, title?: string) {
     throw new Error('Tamanho do prompt deve estar entre 500 e 100000 caracteres');
   }
 
-  console.log('💾 Tentando salvar prompt no banco...', {
-    user_id: user.id,
+  // Primeiro, verificar se existe profile para este usuário
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('id', user.id)
+    .single();
+
+  if (profileError) {
+    console.error('❌ [createPrompt] Erro ao verificar profile:', profileError);
+    throw profileError;
+  }
+
+  if (!profile) {
+    console.error('❌ [createPrompt] Profile não encontrado para user_id:', user.id);
+    throw new Error('Perfil do usuário não encontrado. Por favor, faça logout e login novamente.');
+  }
+
+  console.log('✅ [createPrompt] Profile encontrado:', profile.id);
+
+  console.log('💾 [createPrompt] Tentando salvar prompt no banco...', {
+    user_id: profile.id, // Usar profile.id
     title: sanitizedTitle.substring(0, 50),
     hasPersona: !!personaValidation.sanitized,
     hasObjetivo: !!objetivoValidation.sanitized,
@@ -288,7 +307,7 @@ export async function createPrompt(promptData: PromptData, title?: string) {
   const { data, error } = await supabase
     .from('prompts')
     .insert({
-      user_id: user.id,
+      user_id: profile.id, // CRÍTICO: usar profile.id, não user.id diretamente
       title: sanitizedTitle,
       persona: personaValidation.sanitized || '',
       objetivo: objetivoValidation.sanitized || '',
@@ -781,14 +800,33 @@ export async function getChatMessages(promptVersionId: string) {
     throw new Error('ID de versão de prompt inválido');
   }
 
-  console.log('🔍 Buscando mensagens de chat para versão:', promptVersionId, 'user_id:', user.id);
+  console.log('🔍 [getChatMessages] Buscando mensagens de chat para versão:', promptVersionId, 'user_id:', user.id);
   
-  // Primeiro verificar se a versão pertence a um prompt do usuário
+  // Primeiro, verificar se existe profile para este usuário
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('id', user.id)
+    .single();
+
+  if (profileError) {
+    console.error('❌ [getChatMessages] Erro ao verificar profile:', profileError);
+    throw profileError;
+  }
+
+  if (!profile) {
+    console.error('❌ [getChatMessages] Profile não encontrado para user_id:', user.id);
+    throw new Error('Perfil do usuário não encontrado');
+  }
+
+  console.log('✅ [getChatMessages] Profile encontrado:', profile.id);
+  
+  // Verificar se a versão pertence a um prompt do usuário usando profile.id
   const { data: versionCheck, error: versionCheckError } = await supabase
     .from('prompt_versions')
     .select('prompt_id, prompts!inner(user_id)')
     .eq('id', promptVersionId)
-    .eq('prompts.user_id', user.id)
+    .eq('prompts.user_id', profile.id) // CRÍTICO: usar profile.id
     .single();
 
   if (versionCheckError) {
