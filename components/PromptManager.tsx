@@ -96,15 +96,22 @@ export const PromptManager: React.FC = () => {
                     console.log('📋 Carregando prompt mais recente:', latestPrompt.id, latestPrompt.title);
                     setCurrentPromptId(latestPrompt.id);
                     
-                    // Carregar dados do prompt
+                    // Carregar dados completos do prompt (incluindo relacionamentos)
                     console.log('📝 Carregando dados completos do prompt...');
                     const { promptData } = await getPrompt(latestPrompt.id);
                     console.log('✅ Dados do prompt carregados:', {
                         hasPersona: !!promptData.persona,
+                        persona: promptData.persona?.substring(0, 50) + '...',
                         hasObjetivo: !!promptData.objetivo,
+                        objetivo: promptData.objetivo?.substring(0, 50) + '...',
                         exemplos: promptData.exemplos.length,
+                        variaveis: promptData.variaveisDinamicas.length,
+                        ferramentas: promptData.ferramentas.length,
+                        fluxos: promptData.fluxos.length,
                     });
+                    console.log('💾 Definindo formData completo no estado...');
                     setFormData(promptData);
+                    console.log('✅ FormData definido no estado com sucesso');
                     
                     // Carregar TODAS as versões do prompt
                     console.log('📜 Carregando TODAS as versões do prompt...');
