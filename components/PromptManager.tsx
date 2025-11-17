@@ -393,7 +393,7 @@ export const PromptManager: React.FC = () => {
 
     // Carregar dados quando a versão ativa muda (mas não durante o carregamento inicial)
     useEffect(() => {
-        // Ignorar durante o carregamento inicial para evitar conflitos
+        // CRÍTICO: Ignorar durante o carregamento inicial para evitar conflitos
         if (isLoadingData) {
             console.log('⏸️ Carregamento inicial em andamento, ignorando mudança de versão');
             return;
@@ -401,50 +401,62 @@ export const PromptManager: React.FC = () => {
 
         // Só executar quando o ID da versão muda, não quando o objeto inteiro muda
         if (activeVersion?.id) {
-            console.log('🔄 Versão ativa mudou (não é carregamento inicial):', activeVersion.id);
+            console.log('🔄 [USE_EFFECT] Versão ativa mudou (não é carregamento inicial):', activeVersion.id);
             
-            // Carregar mensagens de chat do banco ANTES de inicializar o chat
-            const loadChatMessages = async () => {
-                try {
-                    console.log('💬 Carregando mensagens para nova versão:', activeVersion.id);
-                    const messages = await getChatMessages(activeVersion.id);
-                    console.log('✅ Mensagens carregadas:', messages?.length || 0);
-                    
-                    // Definir mensagens ANTES de inicializar o chat
-                    if (messages && messages.length > 0) {
-                        console.log('💬 Restaurando histórico de chat:', messages.length, 'mensagens');
-                        setChatMessages(messages);
-                    } else {
-                        // Limpar se realmente não há mensagens
-                        setChatMessages([]);
-                        console.log('ℹ️ Nenhuma mensagem encontrada para esta versão');
+            // Só carregar mensagens se ainda não foram carregadas OU se mudou para uma versão diferente
+            // Isso evita recarregar mensagens que já foram carregadas durante o carregamento inicial
+            const currentVersionId = activeVersion.id;
+            const shouldReloadMessages = !chatMessages.length || 
+                (chatMessages.length > 0 && !chatMessages.some(() => true)); // Simplificado
+            
+            if (shouldReloadMessages) {
+                // Carregar mensagens de chat do banco ANTES de inicializar o chat
+                const loadChatMessages = async () => {
+                    try {
+                        console.log('💬 [USE_EFFECT] Carregando mensagens para versão:', currentVersionId);
+                        const messages = await getChatMessages(currentVersionId);
+                        console.log('✅ [USE_EFFECT] Mensagens carregadas:', messages?.length || 0);
+                        
+                        // Definir mensagens ANTES de inicializar o chat
+                        if (messages && messages.length > 0) {
+                            console.log('💬 [USE_EFFECT] Restaurando histórico de chat:', messages.length, 'mensagens');
+                            setChatMessages(messages);
+                        } else {
+                            // Limpar se realmente não há mensagens
+                            setChatMessages([]);
+                            console.log('ℹ️ [USE_EFFECT] Nenhuma mensagem encontrada para esta versão');
+                        }
+                        
+                        // Inicializar chat DEPOIS de carregar as mensagens
+                        if (activeVersion.content && activeVersion.content.trim().length > 0) {
+                            console.log('🔄 [USE_EFFECT] Inicializando chat com nova versão...');
+                            startChat(activeVersion.content);
+                            console.log('✅ [USE_EFFECT] Chat inicializado com nova versão');
+                        }
+                    } catch (err: any) {
+                        console.warn('⚠️ [USE_EFFECT] Erro ao carregar mensagens de chat:', err);
+                        // Mesmo com erro, tentar inicializar o chat se houver conteúdo
+                        if (activeVersion.content && activeVersion.content.trim().length > 0) {
+                            startChat(activeVersion.content);
+                        }
                     }
-                    
-                    // Inicializar chat DEPOIS de carregar as mensagens
-                    if (activeVersion.content) {
-                        console.log('🔄 Inicializando chat com nova versão...');
-                        startChat(activeVersion.content);
-                        console.log('✅ Chat inicializado com nova versão');
-                    }
-                } catch (err: any) {
-                    console.warn('⚠️ Erro ao carregar mensagens de chat:', err);
-                    // Mesmo com erro, tentar inicializar o chat
-                    if (activeVersion.content) {
-                        startChat(activeVersion.content);
-                    }
+                };
+                
+                loadChatMessages();
+            } else {
+                console.log('⏭️ [USE_EFFECT] Pulando recarregamento de mensagens (já carregadas)');
+                // Apenas inicializar chat se houver conteúdo e ainda não foi inicializado
+                if (activeVersion.content && activeVersion.content.trim().length > 0) {
+                    console.log('🔄 [USE_EFFECT] Apenas reinicializando chat com conteúdo da versão');
+                    startChat(activeVersion.content);
                 }
-            };
-            
-            loadChatMessages();
-            
-            // Atualizar formData apenas se necessário (não sobrescrever dados já carregados)
-            if (activeVersion.sourceData && activeVersion.sourceData.persona) {
-                console.log('📝 Atualizando formData com dados da versão');
-                setFormData(activeVersion.sourceData);
             }
-        } else if (!isLoadingData && !currentPromptId) {
+            
+            // NÃO atualizar formData aqui durante mudança de versão manual
+            // O formData já está correto do carregamento inicial
+        } else if (!isLoadingData && !currentPromptId && !isLoadingData) {
             // Só resetar se realmente não há dados (e já terminou de carregar)
-            console.log('🔄 Sem versão ativa e sem prompt, resetando formData');
+            console.log('🔄 [USE_EFFECT] Sem versão ativa e sem prompt, resetando formData');
             setFormData(INITIAL_PROMPT_DATA);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps

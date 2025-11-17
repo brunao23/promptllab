@@ -23,6 +23,14 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
     onSaveCorrection,
     onDownloadChat 
 }) => {
+    // Debug: Log quando props mudam
+    React.useEffect(() => {
+        console.log('💬 [ChatInterface] Props atualizadas:', {
+            messagesCount: messages?.length || 0,
+            disabled: disabled,
+            isLoading: isLoading,
+        });
+    }, [messages, disabled, isLoading]);
     const [input, setInput] = useState('');
     const [editingText, setEditingText] = useState('');
     const [isDownloadOpen, setIsDownloadOpen] = useState(false);

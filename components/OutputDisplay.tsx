@@ -23,6 +23,16 @@ const fileExtensions: Record<OutputFormat, string> = {
 export const OutputDisplay: React.FC<OutputDisplayProps> = ({ version, isLoading, error, isValidated, onValidate, onExplain }) => {
   const [copySuccess, setCopySuccess] = useState('');
 
+  // Debug: Log quando version muda
+  React.useEffect(() => {
+    console.log('📄 [OutputDisplay] Versão recebida:', {
+      hasVersion: !!version,
+      hasId: !!version?.id,
+      hasContent: !!version?.content,
+      contentLength: version?.content?.length || 0,
+    });
+  }, [version]);
+
   // O prompt sempre é texto/markdown, independentemente do formato de saída alvo.
   const formattedContent = version?.content || '';
 

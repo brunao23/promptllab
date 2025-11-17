@@ -20,6 +20,15 @@ export const PromptOptimizer: React.FC<PromptOptimizerProps> = ({
     manualInstructions,
     onManualInstructionsChange
 }) => {
+    // Debug: Log quando props mudam
+    React.useEffect(() => {
+        console.log('🔧 [PromptOptimizer] Props atualizadas:', {
+            disabled: disabled,
+            isLoading: isLoading,
+            hasOptimizationPairs: optimizationPairs.length > 0,
+        });
+    }, [disabled, isLoading, optimizationPairs]);
+
     const hasCorrections = optimizationPairs.length > 0;
     const hasInstructions = manualInstructions.trim().length > 0;
     const canOptimize = (hasCorrections || hasInstructions) && !disabled && !isLoading;
