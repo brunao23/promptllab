@@ -257,6 +257,7 @@ export const Register: React.FC = () => {
                 value={formData.name}
                 onChange={handleChange}
                 required
+                autoComplete="name"
                 className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition-all"
                 placeholder="João Silva"
               />
@@ -273,6 +274,7 @@ export const Register: React.FC = () => {
                 value={formData.email}
                 onChange={handleChange}
                 required
+                autoComplete="email"
                 className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition-all"
                 placeholder="seu@email.com"
               />
@@ -289,9 +291,10 @@ export const Register: React.FC = () => {
                 value={formData.password}
                 onChange={handleChange}
                 required
-                minLength={6}
+                minLength={8}
+                autoComplete="new-password"
                 className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition-all"
-                placeholder="Mínimo 6 caracteres"
+                placeholder="Mínimo 8 caracteres"
               />
             </div>
 
@@ -306,7 +309,8 @@ export const Register: React.FC = () => {
                 value={formData.confirmPassword}
                 onChange={handleChange}
                 required
-                minLength={6}
+                minLength={8}
+                autoComplete="new-password"
                 className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition-all"
                 placeholder="Digite a senha novamente"
               />
