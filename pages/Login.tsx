@@ -118,6 +118,7 @@ export const Login: React.FC = () => {
         } else {
           setError(`Erro ao fazer login: ${authError.message || 'Por favor, verifique suas credenciais e tente novamente.'}`);
         }
+        // Não fazer console.error aqui, apenas mostrar erro para o usuário
         setIsLoading(false);
         return;
       }
