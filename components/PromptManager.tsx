@@ -84,44 +84,78 @@ export const PromptManager: React.FC = () => {
                 if (prompts && prompts.length > 0) {
                     // Carregar o prompt mais recente
                     const latestPrompt = prompts[0];
-                    console.log('📋 Carregando prompt:', latestPrompt.id);
+                    console.log('📋 Carregando prompt mais recente:', latestPrompt.id, latestPrompt.title);
                     setCurrentPromptId(latestPrompt.id);
                     
                     // Carregar dados do prompt
+                    console.log('📝 Carregando dados completos do prompt...');
                     const { promptData } = await getPrompt(latestPrompt.id);
-                    console.log('✅ Dados do prompt carregados');
+                    console.log('✅ Dados do prompt carregados:', {
+                        hasPersona: !!promptData.persona,
+                        hasObjetivo: !!promptData.objetivo,
+                        exemplos: promptData.exemplos.length,
+                    });
                     setFormData(promptData);
                     
-                    // Carregar versões do prompt
-                    console.log('📜 Carregando versões do prompt...');
+                    // Carregar TODAS as versões do prompt
+                    console.log('📜 Carregando TODAS as versões do prompt...');
                     const versions = await getPromptVersions(latestPrompt.id);
                     console.log('✅ Versões carregadas:', versions?.length || 0);
-                    setVersionHistory(versions);
                     
-                    // Carregar versão ativa (mais recente)
                     if (versions && versions.length > 0) {
+                        console.log('📋 Detalhes das versões:');
+                        versions.forEach((v, idx) => {
+                            console.log(`  v${v.version} - ${v.timestamp} - ID: ${v.id}`);
+                        });
+                        
+                        // Definir histórico completo
+                        setVersionHistory(versions);
+                        
+                        // Carregar versão ativa (mais recente = primeira do array)
                         const latestVersion = versions[0];
-                        console.log('✅ Versão ativa carregada:', latestVersion.id);
+                        console.log('✅ Versão ativa selecionada:', {
+                            id: latestVersion.id,
+                            version: latestVersion.version,
+                            timestamp: latestVersion.timestamp,
+                        });
                         setActiveVersion(latestVersion);
                         
                         // Carregar mensagens de chat da versão ativa
                         try {
-                            console.log('💬 Carregando mensagens de chat...');
+                            console.log('💬 Carregando mensagens de chat da versão:', latestVersion.id);
                             const messages = await getChatMessages(latestVersion.id);
-                            console.log('✅ Mensagens carregadas:', messages?.length || 0);
-                            setChatMessages(messages);
+                            console.log('✅ Mensagens de chat carregadas:', messages?.length || 0);
+                            
+                            if (messages && messages.length > 0) {
+                                setChatMessages(messages);
+                                console.log('💬 Histórico de chat restaurado com sucesso');
+                            } else {
+                                setChatMessages([]);
+                                console.log('ℹ️ Nenhuma mensagem de chat encontrada para esta versão');
+                            }
                             
                             // Reiniciar chat com o prompt da versão ativa
                             if (latestVersion.content) {
                                 startChat(latestVersion.content);
+                                console.log('✅ Chat reiniciado com prompt da versão ativa');
                             }
                         } catch (err: any) {
-                            console.warn('⚠️ Erro ao carregar mensagens de chat:', err);
+                            console.error('❌ Erro ao carregar mensagens de chat:', err);
                             setChatMessages([]);
                         }
+                    } else {
+                        console.warn('⚠️ Prompt encontrado mas sem versões. Criando versão inicial...');
+                        setVersionHistory([]);
+                        setActiveVersion(null);
+                        setChatMessages([]);
                     }
                 } else {
                     console.log('ℹ️ Nenhum prompt encontrado. Usuário pode começar criando um novo.');
+                    // Limpar estados se não há prompts
+                    setCurrentPromptId(null);
+                    setVersionHistory([]);
+                    setActiveVersion(null);
+                    setChatMessages([]);
                 }
             } catch (err: any) {
                 console.error('❌ Erro ao carregar dados do usuário:', err);
@@ -186,24 +220,43 @@ export const PromptManager: React.FC = () => {
     }, []);
 
     useEffect(() => {
-        if (activeVersion) {
+        // Só executar quando o ID da versão muda, não quando o objeto inteiro muda
+        if (activeVersion?.id) {
+            console.log('🔄 Versão ativa mudou:', activeVersion.id);
             startChat(activeVersion.content);
-            // Carregar mensagens de chat do banco
+            
+            // Carregar mensagens de chat do banco apenas se ainda não foram carregadas
+            // ou se mudou para uma versão diferente
             const loadChatMessages = async () => {
                 try {
+                    console.log('💬 Carregando mensagens para versão:', activeVersion.id);
                     const messages = await getChatMessages(activeVersion.id);
-                    setChatMessages(messages);
-                } catch (err) {
-                    console.warn('Erro ao carregar mensagens de chat:', err);
-                    setChatMessages([]);
+                    console.log('✅ Mensagens carregadas:', messages?.length || 0);
+                    
+                    if (messages && messages.length > 0) {
+                        setChatMessages(messages);
+                    } else {
+                        // Só limpar se realmente não há mensagens
+                        setChatMessages([]);
+                    }
+                } catch (err: any) {
+                    console.warn('⚠️ Erro ao carregar mensagens de chat:', err);
+                    // Não limpar mensagens se houve erro, pode ser problema temporário
                 }
             };
+            
             loadChatMessages();
-            setFormData(activeVersion.sourceData);
-        } else {
-             setFormData(INITIAL_PROMPT_DATA);
+            
+            // Atualizar formData apenas se necessário (não sobrescrever dados já carregados)
+            if (activeVersion.sourceData && activeVersion.sourceData.persona) {
+                setFormData(activeVersion.sourceData);
+            }
+        } else if (!isLoadingData && !currentPromptId) {
+            // Só resetar se realmente não há dados (e já terminou de carregar)
+            setFormData(INITIAL_PROMPT_DATA);
         }
-    }, [activeVersion]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeVersion?.id]); // Dependência apenas do ID para evitar loops
     
     const handleAssistantToolCall = (toolCall: any) => {
         const { name, args } = toolCall;
