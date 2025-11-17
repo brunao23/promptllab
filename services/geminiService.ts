@@ -390,9 +390,35 @@ Campos JSON esperados: persona, objetivo, contextoNegocio, contexto, regras (arr
             });
         }, 3, 2000); // 3 tentativas, começando com 2 segundos
         
-        return JSON.parse(response.text) as Partial<PromptData>;
+        // Verificar se a resposta tem texto
+        if (!response || !response.text) {
+            console.error("Resposta vazia ou inválida da API:", response);
+            throw new Error("A API retornou uma resposta vazia. Tente novamente.");
+        }
+        
+        const responseText = response.text.trim();
+        
+        if (!responseText || responseText === 'undefined' || responseText === 'null') {
+            console.error("Texto da resposta está vazio ou inválido:", responseText);
+            throw new Error("A API retornou dados inválidos. Tente novamente.");
+        }
+        
+        // Tentar fazer parse do JSON
+        try {
+            const parsed = JSON.parse(responseText);
+            return parsed as Partial<PromptData>;
+        } catch (parseError: any) {
+            console.error("Erro ao fazer parse do JSON:", parseError);
+            console.error("Texto recebido:", responseText.substring(0, 200));
+            throw new Error("Erro ao processar a resposta da API. O formato retornado é inválido. Tente novamente.");
+        }
     } catch (error: any) {
         console.error("Error analyzing document:", error);
+        
+        // Se já é um erro formatado, apenas propagar
+        if (error?.message && !error?.status && !error?.code) {
+            throw error;
+        }
         
         // Mensagens de erro mais específicas
         if (error?.status === 503 || error?.code === 503 || error?.message?.includes('overloaded') || error?.message?.includes('UNAVAILABLE')) {
@@ -405,7 +431,7 @@ Campos JSON esperados: persona, objetivo, contextoNegocio, contexto, regras (arr
             throw new Error("Erro de autenticação. Verifique sua chave de API do Gemini.");
         } else if (error?.status === 413 || error?.code === 413) {
             throw new Error("Arquivo muito grande. Tente um arquivo menor ou divida o documento.");
-        } else if (error?.message?.includes('JSON')) {
+        } else if (error?.message?.includes('JSON') || error?.message?.includes('parse')) {
             throw new Error("Erro ao processar a resposta da API. Tente novamente.");
         } else {
             throw new Error(error?.message || "Falha ao analisar o documento. Tente novamente mais tarde.");
