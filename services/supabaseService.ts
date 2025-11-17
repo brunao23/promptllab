@@ -119,15 +119,48 @@ export async function signUp(data: SignUpData) {
 
 /**
  * Faz login de um usuário existente
+ * 🔒 SEGURANÇA: Verifica se o email foi confirmado antes de permitir login
  */
 export async function signIn(data: SignInData) {
-  const { data: authData, error } = await supabase.auth.signInWithPassword({
-    email: data.email,
-    password: data.password,
-  });
+  try {
+    const { data: authData, error } = await supabase.auth.signInWithPassword({
+      email: data.email,
+      password: data.password,
+    });
 
-  if (error) throw error;
-  return authData;
+    if (error) {
+      console.error('❌ Erro ao fazer login:', error);
+      throw error;
+    }
+
+    // 🔒 VALIDAÇÃO CRÍTICA: Verificar se o email foi confirmado
+    if (authData?.user) {
+      if (!authData.user.email_confirmed_at && !authData.user.confirmed_at) {
+        // Fazer logout imediatamente para não deixar sessão ativa
+        await supabase.auth.signOut();
+        
+        console.warn('⚠️ Tentativa de login com email não confirmado:', {
+          email: authData.user.email,
+          id: authData.user.id,
+        });
+
+        const emailNotConfirmedError = new Error('Email not confirmed');
+        (emailNotConfirmedError as any).status = 401;
+        throw emailNotConfirmedError;
+      }
+
+      console.log('✅ Login bem-sucedido:', {
+        email: authData.user.email,
+        id: authData.user.id,
+        confirmed: true,
+      });
+    }
+
+    return { data: authData, error: null };
+  } catch (err: any) {
+    console.error('❌ Erro ao fazer login:', err);
+    return { data: null, error: err };
+  }
 }
 
 /**

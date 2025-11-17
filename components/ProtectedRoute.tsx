@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabaseService';
 
 interface ProtectedRouteProps {
@@ -8,25 +8,70 @@ interface ProtectedRouteProps {
 
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [emailConfirmed, setEmailConfirmed] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
     // Verificar autenticação inicial
     const checkAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      setIsAuthenticated(!!session);
+      
+      if (session?.user) {
+        // 🔒 VALIDAÇÃO CRÍTICA: Verificar se o email foi confirmado
+        const confirmed = !!(session.user.email_confirmed_at || session.user.confirmed_at);
+        
+        if (!confirmed) {
+          // Email não confirmado - fazer logout e redirecionar
+          console.warn('⚠️ Tentativa de acessar rota protegida com email não confirmado');
+          await supabase.auth.signOut();
+          setIsAuthenticated(false);
+          setEmailConfirmed(false);
+          setIsLoading(false);
+          navigate('/login', { replace: true, state: { message: 'Por favor, confirme seu e-mail antes de acessar o dashboard.' } });
+          return;
+        }
+        
+        setEmailConfirmed(true);
+        setIsAuthenticated(true);
+      } else {
+        setIsAuthenticated(false);
+        setEmailConfirmed(false);
+      }
+      
       setIsLoading(false);
     };
 
     checkAuth();
 
     // Listener para mudanças de autenticação
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setIsAuthenticated(!!session);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (session?.user) {
+        // 🔒 VALIDAÇÃO: Verificar se o email foi confirmado
+        const confirmed = !!(session.user.email_confirmed_at || session.user.confirmed_at);
+        
+        if (!confirmed) {
+          // Email não confirmado - fazer logout
+          console.warn('⚠️ Sessão detectada com email não confirmado - fazendo logout');
+          await supabase.auth.signOut();
+          setIsAuthenticated(false);
+          setEmailConfirmed(false);
+          setIsLoading(false);
+          navigate('/login', { replace: true, state: { message: 'Por favor, confirme seu e-mail antes de acessar o dashboard.' } });
+          return;
+        }
+        
+        setEmailConfirmed(true);
+        setIsAuthenticated(true);
+      } else {
+        setIsAuthenticated(false);
+        setEmailConfirmed(false);
+      }
+      setIsLoading(false);
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [navigate]);
 
   // Mostrar loading enquanto verifica autenticação
   if (isLoading) {
@@ -43,7 +88,8 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     );
   }
 
-  if (!isAuthenticated) {
+  // 🔒 Só permite acesso se estiver autenticado E com email confirmado
+  if (!isAuthenticated || !emailConfirmed) {
     return <Navigate to="/login" replace />;
   }
 

@@ -86,10 +86,12 @@ export const Login: React.FC = () => {
       });
 
       // Autenticação real com Supabase
-      const { data, error: authError } = await signIn({
+      const signInResult = await signIn({
         email: sanitizedEmail,
         password: formData.password,
       });
+
+      const { data, error: authError } = signInResult;
 
       if (authError) {
         // 🔒 LOG DE FALHA DE LOGIN (Brute Force Detection)
@@ -103,24 +105,43 @@ export const Login: React.FC = () => {
         // Tratamento de erros mais amigável em português
         const errorMessage = authError.message || '';
         
-        if (errorMessage.includes('Invalid login credentials') || errorMessage.includes('Invalid credentials')) {
+        if (errorMessage.includes('Invalid login credentials') || errorMessage.includes('Invalid credentials') || errorMessage.includes('Invalid')) {
           setError('E-mail ou senha incorretos. Tente novamente.');
-        } else if (errorMessage.includes('Email not confirmed') || errorMessage.includes('email_not_confirmed')) {
-          setError('Por favor, confirme seu e-mail antes de fazer login. Verifique sua caixa de entrada.');
+        } else if (errorMessage.includes('Email not confirmed') || errorMessage.includes('email_not_confirmed') || errorMessage.includes('not confirmed')) {
+          setError('🔒 Por favor, confirme seu e-mail antes de fazer login.\n\n📧 Verifique sua caixa de entrada e clique no link de confirmação enviado por email.\n\n⚠️ Se não encontrar o email, verifique também a pasta de spam/lixo eletrônico.');
         } else if (errorMessage.includes('Too many requests') || errorMessage.includes('rate_limit')) {
           setError('Muitas tentativas. Por favor, aguarde alguns minutos antes de tentar novamente.');
-        } else if (errorMessage.includes('User not found')) {
-          setError('Usuário não encontrado. Verifique seu e-mail ou crie uma conta.');
+        } else if (errorMessage.includes('User not found') || errorMessage.includes('not found')) {
+          setError('❌ Usuário não encontrado. Verifique seu e-mail ou crie uma conta.');
         } else if (errorMessage.includes('Password')) {
           setError('Erro na senha. Verifique se digitou corretamente.');
         } else {
-          setError('Erro ao fazer login. Por favor, verifique suas credenciais e tente novamente.');
+          setError(`Erro ao fazer login: ${authError.message || 'Por favor, verifique suas credenciais e tente novamente.'}`);
         }
+        setIsLoading(false);
         return;
       }
 
-      // Login bem-sucedido - o listener do useEffect redirecionará automaticamente
+      // 🔒 VALIDAÇÃO ADICIONAL: Verificar se o email foi confirmado
       if (data?.user) {
+        // Verificar se o email foi confirmado
+        if (!data.user.email_confirmed_at && !data.user.confirmed_at) {
+          // Fazer logout imediatamente
+          await supabase.auth.signOut();
+          
+          setError('🔒 Seu e-mail ainda não foi confirmado.\n\n📧 Por favor, verifique sua caixa de entrada e clique no link de confirmação enviado por email.\n\n⚠️ Se não encontrar o email, verifique também a pasta de spam/lixo eletrônico.');
+          
+          logSecurityEvent({
+            type: 'suspicious_activity',
+            identifier,
+            timestamp: Date.now(),
+            details: { action: 'login_attempt_unconfirmed_email', email: sanitizedEmail },
+          });
+          
+          setIsLoading(false);
+          return;
+        }
+
         // 🔒 Limpar rate limit após sucesso
         clearRateLimit(identifier);
         
@@ -132,6 +153,10 @@ export const Login: React.FC = () => {
         });
         
         // Navegação será feita pelo listener de auth state change
+        // Redirecionar manualmente também para garantir
+        setTimeout(() => {
+          navigate('/dashboard', { replace: true });
+        }, 500);
       }
     } catch (err: any) {
       setError(err.message || 'Erro ao fazer login. Tente novamente.');
@@ -169,7 +194,7 @@ export const Login: React.FC = () => {
         <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl p-8 border border-slate-700/50 shadow-xl">
           <form onSubmit={handleSubmit} className="space-y-6">
             {error && (
-              <div className="bg-red-900/30 border border-red-700/50 rounded-lg p-4 text-red-200 text-sm">
+              <div className="bg-red-900/30 border border-red-700/50 rounded-lg p-4 text-red-200 text-sm whitespace-pre-line">
                 {error}
               </div>
             )}
