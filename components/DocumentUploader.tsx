@@ -150,7 +150,12 @@ export const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onDataExtrac
                     )}
                 </div>
             </div>
-            {error && <p className="text-xs text-red-400 mt-2">{error}</p>}
+            {error && (
+                <div className="mt-2 p-3 bg-red-900/30 border border-red-700/50 rounded-lg">
+                    <p className="text-sm text-red-300 font-medium">⚠️ Erro ao processar documento</p>
+                    <p className="text-xs text-red-400 mt-1">{error}</p>
+                </div>
+            )}
         </div>
     );
 };
