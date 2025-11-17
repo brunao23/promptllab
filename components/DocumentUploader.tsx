@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { analyzeDocument } from '../services/geminiService';
+import { validateFileSize, validateFileType } from '../utils/security';
 import type { PromptData } from '../types';
 
 interface DocumentUploaderProps {
@@ -24,6 +25,26 @@ export const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onDataExtrac
     }, []);
 
     const processFile = async (file: File) => {
+        // 🔒 VALIDAÇÃO DE SEGURANÇA - Tipo de arquivo
+        const fileTypeValidation = validateFileType(file);
+        if (!fileTypeValidation.valid) {
+            setError(fileTypeValidation.error || 'Tipo de arquivo não permitido.');
+            return;
+        }
+
+        // 🔒 VALIDAÇÃO DE SEGURANÇA - Tamanho do arquivo
+        const fileSizeValidation = validateFileSize(file);
+        if (!fileSizeValidation.valid) {
+            setError(fileSizeValidation.error || 'Arquivo muito grande.');
+            return;
+        }
+
+        // 🔒 VALIDAÇÃO DE SEGURANÇA - Nome do arquivo
+        if (file.name.length > 255) {
+            setError('Nome do arquivo muito longo (máximo 255 caracteres).');
+            return;
+        }
+
         // Gemini inline currently supports PDF and various text formats, but NOT specifically native DOC/DOCX inline.
         // Restricting to reliable formats to prevent 400 Bad Request errors.
         const validTypes = ['application/pdf', 'text/plain', 'text/markdown', 'text/x-markdown', 'text/html', 'text/csv'];

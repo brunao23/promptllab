@@ -1,6 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { signIn, supabase } from '../services/supabaseService';
+import { 
+  validateEmail, 
+  sanitizeText,
+  checkRateLimit,
+  clearRateLimit,
+  getRateLimitIdentifier,
+  logSecurityEvent,
+} from '../utils/security';
 
 export const Login: React.FC = () => {
   const navigate = useNavigate();
@@ -38,19 +46,60 @@ export const Login: React.FC = () => {
     setIsLoading(true);
 
     try {
+      // 🔒 VALIDAÇÃO DE ENTRADA - Campos obrigatórios
       if (!formData.email || !formData.password) {
         setError('Por favor, preencha todos os campos.');
         setIsLoading(false);
         return;
       }
 
+      // 🔒 VALIDAÇÃO DE SEGURANÇA - Email
+      const sanitizedEmail = formData.email.trim().toLowerCase();
+      if (!validateEmail(sanitizedEmail)) {
+        setError('Por favor, insira um e-mail válido.');
+        setIsLoading(false);
+        return;
+      }
+
+      // 🔒 VALIDAÇÃO DE SEGURANÇA - Rate Limiting (Proteção contra Brute Force)
+      const identifier = getRateLimitIdentifier(sanitizedEmail);
+      const rateLimitCheck = checkRateLimit(identifier, 'login');
+      if (!rateLimitCheck.allowed) {
+        setError(
+          `Muitas tentativas de login. Sua conta foi temporariamente bloqueada. Tente novamente em ${rateLimitCheck.retryAfter} minutos.`
+        );
+        logSecurityEvent({
+          type: 'rate_limit_exceeded',
+          identifier,
+          timestamp: Date.now(),
+          details: { action: 'login', email: sanitizedEmail },
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      // 🔒 LOG DE TENTATIVA DE LOGIN
+      logSecurityEvent({
+        type: 'login_attempt',
+        identifier,
+        timestamp: Date.now(),
+      });
+
       // Autenticação real com Supabase
       const { data, error: authError } = await signIn({
-        email: formData.email,
+        email: sanitizedEmail,
         password: formData.password,
       });
 
       if (authError) {
+        // 🔒 LOG DE FALHA DE LOGIN (Brute Force Detection)
+        logSecurityEvent({
+          type: 'login_failed',
+          identifier,
+          timestamp: Date.now(),
+          details: { error: authError.message, email: sanitizedEmail },
+        });
+
         // Tratamento de erros mais amigável em português
         const errorMessage = authError.message || '';
         
@@ -72,6 +121,16 @@ export const Login: React.FC = () => {
 
       // Login bem-sucedido - o listener do useEffect redirecionará automaticamente
       if (data?.user) {
+        // 🔒 Limpar rate limit após sucesso
+        clearRateLimit(identifier);
+        
+        // 🔒 LOG DE LOGIN BEM-SUCEDIDO
+        logSecurityEvent({
+          type: 'login_success',
+          identifier,
+          timestamp: Date.now(),
+        });
+        
         // Navegação será feita pelo listener de auth state change
       }
     } catch (err: any) {

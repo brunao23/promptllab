@@ -3,6 +3,14 @@
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import type { PromptData, PromptVersion, ChatMessage, FewShotExample, VariavelDinamica, Ferramenta, Fluxo, OptimizationPair } from '../types';
+import { 
+  sanitizeText, 
+  validatePromptText, 
+  isValidUUID, 
+  sanitizeObject,
+  validateFileSize,
+  validateFileType,
+} from '../utils/security';
 
 // Configuração do Supabase
 // No Vite, use VITE_ prefixo para variáveis de ambiente
@@ -149,19 +157,61 @@ export async function createPrompt(promptData: PromptData, title?: string) {
   const user = await getCurrentUser();
   if (!user) throw new Error('Usuário não autenticado');
 
+  // 🔒 VALIDAÇÃO E SANITIZAÇÃO DE DADOS
+  const maxTitleLength = 200;
+  const sanitizedTitle = title 
+    ? sanitizeText(title.trim(), maxTitleLength) 
+    : sanitizeText(promptData.persona.substring(0, 50), maxTitleLength);
+
+  // Validar e sanitizar campos de texto
+  const personaValidation = validatePromptText(promptData.persona, 10000);
+  if (!personaValidation.valid) {
+    throw new Error(personaValidation.error || 'Persona inválida');
+  }
+
+  const objetivoValidation = validatePromptText(promptData.objetivo, 5000);
+  if (!objetivoValidation.valid) {
+    throw new Error(objetivoValidation.error || 'Objetivo inválido');
+  }
+
+  const contextoNegocioValidation = validatePromptText(promptData.contextoNegocio || '', 10000);
+  const contextoValidation = validatePromptText(promptData.contexto || '', 10000);
+
+  // Sanitizar regras
+  const sanitizedRegras = promptData.regras
+    .map(regra => sanitizeText(regra.trim(), 1000))
+    .filter(regra => regra.length > 0);
+
+  // Validar formato de saída
+  const validOutputFormats = ['text', 'markdown', 'json', 'xml', 'yaml'];
+  const validMasterFormats = ['markdown', 'json'];
+  
+  if (!validOutputFormats.includes(promptData.formatoSaida)) {
+    throw new Error('Formato de saída inválido');
+  }
+
+  if (!validMasterFormats.includes(promptData.masterPromptFormat)) {
+    throw new Error('Formato do prompt mestre inválido');
+  }
+
+  // Validar tamanho do prompt
+  if (promptData.promptSize < 500 || promptData.promptSize > 100000) {
+    throw new Error('Tamanho do prompt deve estar entre 500 e 100000 caracteres');
+  }
+
   const { data, error } = await supabase
     .from('prompts')
     .insert({
       user_id: user.id,
-      title: title || promptData.persona.substring(0, 50),
-      persona: promptData.persona,
-      objetivo: promptData.objetivo,
-      contexto_negocio: promptData.contextoNegocio,
-      contexto: promptData.contexto,
-      regras: promptData.regras,
+      title: sanitizedTitle,
+      persona: personaValidation.sanitized || '',
+      objetivo: objetivoValidation.sanitized || '',
+      contexto_negocio: contextoNegocioValidation.sanitized || '',
+      contexto: contextoValidation.sanitized || '',
+      regras: sanitizedRegras,
       formato_saida: promptData.formatoSaida,
       master_prompt_format: promptData.masterPromptFormat,
-      estrutura_saida: promptData.estruturaSaida,
+      estrutura_saida: sanitizeText(promptData.estruturaSaida || '', 5000),
       prompt_size: promptData.promptSize,
     })
     .select()
@@ -253,6 +303,11 @@ export async function getPrompt(promptId: string) {
   const user = await getCurrentUser();
   if (!user) throw new Error('Usuário não autenticado');
 
+  // 🔒 VALIDAÇÃO DE SEGURANÇA - UUID válido
+  if (!isValidUUID(promptId)) {
+    throw new Error('ID de prompt inválido');
+  }
+
   // Buscar prompt
   const { data: prompt, error: promptError } = await supabase
     .from('prompts')
@@ -332,6 +387,17 @@ export async function createPromptVersion(
   const user = await getCurrentUser();
   if (!user) throw new Error('Usuário não autenticado');
 
+  // 🔒 VALIDAÇÃO DE SEGURANÇA - UUID válido
+  if (!isValidUUID(promptId)) {
+    throw new Error('ID de prompt inválido');
+  }
+
+  // 🔒 VALIDAÇÃO E SANITIZAÇÃO - Conteúdo da versão
+  const contentValidation = validatePromptText(versionData.content, 100000);
+  if (!contentValidation.valid) {
+    throw new Error(contentValidation.error || 'Conteúdo da versão inválido');
+  }
+
   // Obter o número da próxima versão
   const { data: lastVersion } = await supabase
     .from('prompt_versions')
@@ -348,10 +414,10 @@ export async function createPromptVersion(
     .insert({
       prompt_id: promptId,
       version_number: nextVersionNumber,
-      content: versionData.content,
+      content: contentValidation.sanitized || '',
       format: versionData.format,
       master_format: versionData.masterFormat,
-      source_data: versionData.sourceData as any,
+      source_data: sanitizeObject(versionData.sourceData as any) as any,
     })
     .select()
     .single();
@@ -378,6 +444,11 @@ export async function createPromptVersion(
 export async function getPromptVersions(promptId: string) {
   const user = await getCurrentUser();
   if (!user) throw new Error('Usuário não autenticado');
+
+  // 🔒 VALIDAÇÃO DE SEGURANÇA - UUID válido
+  if (!isValidUUID(promptId)) {
+    throw new Error('ID de prompt inválido');
+  }
 
   const { data, error } = await supabase
     .from('prompt_versions')
@@ -416,6 +487,21 @@ export async function saveChatMessage(
   const user = await getCurrentUser();
   if (!user) throw new Error('Usuário não autenticado');
 
+  // 🔒 VALIDAÇÃO DE SEGURANÇA - UUID válido
+  if (!isValidUUID(promptVersionId)) {
+    throw new Error('ID de versão de prompt inválido');
+  }
+
+  // 🔒 VALIDAÇÃO E SANITIZAÇÃO - Mensagem
+  if (!message.author || !['user', 'agent'].includes(message.author)) {
+    throw new Error('Autor da mensagem inválido');
+  }
+
+  const textValidation = validatePromptText(message.text, 50000);
+  if (!textValidation.valid) {
+    throw new Error(textValidation.error || 'Texto da mensagem inválido');
+  }
+
   // Obter a próxima ordem
   const { data: lastMessage } = await supabase
     .from('chat_messages')
@@ -432,9 +518,9 @@ export async function saveChatMessage(
     .insert({
       prompt_version_id: promptVersionId,
       author: message.author,
-      text: message.text,
+      text: textValidation.sanitized || '',
       feedback: message.feedback,
-      correction: message.correction,
+      correction: message.correction ? sanitizeText(message.correction, 5000) : null,
       order_index: nextOrder,
     })
     .select()
@@ -450,6 +536,11 @@ export async function saveChatMessage(
 export async function getChatMessages(promptVersionId: string) {
   const user = await getCurrentUser();
   if (!user) throw new Error('Usuário não autenticado');
+
+  // 🔒 VALIDAÇÃO DE SEGURANÇA - UUID válido
+  if (!isValidUUID(promptVersionId)) {
+    throw new Error('ID de versão de prompt inválido');
+  }
 
   const { data, error } = await supabase
     .from('chat_messages')
@@ -488,13 +579,27 @@ export async function saveOptimizationPair(
   const user = await getCurrentUser();
   if (!user) throw new Error('Usuário não autenticado');
 
+  // 🔒 VALIDAÇÃO DE SEGURANÇA - UUID válido
+  if (!isValidUUID(promptVersionId)) {
+    throw new Error('ID de versão de prompt inválido');
+  }
+
+  // 🔒 VALIDAÇÃO E SANITIZAÇÃO - Par de otimização
+  const userQueryValidation = validatePromptText(pair.userQuery, 5000);
+  const originalResponseValidation = validatePromptText(pair.originalResponse, 50000);
+  const correctedResponseValidation = validatePromptText(pair.correctedResponse, 50000);
+
+  if (!userQueryValidation.valid || !originalResponseValidation.valid || !correctedResponseValidation.valid) {
+    throw new Error('Dados do par de otimização inválidos');
+  }
+
   const { data, error } = await supabase
     .from('optimization_pairs')
     .insert({
       prompt_version_id: promptVersionId,
-      user_query: pair.userQuery,
-      original_response: pair.originalResponse,
-      corrected_response: pair.correctedResponse,
+      user_query: userQueryValidation.sanitized || '',
+      original_response: originalResponseValidation.sanitized || '',
+      corrected_response: correctedResponseValidation.sanitized || '',
     })
     .select()
     .single();
@@ -509,6 +614,11 @@ export async function saveOptimizationPair(
 export async function getOptimizationPairs(promptVersionId: string) {
   const user = await getCurrentUser();
   if (!user) throw new Error('Usuário não autenticado');
+
+  // 🔒 VALIDAÇÃO DE SEGURANÇA - UUID válido
+  if (!isValidUUID(promptVersionId)) {
+    throw new Error('ID de versão de prompt inválido');
+  }
 
   const { data, error } = await supabase
     .from('optimization_pairs')

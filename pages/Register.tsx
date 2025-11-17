@@ -1,6 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { signUp, supabase } from '../services/supabaseService';
+import { 
+  validateEmail, 
+  validatePassword, 
+  validateName, 
+  sanitizeText,
+  checkRateLimit,
+  clearRateLimit,
+  getRateLimitIdentifier,
+  logSecurityEvent,
+  sanitizeObject
+} from '../utils/security';
 
 export const Register: React.FC = () => {
   const navigate = useNavigate();
@@ -40,40 +51,89 @@ export const Register: React.FC = () => {
     setError(null);
     setSuccess(null);
 
-    // Validações
+    // 🔒 VALIDAÇÃO DE SEGURANÇA - Rate Limiting
+    const identifier = getRateLimitIdentifier(formData.email);
+    const rateLimitCheck = checkRateLimit(identifier, 'signup');
+    if (!rateLimitCheck.allowed) {
+      setError(
+        `Muitas tentativas de cadastro. Tente novamente em ${rateLimitCheck.retryAfter} minutos.`
+      );
+      logSecurityEvent({
+        type: 'rate_limit_exceeded',
+        identifier,
+        timestamp: Date.now(),
+        details: { action: 'signup' },
+      });
+      setIsLoading(false);
+      return;
+    }
+
+    // 🔒 VALIDAÇÃO DE ENTRADA - Campos obrigatórios
     if (!formData.name || !formData.email || !formData.password || !formData.confirmPassword) {
       setError('Por favor, preencha todos os campos.');
+      setIsLoading(false);
+      return;
+    }
+
+    // 🔒 VALIDAÇÃO DE SEGURANÇA - Nome
+    const nameValidation = validateName(sanitizeText(formData.name.trim()));
+    if (!nameValidation.valid) {
+      setError(nameValidation.error || 'Nome inválido.');
+      setIsLoading(false);
+      return;
+    }
+
+    // 🔒 VALIDAÇÃO DE SEGURANÇA - Email
+    if (!validateEmail(formData.email.trim())) {
+      setError('Por favor, insira um e-mail válido.');
+      setIsLoading(false);
+      return;
+    }
+
+    // 🔒 VALIDAÇÃO DE SEGURANÇA - Senha
+    const passwordValidation = validatePassword(formData.password);
+    if (!passwordValidation.valid) {
+      setError(passwordValidation.errors[0] || 'Senha inválida.');
+      setIsLoading(false);
       return;
     }
 
     if (formData.password !== formData.confirmPassword) {
       setError('As senhas não coincidem.');
+      setIsLoading(false);
       return;
     }
 
-    if (formData.password.length < 6) {
-      setError('A senha deve ter pelo menos 6 caracteres.');
-      return;
-    }
-
-    // Validação de email
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(formData.email)) {
-      setError('Por favor, insira um e-mail válido.');
-      return;
-    }
+    // 🔒 LOG DE SEGURANÇA
+    logSecurityEvent({
+      type: 'signup_attempt',
+      identifier,
+      timestamp: Date.now(),
+    });
 
     setIsLoading(true);
 
     try {
+      // 🔒 SANITIZAÇÃO DE DADOS antes de enviar
+      const sanitizedName = sanitizeText(formData.name.trim(), 100);
+      const sanitizedEmail = formData.email.trim().toLowerCase();
+
       // Cadastro real com Supabase
       const { data, error: authError } = await signUp({
-        email: formData.email,
-        password: formData.password,
-        full_name: formData.name,
+        email: sanitizedEmail,
+        password: formData.password, // Senha não precisa sanitizar
+        full_name: sanitizedName,
       });
 
       if (authError) {
+        // 🔒 LOG DE ERRO DE SEGURANÇA
+        logSecurityEvent({
+          type: 'suspicious_activity',
+          identifier,
+          timestamp: Date.now(),
+          details: { error: authError.message, action: 'signup_failed' },
+        });
+
         // Tratamento de erros mais amigável em português
         const errorMessage = authError.message || '';
         
@@ -81,7 +141,7 @@ export const Register: React.FC = () => {
           setError('Este e-mail já está cadastrado. Tente fazer login ou recuperar sua senha.');
         } else if (errorMessage.includes('Password') || errorMessage.includes('password')) {
           if (errorMessage.includes('length') || errorMessage.includes('6')) {
-            setError('A senha deve ter pelo menos 6 caracteres.');
+            setError('A senha deve atender aos requisitos de segurança (mínimo 8 caracteres, maiúscula, minúscula, número e caractere especial).');
           } else {
             setError('A senha não atende aos requisitos de segurança.');
           }
@@ -103,6 +163,9 @@ export const Register: React.FC = () => {
 
       // Cadastro bem-sucedido
       if (data?.user) {
+        // 🔒 Limpar rate limit após sucesso
+        clearRateLimit(identifier);
+        
         // Verificar se precisa confirmar email
         if (data.user.confirmed_at) {
           // Email já confirmado - redirecionar
