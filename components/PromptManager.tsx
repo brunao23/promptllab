@@ -134,8 +134,22 @@ export const PromptManager: React.FC = () => {
                             });
                             
                             // Definir histórico completo ANTES de qualquer outra coisa
+                            // CRÍTICO: Usar callback para garantir atualização
                             console.log('💾 DEFININDO histórico completo no estado:', versions.length, 'versões');
-                            setVersionHistory(versions);
+                            setVersionHistory(prev => {
+                                // Verificar se já tem o mesmo número de versões
+                                if (prev.length === versions.length && prev.length > 0) {
+                                    // Verificar se os IDs são os mesmos
+                                    const prevIds = prev.map(v => v.id).sort().join(',');
+                                    const newIds = versions.map(v => v.id).sort().join(',');
+                                    if (prevIds === newIds) {
+                                        console.log('⏭️ Histórico já está atualizado, pulando');
+                                        return prev;
+                                    }
+                                }
+                                console.log('✅ Atualizando histórico com', versions.length, 'versões');
+                                return versions;
+                            });
                             console.log('✅ Histórico definido no estado. Total de versões:', versions.length);
                             
                             // Carregar versão ativa (mais recente = primeira do array)
