@@ -13,8 +13,7 @@ import type { PromptData, PromptVersion, ChatMessage, FewShotExample, Optimizati
 import { INITIAL_PROMPT_DATA } from '../constants';
 import { createFinalPrompt, startChat, continueChat, optimizePrompt, generateExamples, processAudioCommand, explainPrompt } from '../services/geminiService';
 import type { GenerateContentResponse } from '@google/genai';
-
-declare const jspdf: any;
+import { jsPDF } from 'jspdf';
 
 export const PromptManager: React.FC = () => {
     const [versionHistory, setVersionHistory] = useState<PromptVersion[]>([]);
@@ -288,7 +287,6 @@ export const PromptManager: React.FC = () => {
             document.body.removeChild(link);
             URL.revokeObjectURL(url);
         } else {
-            const { jsPDF } = jspdf;
             const doc = new jsPDF();
             let y = 20;
             const margin = 10;
@@ -405,7 +403,6 @@ export const PromptManager: React.FC = () => {
             document.body.removeChild(link);
             URL.revokeObjectURL(url);
         } else {
-            const { jsPDF } = jspdf;
             const doc = new jsPDF();
             let y = 15;
             const margin = 10;
