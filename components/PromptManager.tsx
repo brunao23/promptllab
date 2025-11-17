@@ -115,28 +115,44 @@ export const PromptManager: React.FC = () => {
                     
                     // Carregar TODAS as versões do prompt
                     console.log('📜 Carregando TODAS as versões do prompt...');
-                    const versions = await getPromptVersions(latestPrompt.id);
-                    console.log('✅ Versões carregadas:', versions?.length || 0);
-                    
-                    if (versions && versions.length > 0) {
-                        console.log('📋 Detalhes das versões:');
-                        versions.forEach((v, idx) => {
-                            console.log(`  v${v.version} - ${v.timestamp} - ID: ${v.id}`);
-                        });
+                    let versions: PromptVersion[] = [];
+                    try {
+                        versions = await getPromptVersions(latestPrompt.id);
+                        console.log('✅ Versões carregadas do banco:', versions?.length || 0);
                         
-                        // Definir histórico completo
-                        console.log('💾 Definindo histórico completo no estado:', versions.length, 'versões');
-                        setVersionHistory(versions);
-                        console.log('✅ Histórico definido no estado. Total de versões:', versions.length);
-                        
-                        // Carregar versão ativa (mais recente = primeira do array)
-                        const latestVersion = versions[0];
-                        console.log('✅ Versão ativa selecionada:', {
-                            id: latestVersion.id,
-                            version: latestVersion.version,
-                            timestamp: latestVersion.timestamp,
-                        });
-                        setActiveVersion(latestVersion);
+                        if (versions && versions.length > 0) {
+                            console.log('📋 Detalhes completos das versões:');
+                            versions.forEach((v, idx) => {
+                                console.log(`  [${idx}] v${v.version} - ${v.timestamp} - ID: ${v.id}`);
+                                console.log(`      Conteúdo: ${v.content?.substring(0, 100)}...`);
+                                console.log(`      Has sourceData: ${!!v.sourceData}`);
+                            });
+                            
+                            // Definir histórico completo
+                            console.log('💾 Definindo histórico completo no estado:', versions.length, 'versões');
+                            setVersionHistory(versions);
+                            console.log('✅ Histórico definido no estado. Total de versões:', versions.length);
+                            
+                            // Carregar versão ativa (mais recente = primeira do array)
+                            const latestVersion = versions[0];
+                            console.log('🎯 SELECIONANDO VERSÃO ATIVA:', {
+                                id: latestVersion.id,
+                                version: latestVersion.version,
+                                timestamp: latestVersion.timestamp,
+                                hasContent: !!latestVersion.content,
+                                contentLength: latestVersion.content?.length || 0,
+                                hasSourceData: !!latestVersion.sourceData,
+                            });
+                            
+                            if (!latestVersion.id) {
+                                console.error('❌ ERRO: Versão não tem ID!');
+                            }
+                            if (!latestVersion.content) {
+                                console.warn('⚠️ AVISO: Versão não tem conteúdo!');
+                            }
+                            
+                            setActiveVersion(latestVersion);
+                            console.log('✅ Versão ativa definida no estado');
                         
                         // Carregar mensagens de chat da versão ativa ANTES de inicializar o chat
                         try {
@@ -187,9 +203,17 @@ export const PromptManager: React.FC = () => {
                 }
             } catch (err: any) {
                 console.error('❌ Erro ao carregar dados do usuário:', err);
+                console.error('❌ Detalhes do erro:', {
+                    message: err.message,
+                    stack: err.stack,
+                    details: err.details,
+                    hint: err.hint,
+                    code: err.code,
+                });
                 setError(`Erro ao carregar dados: ${err.message || 'Erro desconhecido'}`);
                 // Continuar com dados vazios
             } finally {
+                console.log('✅ Carregamento de dados finalizado. isLoadingData = false');
                 setIsLoadingData(false);
             }
         };
