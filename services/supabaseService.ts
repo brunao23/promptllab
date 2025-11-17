@@ -658,7 +658,16 @@ export async function saveChatMessage(
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    console.error('❌ ERRO ao salvar mensagem de chat no banco:', {
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code,
+    });
+    throw error;
+  }
+  
   return data;
 }
 
