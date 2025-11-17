@@ -401,15 +401,55 @@ export async function getUserPrompts() {
   const user = await getCurrentUser();
   if (!user) throw new Error('Usuário não autenticado');
 
+  console.log('🔍 [getUserPrompts] Buscando prompts para user_id:', user.id);
+
+  // Primeiro, verificar se existe profile para este usuário
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('id', user.id)
+    .single();
+
+  if (profileError) {
+    console.error('❌ [getUserPrompts] Erro ao verificar profile:', profileError);
+    throw profileError;
+  }
+
+  if (!profile) {
+    console.error('❌ [getUserPrompts] Profile não encontrado para user_id:', user.id);
+    throw new Error('Perfil do usuário não encontrado');
+  }
+
+  console.log('✅ [getUserPrompts] Profile encontrado:', profile.id);
+
+  // Agora buscar prompts usando o profile.id como user_id
   const { data, error } = await supabase
     .from('prompts')
     .select('*')
-    .eq('user_id', user.id)
-    .eq('is_active', true)
+    .eq('user_id', profile.id) // CRÍTICO: usar profile.id, não user.id diretamente
     .order('created_at', { ascending: false });
 
-  if (error) throw error;
-  return data;
+  if (error) {
+    console.error('❌ [getUserPrompts] Erro ao buscar prompts:', error);
+    throw error;
+  }
+
+  // Filtrar por is_active manualmente (pode ser NULL ou false)
+  const activePrompts = (data || []).filter(p => p.is_active !== false);
+  
+  console.log('✅ [getUserPrompts] Prompts encontrados:', {
+    total: data?.length || 0,
+    ativos: activePrompts.length,
+    inativos: (data || []).length - activePrompts.length,
+  });
+
+  if (activePrompts.length > 0) {
+    activePrompts.forEach((p, idx) => {
+      console.log(`  [${idx}] ID: ${p.id}, Título: ${p.title || 'Sem título'}, Criado: ${p.created_at}`);
+    });
+  }
+
+  return activePrompts;
 }
 
 /**
@@ -424,12 +464,33 @@ export async function getPrompt(promptId: string) {
     throw new Error('ID de prompt inválido');
   }
 
-  // Buscar prompt
+  console.log('🔍 [getPrompt] Buscando prompt:', promptId, 'para user_id:', user.id);
+
+  // Primeiro, verificar se existe profile para este usuário
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('id', user.id)
+    .single();
+
+  if (profileError) {
+    console.error('❌ [getPrompt] Erro ao verificar profile:', profileError);
+    throw profileError;
+  }
+
+  if (!profile) {
+    console.error('❌ [getPrompt] Profile não encontrado para user_id:', user.id);
+    throw new Error('Perfil do usuário não encontrado');
+  }
+
+  console.log('✅ [getPrompt] Profile encontrado:', profile.id);
+
+  // Buscar prompt usando profile.id como user_id
   const { data: prompt, error: promptError } = await supabase
     .from('prompts')
     .select('*')
     .eq('id', promptId)
-    .eq('user_id', user.id)
+    .eq('user_id', profile.id) // CRÍTICO: usar profile.id, não user.id diretamente
     .single();
 
   if (promptError) throw promptError;
