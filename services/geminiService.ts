@@ -308,6 +308,51 @@ Retorne APENAS a documentação em Markdown.`;
 // but they would be included in the full file content in a real scenario if I wasn't using the XML format efficiently)
 // RE-INCLUDING FULL CONTENT TO BE SAFE as requested by the prompt format.
 
+/**
+ * Função auxiliar para retry com backoff exponencial
+ */
+const retryWithBackoff = async <T>(
+    fn: () => Promise<T>,
+    maxRetries: number = 3,
+    initialDelay: number = 1000
+): Promise<T> => {
+    let lastError: any;
+    
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+            return await fn();
+        } catch (error: any) {
+            lastError = error;
+            
+            // Verificar se é um erro que vale a pena tentar novamente
+            const isRetryable = 
+                error?.status === 503 || // Service Unavailable
+                error?.status === 429 || // Too Many Requests
+                error?.status === 500 || // Internal Server Error
+                error?.status === 502 || // Bad Gateway
+                error?.code === 503 ||
+                error?.code === 429 ||
+                error?.code === 500 ||
+                error?.code === 502 ||
+                error?.message?.includes('overloaded') ||
+                error?.message?.includes('try again later') ||
+                error?.message?.includes('rate limit') ||
+                error?.message?.includes('UNAVAILABLE');
+            
+            if (!isRetryable || attempt === maxRetries) {
+                throw error;
+            }
+            
+            // Calcular delay com backoff exponencial
+            const delay = initialDelay * Math.pow(2, attempt);
+            console.log(`⚠️ Tentativa ${attempt + 1}/${maxRetries + 1} falhou. Tentando novamente em ${delay}ms...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+        }
+    }
+    
+    throw lastError;
+};
+
 export const analyzeDocument = async (fileBase64: string, mimeType: string): Promise<Partial<PromptData>> => {
     const ai = getAI();
 
@@ -324,28 +369,47 @@ Campos JSON esperados: persona, objetivo, contextoNegocio, contexto, regras (arr
 `;
 
     try {
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-pro',
-            contents: { parts: [docPart, { text: extractionPrompt }] },
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: {
-                    type: Type.OBJECT,
-                    properties: {
-                        persona: { type: Type.STRING },
-                        objetivo: { type: Type.STRING },
-                        contextoNegocio: { type: Type.STRING },
-                        contexto: { type: Type.STRING },
-                        regras: { type: Type.ARRAY, items: { type: Type.STRING } }
-                    },
-                    required: ['persona', 'objetivo', 'contextoNegocio', 'contexto', 'regras']
+        const response = await retryWithBackoff(async () => {
+            return await ai.models.generateContent({
+                model: 'gemini-2.5-pro',
+                contents: { parts: [docPart, { text: extractionPrompt }] },
+                config: {
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                        type: Type.OBJECT,
+                        properties: {
+                            persona: { type: Type.STRING },
+                            objetivo: { type: Type.STRING },
+                            contextoNegocio: { type: Type.STRING },
+                            contexto: { type: Type.STRING },
+                            regras: { type: Type.ARRAY, items: { type: Type.STRING } }
+                        },
+                        required: ['persona', 'objetivo', 'contextoNegocio', 'contexto', 'regras']
+                    }
                 }
-            }
-        });
+            });
+        }, 3, 2000); // 3 tentativas, começando com 2 segundos
+        
         return JSON.parse(response.text) as Partial<PromptData>;
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error analyzing document:", error);
-        throw new Error("Falha ao analisar o documento.");
+        
+        // Mensagens de erro mais específicas
+        if (error?.status === 503 || error?.code === 503 || error?.message?.includes('overloaded') || error?.message?.includes('UNAVAILABLE')) {
+            throw new Error("O serviço está temporariamente sobrecarregado. Por favor, tente novamente em alguns instantes.");
+        } else if (error?.status === 429 || error?.code === 429 || error?.message?.includes('rate limit')) {
+            throw new Error("Muitas requisições. Por favor, aguarde alguns segundos antes de tentar novamente.");
+        } else if (error?.status === 400 || error?.code === 400 || error?.message?.includes('400')) {
+            throw new Error("Formato de arquivo não suportado ou inválido. Tente converter para PDF ou TXT.");
+        } else if (error?.status === 401 || error?.code === 401) {
+            throw new Error("Erro de autenticação. Verifique sua chave de API do Gemini.");
+        } else if (error?.status === 413 || error?.code === 413) {
+            throw new Error("Arquivo muito grande. Tente um arquivo menor ou divida o documento.");
+        } else if (error?.message?.includes('JSON')) {
+            throw new Error("Erro ao processar a resposta da API. Tente novamente.");
+        } else {
+            throw new Error(error?.message || "Falha ao analisar o documento. Tente novamente mais tarde.");
+        }
     }
 };
 

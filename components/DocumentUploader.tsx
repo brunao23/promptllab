@@ -73,13 +73,11 @@ export const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onDataExtrac
                         const extractedData = await analyzeDocument(base64String, finalMimeType);
                         onDataExtracted(extractedData);
                     } catch (err: any) {
-                        console.error(err);
-                        // Improve error message for user if it's still a 400 related to mime type unexpectedly
-                        if (err.message?.includes('400') || err.message?.includes('MIME')) {
-                             setError('A API rejeitou este formato de arquivo. Tente converter para PDF ou TXT.');
-                        } else {
-                             setError(err.message || 'Falha na análise do documento.');
-                        }
+                        console.error("Error analyzing document:", err);
+                        
+                        // Usar a mensagem de erro já formatada do analyzeDocument
+                        const errorMessage = err.message || 'Falha na análise do documento.';
+                        setError(errorMessage);
                         setFileName(null);
                     } finally {
                         onLoadingChange(false);
