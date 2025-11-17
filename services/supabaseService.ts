@@ -83,20 +83,38 @@ export async function signUp(data: SignUpData) {
   const productionUrl = 'https://labprompt.com.br';
   const redirectTo = `${productionUrl}/auth/callback`;
   
-  const { data: authData, error } = await supabase.auth.signUp({
-    email: data.email,
-    password: data.password,
-    options: {
-      data: {
-        full_name: data.full_name,
+  try {
+    const { data: authData, error } = await supabase.auth.signUp({
+      email: data.email,
+      password: data.password,
+      options: {
+        data: {
+          full_name: data.full_name || '',
+        },
+        // SEMPRE usar produção para email de confirmação
+        emailRedirectTo: redirectTo,
       },
-      // SEMPRE usar produção para email de confirmação
-      emailRedirectTo: redirectTo,
-    },
-  });
+    });
 
-  if (error) throw error;
-  return authData;
+    if (error) {
+      console.error('❌ Erro ao registrar usuário:', error);
+      throw error;
+    }
+
+    // Log de sucesso (sem informações sensíveis)
+    if (authData?.user) {
+      console.log('✅ Usuário registrado com sucesso:', {
+        email: authData.user.email,
+        id: authData.user.id,
+        confirmed: !!authData.user.confirmed_at,
+      });
+    }
+
+    return { data: authData, error: null };
+  } catch (err: any) {
+    console.error('❌ Erro ao registrar usuário:', err);
+    return { data: null, error: err };
+  }
 }
 
 /**

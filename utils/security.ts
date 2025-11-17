@@ -31,8 +31,8 @@ const RATE_LIMIT_CONFIG = {
   WINDOW_MINUTES: 15,
   // Máximo de requisições por minuto
   MAX_REQUESTS_PER_MINUTE: 60,
-  // Máximo de requisições de cadastro por IP
-  MAX_SIGNUP_PER_HOUR: 3,
+  // Máximo de requisições de cadastro por hora (aumentado para permitir testes)
+  MAX_SIGNUP_PER_HOUR: 5,
 };
 
 /**

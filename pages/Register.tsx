@@ -119,11 +119,13 @@ export const Register: React.FC = () => {
       const sanitizedEmail = formData.email.trim().toLowerCase();
 
       // Cadastro real com Supabase
-      const { data, error: authError } = await signUp({
+      const signUpResult = await signUp({
         email: sanitizedEmail,
         password: formData.password, // Senha não precisa sanitizar
         full_name: sanitizedName,
       });
+
+      const { data, error: authError } = signUpResult;
 
       if (authError) {
         // 🔒 LOG DE ERRO DE SEGURANÇA
@@ -137,7 +139,7 @@ export const Register: React.FC = () => {
         // Tratamento de erros mais amigável em português
         const errorMessage = authError.message || '';
         
-        if (errorMessage.includes('User already registered') || errorMessage.includes('already registered') || errorMessage.includes('email_already_exists')) {
+        if (errorMessage.includes('User already registered') || errorMessage.includes('already registered') || errorMessage.includes('email_already_exists') || errorMessage.includes('already exists')) {
           setError('Este e-mail já está cadastrado. Tente fazer login ou recuperar sua senha.');
         } else if (errorMessage.includes('Password') || errorMessage.includes('password')) {
           if (errorMessage.includes('length') || errorMessage.includes('6')) {
@@ -156,30 +158,46 @@ export const Register: React.FC = () => {
         } else if (errorMessage.includes('Signup is disabled')) {
           setError('O cadastro está temporariamente desabilitado. Entre em contato com o suporte.');
         } else {
-          setError('Erro ao criar conta. Por favor, verifique os dados e tente novamente.');
+          setError(`Erro ao criar conta: ${authError.message || 'Por favor, verifique os dados e tente novamente.'}`);
         }
+        setIsLoading(false);
         return;
       }
 
-      // Cadastro bem-sucedido
+      // 🔒 Limpar rate limit após sucesso
+      clearRateLimit(identifier);
+
+      // Sempre mostrar mensagem de sucesso quando não há erro
+      // O Supabase sempre retorna user, mesmo quando precisa confirmar email
       if (data?.user) {
-        // 🔒 Limpar rate limit após sucesso
-        clearRateLimit(identifier);
-        
         // Verificar se precisa confirmar email
         if (data.user.confirmed_at) {
           // Email já confirmado - redirecionar
-          setSuccess('Conta criada com sucesso! Redirecionando...');
+          setSuccess('✅ Conta criada com sucesso! Redirecionando para o dashboard...');
           setTimeout(() => {
             navigate('/dashboard');
-          }, 1500);
+          }, 2000);
         } else {
-          // Email precisa ser confirmado
+          // Email precisa ser confirmado - SEMPRE mostrar mensagem clara
           setSuccess(
-            'Conta criada com sucesso! Enviamos um e-mail de confirmação para você. ' +
-            'Clique no link do e-mail para ativar sua conta e começar a usar a ferramenta.'
+            '✅ Conta criada com sucesso!\n\n' +
+            '📧 Enviamos um e-mail de confirmação para ' + sanitizedEmail + '.\n\n' +
+            'Por favor, verifique sua caixa de entrada e clique no botão "Confirmar Email" para ativar sua conta.\n\n' +
+            '⚠️ Se não encontrar o e-mail, verifique também a pasta de spam/lixo eletrônico.\n\n' +
+            'Após confirmar seu e-mail, você poderá fazer login e começar a usar a ferramenta!'
           );
+          
+          // Limpar formulário após sucesso
+          setFormData({
+            name: '',
+            email: '',
+            password: '',
+            confirmPassword: ''
+          });
         }
+      } else {
+        // Caso raro onde não há user retornado mas também não há erro
+        setSuccess('✅ Cadastro processado com sucesso! Verifique seu e-mail para confirmar sua conta.');
       }
     } catch (err: any) {
       setError(err.message || 'Erro ao criar conta. Tente novamente.');
@@ -223,7 +241,7 @@ export const Register: React.FC = () => {
             )}
 
             {success && (
-              <div className="bg-green-900/30 border border-green-700/50 rounded-lg p-4 text-green-200 text-sm">
+              <div className="bg-green-900/30 border border-green-700/50 rounded-lg p-4 text-green-200 text-sm whitespace-pre-line">
                 {success}
               </div>
             )}
