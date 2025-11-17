@@ -226,9 +226,12 @@ export const PromptManager: React.FC = () => {
                         } else {
                             console.warn('⚠️ Nenhuma versão encontrada para o prompt:', latestPrompt.id);
                             // Não limpar tudo, manter o prompt e formData carregados
+                            // Mas definir arrays vazios para que os componentes saibam que não há dados
+                            console.log('💾 Definindo arrays vazios no estado (sem versões)');
                             setVersionHistory([]);
                             setActiveVersion(null);
                             setChatMessages([]);
+                            console.log('✅ Estados de versões limpos (sem versões)');
                         }
                     } catch (versionsError: any) {
                         console.error('❌ ERRO CRÍTICO ao carregar versões:', versionsError);
@@ -240,10 +243,16 @@ export const PromptManager: React.FC = () => {
                             code: versionsError.code,
                         });
                         // Em caso de erro, não limpar tudo - manter o que já foi carregado
+                        // Mas definir arrays vazios para que os componentes saibam que não há dados
                         setVersionHistory([]);
                         setActiveVersion(null);
                         setChatMessages([]);
                     }
+                    
+                    // CRÍTICO: Aguardar um pouco mais para garantir que TODOS os estados foram atualizados
+                    console.log('⏳ Aguardando sincronização de estados...');
+                    await new Promise(resolve => setTimeout(resolve, 200));
+                    console.log('✅ Sincronização de estados concluída');
                 } else {
                     console.log('ℹ️ Nenhum prompt encontrado. Usuário pode começar criando um novo.');
                     // Limpar estados se não há prompts
