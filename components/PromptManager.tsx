@@ -131,13 +131,15 @@ export const PromptManager: React.FC = () => {
                         });
                         setActiveVersion(latestVersion);
                         
-                        // Carregar mensagens de chat da versão ativa
+                        // Carregar mensagens de chat da versão ativa ANTES de inicializar o chat
                         try {
                             console.log('💬 Carregando mensagens de chat da versão:', latestVersion.id);
                             const messages = await getChatMessages(latestVersion.id);
                             console.log('✅ Mensagens de chat carregadas:', messages?.length || 0);
                             
+                            // Definir mensagens ANTES de inicializar o chat
                             if (messages && messages.length > 0) {
+                                console.log('💬 Restaurando histórico completo de chat:', messages.length, 'mensagens');
                                 setChatMessages(messages);
                                 console.log('💬 Histórico de chat restaurado com sucesso');
                             } else {
@@ -145,14 +147,22 @@ export const PromptManager: React.FC = () => {
                                 console.log('ℹ️ Nenhuma mensagem de chat encontrada para esta versão');
                             }
                             
-                            // Reiniciar chat com o prompt da versão ativa
+                            // Reiniciar chat com o prompt da versão ativa DEPOIS de carregar as mensagens
                             if (latestVersion.content) {
+                                console.log('🔄 Inicializando chat com conteúdo da versão...');
                                 startChat(latestVersion.content);
-                                console.log('✅ Chat reiniciado com prompt da versão ativa');
+                                console.log('✅ Chat inicializado com prompt da versão ativa');
+                                console.log('📋 Conteúdo do prompt carregado:', latestVersion.content.substring(0, 100) + '...');
+                            } else {
+                                console.warn('⚠️ Versão não tem conteúdo para inicializar o chat');
                             }
                         } catch (err: any) {
                             console.error('❌ Erro ao carregar mensagens de chat:', err);
                             setChatMessages([]);
+                            // Mesmo com erro, tentar inicializar o chat
+                            if (latestVersion.content) {
+                                startChat(latestVersion.content);
+                            }
                         }
                     } else {
                         console.warn('⚠️ Prompt encontrado mas sem versões. Criando versão inicial...');
@@ -264,29 +274,47 @@ export const PromptManager: React.FC = () => {
         checkApiKey();
     }, []);
 
+    // Carregar dados quando a versão ativa muda (mas não durante o carregamento inicial)
     useEffect(() => {
+        // Ignorar durante o carregamento inicial para evitar conflitos
+        if (isLoadingData) {
+            console.log('⏸️ Carregamento inicial em andamento, ignorando mudança de versão');
+            return;
+        }
+
         // Só executar quando o ID da versão muda, não quando o objeto inteiro muda
         if (activeVersion?.id) {
-            console.log('🔄 Versão ativa mudou:', activeVersion.id);
-            startChat(activeVersion.content);
+            console.log('🔄 Versão ativa mudou (não é carregamento inicial):', activeVersion.id);
             
-            // Carregar mensagens de chat do banco apenas se ainda não foram carregadas
-            // ou se mudou para uma versão diferente
+            // Carregar mensagens de chat do banco ANTES de inicializar o chat
             const loadChatMessages = async () => {
                 try {
-                    console.log('💬 Carregando mensagens para versão:', activeVersion.id);
+                    console.log('💬 Carregando mensagens para nova versão:', activeVersion.id);
                     const messages = await getChatMessages(activeVersion.id);
                     console.log('✅ Mensagens carregadas:', messages?.length || 0);
                     
+                    // Definir mensagens ANTES de inicializar o chat
                     if (messages && messages.length > 0) {
+                        console.log('💬 Restaurando histórico de chat:', messages.length, 'mensagens');
                         setChatMessages(messages);
                     } else {
-                        // Só limpar se realmente não há mensagens
+                        // Limpar se realmente não há mensagens
                         setChatMessages([]);
+                        console.log('ℹ️ Nenhuma mensagem encontrada para esta versão');
+                    }
+                    
+                    // Inicializar chat DEPOIS de carregar as mensagens
+                    if (activeVersion.content) {
+                        console.log('🔄 Inicializando chat com nova versão...');
+                        startChat(activeVersion.content);
+                        console.log('✅ Chat inicializado com nova versão');
                     }
                 } catch (err: any) {
                     console.warn('⚠️ Erro ao carregar mensagens de chat:', err);
-                    // Não limpar mensagens se houve erro, pode ser problema temporário
+                    // Mesmo com erro, tentar inicializar o chat
+                    if (activeVersion.content) {
+                        startChat(activeVersion.content);
+                    }
                 }
             };
             
@@ -294,14 +322,16 @@ export const PromptManager: React.FC = () => {
             
             // Atualizar formData apenas se necessário (não sobrescrever dados já carregados)
             if (activeVersion.sourceData && activeVersion.sourceData.persona) {
+                console.log('📝 Atualizando formData com dados da versão');
                 setFormData(activeVersion.sourceData);
             }
         } else if (!isLoadingData && !currentPromptId) {
             // Só resetar se realmente não há dados (e já terminou de carregar)
+            console.log('🔄 Sem versão ativa e sem prompt, resetando formData');
             setFormData(INITIAL_PROMPT_DATA);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [activeVersion?.id]); // Dependência apenas do ID para evitar loops
+    }, [activeVersion?.id, isLoadingData]); // Dependência do ID e do estado de carregamento
     
     const handleAssistantToolCall = (toolCall: any) => {
         const { name, args } = toolCall;
