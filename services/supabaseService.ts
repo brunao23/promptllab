@@ -720,27 +720,62 @@ export async function getChatMessages(promptVersionId: string) {
     throw new Error('ID de versão de prompt inválido');
   }
 
+  console.log('🔍 Buscando mensagens de chat para versão:', promptVersionId, 'user_id:', user.id);
+  
+  // Primeiro verificar se a versão pertence a um prompt do usuário
+  const { data: versionCheck, error: versionCheckError } = await supabase
+    .from('prompt_versions')
+    .select('prompt_id, prompts!inner(user_id)')
+    .eq('id', promptVersionId)
+    .eq('prompts.user_id', user.id)
+    .single();
+
+  if (versionCheckError) {
+    console.error('❌ Erro ao verificar versão:', versionCheckError);
+    throw versionCheckError;
+  }
+
+  if (!versionCheck) {
+    console.error('❌ Versão não encontrada ou não pertence ao usuário');
+    throw new Error('Versão não encontrada ou você não tem permissão para acessá-la');
+  }
+
+  // Buscar mensagens
   const { data, error } = await supabase
     .from('chat_messages')
-    .select(`
-      *,
-      prompt_versions!inner(
-        prompts!inner(user_id)
-      )
-    `)
-    .eq('prompt_versions.prompts.user_id', user.id)
+    .select('*')
     .eq('prompt_version_id', promptVersionId)
     .order('order_index', { ascending: true });
 
-  if (error) throw error;
+  if (error) {
+    console.error('❌ Erro ao buscar mensagens:', error);
+    throw error;
+  }
 
-  return (data || []).map((m: any) => ({
-    author: m.author as 'user' | 'agent',
-    text: m.text,
-    feedback: m.feedback as 'correct' | 'incorrect' | undefined,
-    isEditing: false,
-    correction: m.correction,
-  })) as ChatMessage[];
+  console.log('✅ Mensagens encontradas no banco:', data?.length || 0);
+
+  if (!data || data.length === 0) {
+    console.log('ℹ️ Nenhuma mensagem encontrada para esta versão');
+    return [];
+  }
+
+  // Converter e validar cada mensagem
+  const messages = (data || []).map((m: any) => {
+    const message: ChatMessage = {
+      author: (m.author === 'user' || m.author === 'agent') ? m.author : 'user',
+      text: m.text || '',
+      feedback: m.feedback as 'correct' | 'incorrect' | undefined,
+      isEditing: false,
+      correction: m.correction || undefined,
+    };
+    
+    console.log(`  ✓ ${message.author}: ${message.text.substring(0, 50)}...`);
+    
+    return message;
+  });
+
+  console.log('✅ Mensagens convertidas com sucesso:', messages.length);
+  return messages;
 }
 
 // =====================================================
