@@ -36,14 +36,14 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({ history, activeVersi
             </button>
         </div>
       </div>
-      {history.length === 0 ? (
+      {(!history || history.length === 0) ? (
         <div className="flex-grow flex items-center justify-center text-slate-500 text-center text-sm p-4">
           Nenhuma versão gerada. Gere um novo prompt ou importe um existente.
         </div>
       ) : (
         <div className="flex-grow overflow-y-auto pr-2 -mr-2">
           <ul className="space-y-2">
-            {history.slice().reverse().map((version) => (
+            {(history || []).slice().reverse().map((version) => (
               <li
                 key={version.id}
                 onClick={() => onSelectVersion(version.id)}

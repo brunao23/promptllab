@@ -202,6 +202,18 @@ export const PromptManager: React.FC = () => {
         };
     }, []);
 
+    // Debug: Log quando versionHistory muda
+    useEffect(() => {
+        if (versionHistory.length > 0) {
+            console.log('📊 Histórico de versões atualizado:', {
+                total: versionHistory.length,
+                versoes: versionHistory.map(v => `v${v.version} (${v.id})`).join(', '),
+            });
+        } else {
+            console.log('📊 Histórico de versões está vazio');
+        }
+    }, [versionHistory]);
+
     // Auto-save do formData quando muda (debounced)
     useEffect(() => {
         if (hasUnsavedChanges && !isLoadingData) {
