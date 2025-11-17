@@ -1,17 +1,67 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { signOut, supabase, getCurrentProfile } from '../services/supabaseService';
 
 export const Header: React.FC = () => {
   const navigate = useNavigate();
-  const userEmail = localStorage.getItem('userEmail');
-  const userName = localStorage.getItem('userName');
-  const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [userName, setUserName] = useState<string | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  const handleLogout = () => {
-    localStorage.removeItem('isAuthenticated');
-    localStorage.removeItem('userEmail');
-    localStorage.removeItem('userName');
-    navigate('/login');
+  useEffect(() => {
+    // Verificar autenticação inicial
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setIsAuthenticated(!!session);
+
+      if (session?.user) {
+        setUserEmail(session.user.email || null);
+        
+        // Buscar perfil do usuário
+        try {
+          const profile = await getCurrentProfile();
+          if (profile) {
+            setUserName(profile.full_name || null);
+          }
+        } catch (error) {
+          console.error('Erro ao buscar perfil:', error);
+        }
+      }
+    };
+
+    checkAuth();
+
+    // Listener para mudanças de autenticação
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsAuthenticated(!!session);
+      
+      if (session?.user) {
+        setUserEmail(session.user.email || null);
+        
+        // Buscar perfil do usuário
+        getCurrentProfile().then(profile => {
+          if (profile) {
+            setUserName(profile.full_name || null);
+          }
+        }).catch(error => {
+          console.error('Erro ao buscar perfil:', error);
+        });
+      } else {
+        setUserEmail(null);
+        setUserName(null);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      navigate('/login');
+    } catch (error) {
+      console.error('Erro ao fazer logout:', error);
+    }
   };
 
   return (

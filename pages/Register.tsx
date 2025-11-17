@@ -1,16 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { signUp, supabase } from '../services/supabaseService';
 
 export const Register: React.FC = () => {
   const navigate = useNavigate();
   
   // Redireciona se já estiver autenticado
   useEffect(() => {
-    const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
-    if (isAuthenticated) {
-      navigate('/dashboard', { replace: true });
-    }
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        navigate('/dashboard', { replace: true });
+      }
+    };
+    checkAuth();
+
+    // Listener para mudanças de autenticação
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        navigate('/dashboard', { replace: true });
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, [navigate]);
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -18,13 +32,20 @@ export const Register: React.FC = () => {
     confirmPassword: ''
   });
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setSuccess(null);
 
     // Validações
+    if (!formData.name || !formData.email || !formData.password || !formData.confirmPassword) {
+      setError('Por favor, preencha todos os campos.');
+      return;
+    }
+
     if (formData.password !== formData.confirmPassword) {
       setError('As senhas não coincidem.');
       return;
@@ -35,21 +56,50 @@ export const Register: React.FC = () => {
       return;
     }
 
+    // Validação de email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      setError('Por favor, insira um e-mail válido.');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      // Simulação de cadastro (substituir por chamada real de API)
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Por enquanto, apenas redireciona (sem validação real)
-      // TODO: Implementar cadastro real
-      if (formData.name && formData.email && formData.password) {
-        localStorage.setItem('isAuthenticated', 'true');
-        localStorage.setItem('userEmail', formData.email);
-        localStorage.setItem('userName', formData.name);
-        navigate('/dashboard');
-      } else {
-        setError('Por favor, preencha todos os campos.');
+      // Cadastro real com Supabase
+      const { data, error: authError } = await signUp({
+        email: formData.email,
+        password: formData.password,
+        full_name: formData.name,
+      });
+
+      if (authError) {
+        // Tratamento de erros mais amigável
+        if (authError.message.includes('User already registered')) {
+          setError('Este e-mail já está cadastrado. Tente fazer login.');
+        } else if (authError.message.includes('Password')) {
+          setError('A senha deve ter pelo menos 6 caracteres.');
+        } else if (authError.message.includes('Email')) {
+          setError('Por favor, insira um e-mail válido.');
+        } else {
+          setError(authError.message || 'Erro ao criar conta. Tente novamente.');
+        }
+        return;
+      }
+
+      // Cadastro bem-sucedido
+      if (data?.user) {
+        // Verificar se precisa confirmar email
+        if (data.user.confirmed_at) {
+          // Email já confirmado - redirecionar
+          setSuccess('Conta criada com sucesso! Redirecionando...');
+          setTimeout(() => {
+            navigate('/dashboard');
+          }, 1500);
+        } else {
+          // Email precisa ser confirmado
+          setSuccess('Conta criada com sucesso! Verifique seu e-mail para confirmar a conta.');
+        }
       }
     } catch (err: any) {
       setError(err.message || 'Erro ao criar conta. Tente novamente.');
@@ -89,6 +139,12 @@ export const Register: React.FC = () => {
             {error && (
               <div className="bg-red-900/30 border border-red-700/50 rounded-lg p-4 text-red-200 text-sm">
                 {error}
+              </div>
+            )}
+
+            {success && (
+              <div className="bg-green-900/30 border border-green-700/50 rounded-lg p-4 text-green-200 text-sm">
+                {success}
               </div>
             )}
 

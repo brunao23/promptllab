@@ -1,16 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { signIn, supabase } from '../services/supabaseService';
 
 export const Login: React.FC = () => {
   const navigate = useNavigate();
   
   // Redireciona se já estiver autenticado
   useEffect(() => {
-    const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
-    if (isAuthenticated) {
-      navigate('/dashboard', { replace: true });
-    }
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        navigate('/dashboard', { replace: true });
+      }
+    };
+    checkAuth();
+
+    // Listener para mudanças de autenticação
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        navigate('/dashboard', { replace: true });
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, [navigate]);
+
   const [formData, setFormData] = useState({
     email: '',
     password: ''
@@ -24,17 +38,33 @@ export const Login: React.FC = () => {
     setIsLoading(true);
 
     try {
-      // Simulação de autenticação (substituir por chamada real de API)
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Por enquanto, apenas redireciona (sem validação real)
-      // TODO: Implementar autenticação real
-      if (formData.email && formData.password) {
-        localStorage.setItem('isAuthenticated', 'true');
-        localStorage.setItem('userEmail', formData.email);
-        navigate('/dashboard');
-      } else {
+      if (!formData.email || !formData.password) {
         setError('Por favor, preencha todos os campos.');
+        setIsLoading(false);
+        return;
+      }
+
+      // Autenticação real com Supabase
+      const { data, error: authError } = await signIn({
+        email: formData.email,
+        password: formData.password,
+      });
+
+      if (authError) {
+        // Tratamento de erros mais amigável
+        if (authError.message.includes('Invalid login credentials')) {
+          setError('E-mail ou senha incorretos. Tente novamente.');
+        } else if (authError.message.includes('Email not confirmed')) {
+          setError('Por favor, confirme seu e-mail antes de fazer login.');
+        } else {
+          setError(authError.message || 'Erro ao fazer login. Tente novamente.');
+        }
+        return;
+      }
+
+      // Login bem-sucedido - o listener do useEffect redirecionará automaticamente
+      if (data?.user) {
+        // Navegação será feita pelo listener de auth state change
       }
     } catch (err: any) {
       setError(err.message || 'Erro ao fazer login. Tente novamente.');
