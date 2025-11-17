@@ -74,15 +74,29 @@ export const Register: React.FC = () => {
       });
 
       if (authError) {
-        // Tratamento de erros mais amigável
-        if (authError.message.includes('User already registered')) {
-          setError('Este e-mail já está cadastrado. Tente fazer login.');
-        } else if (authError.message.includes('Password')) {
-          setError('A senha deve ter pelo menos 6 caracteres.');
-        } else if (authError.message.includes('Email')) {
-          setError('Por favor, insira um e-mail válido.');
+        // Tratamento de erros mais amigável em português
+        const errorMessage = authError.message || '';
+        
+        if (errorMessage.includes('User already registered') || errorMessage.includes('already registered') || errorMessage.includes('email_already_exists')) {
+          setError('Este e-mail já está cadastrado. Tente fazer login ou recuperar sua senha.');
+        } else if (errorMessage.includes('Password') || errorMessage.includes('password')) {
+          if (errorMessage.includes('length') || errorMessage.includes('6')) {
+            setError('A senha deve ter pelo menos 6 caracteres.');
+          } else {
+            setError('A senha não atende aos requisitos de segurança.');
+          }
+        } else if (errorMessage.includes('Email') || errorMessage.includes('email')) {
+          if (errorMessage.includes('invalid') || errorMessage.includes('formato')) {
+            setError('Por favor, insira um e-mail válido.');
+          } else {
+            setError('Erro com o e-mail fornecido. Verifique e tente novamente.');
+          }
+        } else if (errorMessage.includes('rate_limit') || errorMessage.includes('Too many requests')) {
+          setError('Muitas tentativas. Por favor, aguarde alguns minutos antes de tentar novamente.');
+        } else if (errorMessage.includes('Signup is disabled')) {
+          setError('O cadastro está temporariamente desabilitado. Entre em contato com o suporte.');
         } else {
-          setError(authError.message || 'Erro ao criar conta. Tente novamente.');
+          setError('Erro ao criar conta. Por favor, verifique os dados e tente novamente.');
         }
         return;
       }
@@ -98,7 +112,10 @@ export const Register: React.FC = () => {
           }, 1500);
         } else {
           // Email precisa ser confirmado
-          setSuccess('Conta criada com sucesso! Verifique seu e-mail para confirmar a conta.');
+          setSuccess(
+            'Conta criada com sucesso! Enviamos um e-mail de confirmação para você. ' +
+            'Clique no link do e-mail para ativar sua conta e começar a usar a ferramenta.'
+          );
         }
       }
     } catch (err: any) {

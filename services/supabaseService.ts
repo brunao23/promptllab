@@ -40,6 +40,12 @@ export interface SignInData {
  * Registra um novo usuário
  */
 export async function signUp(data: SignUpData) {
+  // SEMPRE usar a URL de produção para o email de confirmação
+  // Isso garante que o link do email sempre funcione, mesmo se o usuário
+  // estiver testando em localhost ou em preview da Vercel
+  const productionUrl = 'https://labprompt.com.br';
+  const redirectTo = `${productionUrl}/auth/callback`;
+  
   const { data: authData, error } = await supabase.auth.signUp({
     email: data.email,
     password: data.password,
@@ -47,6 +53,8 @@ export async function signUp(data: SignUpData) {
       data: {
         full_name: data.full_name,
       },
+      // SEMPRE usar produção para email de confirmação
+      emailRedirectTo: redirectTo,
     },
   });
 

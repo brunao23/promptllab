@@ -51,13 +51,21 @@ export const Login: React.FC = () => {
       });
 
       if (authError) {
-        // Tratamento de erros mais amigável
-        if (authError.message.includes('Invalid login credentials')) {
+        // Tratamento de erros mais amigável em português
+        const errorMessage = authError.message || '';
+        
+        if (errorMessage.includes('Invalid login credentials') || errorMessage.includes('Invalid credentials')) {
           setError('E-mail ou senha incorretos. Tente novamente.');
-        } else if (authError.message.includes('Email not confirmed')) {
-          setError('Por favor, confirme seu e-mail antes de fazer login.');
+        } else if (errorMessage.includes('Email not confirmed') || errorMessage.includes('email_not_confirmed')) {
+          setError('Por favor, confirme seu e-mail antes de fazer login. Verifique sua caixa de entrada.');
+        } else if (errorMessage.includes('Too many requests') || errorMessage.includes('rate_limit')) {
+          setError('Muitas tentativas. Por favor, aguarde alguns minutos antes de tentar novamente.');
+        } else if (errorMessage.includes('User not found')) {
+          setError('Usuário não encontrado. Verifique seu e-mail ou crie uma conta.');
+        } else if (errorMessage.includes('Password')) {
+          setError('Erro na senha. Verifique se digitou corretamente.');
         } else {
-          setError(authError.message || 'Erro ao fazer login. Tente novamente.');
+          setError('Erro ao fazer login. Por favor, verifique suas credenciais e tente novamente.');
         }
         return;
       }
