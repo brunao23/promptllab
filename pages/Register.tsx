@@ -45,6 +45,8 @@ export const Register: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [savedEmail, setSavedEmail] = useState<string | null>(null);
+  const [isResending, setIsResending] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
