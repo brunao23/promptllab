@@ -63,18 +63,27 @@ export const PromptManager: React.FC = () => {
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const audioChunksRef = useRef<Blob[]>([]);
 
-    // Carregar dados do Supabase ao montar o componente
+    // Carregar dados do Supabase ao montar o componente E quando a sessão mudar
     useEffect(() => {
         const loadUserData = async () => {
             try {
+                console.log('🔄 Iniciando carregamento de dados do usuário...');
                 setIsLoadingData(true);
                 
                 // Verificar se usuário está autenticado
                 const { data: { session } } = await supabase.auth.getSession();
                 if (!session) {
+                    console.log('⚠️ Usuário não autenticado, pulando carregamento');
                     setIsLoadingData(false);
+                    // Limpar estados se não há sessão
+                    setCurrentPromptId(null);
+                    setVersionHistory([]);
+                    setActiveVersion(null);
+                    setChatMessages([]);
                     return;
                 }
+
+                console.log('✅ Usuário autenticado:', session.user.email);
 
                 // Carregar prompts do usuário
                 console.log('📥 Carregando prompts do usuário...');
@@ -167,6 +176,28 @@ export const PromptManager: React.FC = () => {
         };
 
         loadUserData();
+
+        // Listener para mudanças de autenticação (logout/login)
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+            console.log('🔐 Mudança de autenticação:', event);
+            if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+                if (session) {
+                    console.log('✅ Usuário fez login, recarregando dados...');
+                    await loadUserData();
+                }
+            } else if (event === 'SIGNED_OUT') {
+                console.log('🚪 Usuário fez logout, limpando dados...');
+                setCurrentPromptId(null);
+                setVersionHistory([]);
+                setActiveVersion(null);
+                setChatMessages([]);
+                setFormData(INITIAL_PROMPT_DATA);
+            }
+        });
+
+        return () => {
+            subscription.unsubscribe();
+        };
     }, []);
 
     // Auto-save do formData quando muda (debounced)
