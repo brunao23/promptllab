@@ -182,6 +182,11 @@ export function isValidEmail(email: string): boolean {
 }
 
 /**
+ * Alias para isValidEmail (mantém compatibilidade)
+ */
+export const validateEmail = isValidEmail;
+
+/**
  * Valida força da senha
  */
 export interface PasswordValidation {
