@@ -582,27 +582,64 @@ export async function getPromptVersions(promptId: string) {
     throw new Error('ID de prompt inválido');
   }
 
+  console.log('🔍 Buscando versões no banco para prompt_id:', promptId, 'user_id:', user.id);
+  
+  // Primeiro verificar se o prompt pertence ao usuário
+  const { data: promptCheck, error: promptCheckError } = await supabase
+    .from('prompts')
+    .select('id')
+    .eq('id', promptId)
+    .eq('user_id', user.id)
+    .single();
+
+  if (promptCheckError) {
+    console.error('❌ Erro ao verificar prompt:', promptCheckError);
+    throw promptCheckError;
+  }
+
+  if (!promptCheck) {
+    console.error('❌ Prompt não encontrado ou não pertence ao usuário');
+    throw new Error('Prompt não encontrado ou você não tem permissão para acessá-lo');
+  }
+
+  // Agora buscar as versões
   const { data, error } = await supabase
     .from('prompt_versions')
-    .select(`
-      *,
-      prompts!inner(user_id)
-    `)
-    .eq('prompts.user_id', user.id)
+    .select('*')
     .eq('prompt_id', promptId)
     .order('version_number', { ascending: false });
 
-  if (error) throw error;
+  if (error) {
+    console.error('❌ Erro ao buscar versões:', error);
+    throw error;
+  }
 
-  return (data || []).map((v: any) => ({
-    id: v.id,
-    version: v.version_number,
-    content: v.content,
-    format: v.format,
-    masterFormat: v.master_format,
-    timestamp: new Date(v.created_at).toLocaleString('pt-BR'),
-    sourceData: v.source_data as PromptData,
-  })) as PromptVersion[];
+  console.log('✅ Versões encontradas no banco:', data?.length || 0);
+
+  if (!data || data.length === 0) {
+    console.log('ℹ️ Nenhuma versão encontrada para este prompt');
+    return [];
+  }
+
+  // Converter e validar cada versão
+  const versions = (data || []).map((v: any) => {
+    const version: PromptVersion = {
+      id: v.id,
+      version: v.version_number,
+      content: v.content || '',
+      format: v.format || 'markdown',
+      masterFormat: (v.master_format || 'markdown') as 'markdown' | 'json',
+      timestamp: v.created_at ? new Date(v.created_at).toLocaleString('pt-BR') : new Date().toLocaleString('pt-BR'),
+      sourceData: (v.source_data || {}) as PromptData,
+    };
+    
+    console.log(`  ✓ Versão ${version.version} (ID: ${version.id}) - Conteúdo: ${version.content?.length || 0} chars`);
+    
+    return version;
+  });
+
+  console.log('✅ Versões convertidas com sucesso:', versions.length);
+  return versions;
 }
 
 // =====================================================
