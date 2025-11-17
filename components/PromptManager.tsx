@@ -118,7 +118,9 @@ export const PromptManager: React.FC = () => {
                         });
                         
                         // Definir histórico completo
+                        console.log('💾 Definindo histórico completo no estado:', versions.length, 'versões');
                         setVersionHistory(versions);
+                        console.log('✅ Histórico definido no estado. Total de versões:', versions.length);
                         
                         // Carregar versão ativa (mais recente = primeira do array)
                         const latestVersion = versions[0];
