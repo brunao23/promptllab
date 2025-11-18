@@ -280,16 +280,20 @@ export const ShareChatPage: React.FC = () => {
         const labelHeight = 5;
         let bubbleHeight = (lines.length * lineHeight) + (padding * 2) + labelHeight;
         
-        // Se houver correção, adicionar espaço
+        // Calcular altura total incluindo feedback/correção
+        let totalHeight = bubbleHeight;
+        
         if (msg.feedback === 'incorrect' && msg.correction) {
           const correctionLines = doc.splitTextToSize(
-            `[Correção]: ${cleanTextForPDF(msg.correction)}`,
+            cleanTextForPDF(msg.correction),
             bubbleWidth - 20
           );
-          bubbleHeight += (correctionLines.length * 4) + 8;
+          totalHeight += (correctionLines.length * 5) + 15; // Espaço para correção
+        } else if (msg.feedback === 'correct') {
+          totalHeight += 8; // Espaço para feedback de correto
         }
         
-        if (y + bubbleHeight > pageHeight - margin) {
+        if (y + totalHeight > pageHeight - margin) {
           doc.addPage();
           y = 20;
         }
@@ -300,7 +304,7 @@ export const ShareChatPage: React.FC = () => {
         const userColor = [16, 185, 129];
         const agentColor = [60, 60, 60];
         
-        // Desenhar balão
+        // Desenhar balão da mensagem
         doc.setFillColor(isUser ? userColor[0] : agentColor[0], isUser ? userColor[1] : agentColor[1], isUser ? userColor[2] : agentColor[2]);
         doc.setDrawColor(isUser ? userColor[0] : agentColor[0], isUser ? userColor[1] : agentColor[1], isUser ? userColor[2] : agentColor[2]);
         doc.roundedRect(x, y, bubbleWidth, bubbleHeight, 3, 3, 'FD');
@@ -311,31 +315,60 @@ export const ShareChatPage: React.FC = () => {
         const authorLabel = isUser ? 'Cliente' : agentName;
         doc.text(authorLabel, x + padding, y + padding + labelHeight);
         
-        // Texto da mensagem
+        // Texto da mensagem (usar correção se houver)
         doc.setFontSize(11);
         doc.setTextColor(255, 255, 255);
-        doc.text(lines, x + padding, y + padding + labelHeight + lineHeight);
+        const displayText = (msg.feedback === 'incorrect' && msg.correction) 
+          ? cleanTextForPDF(msg.correction) 
+          : text;
+        const displayLines = doc.splitTextToSize(displayText, bubbleWidth - 20);
+        doc.text(displayLines, x + padding, y + padding + labelHeight + lineHeight);
         
-        let textY = y + padding + labelHeight + lineHeight + (lines.length * lineHeight) + 4;
+        let currentY = y + bubbleHeight + 8;
         
-        // Feedback e correção
-        if (msg.feedback === 'incorrect' && msg.correction) {
-          doc.setFontSize(9);
-          doc.setTextColor(255, 100, 100);
-          doc.text('[Feedback: Incorreto]', x + padding, textY);
-          textY += 6;
-          
-          const correctionText = cleanTextForPDF(msg.correction);
-          const correctionLines = doc.splitTextToSize(`Correção: ${correctionText}`, bubbleWidth - 20);
-          doc.setTextColor(100, 255, 100);
-          doc.text(correctionLines, x + padding, textY);
-        } else if (msg.feedback === 'correct') {
-          doc.setFontSize(9);
-          doc.setTextColor(100, 255, 100);
-          doc.text('[Feedback: Correto ✓]', x + padding, textY);
+        // Feedback e correção (apenas para mensagens do agente)
+        if (!isUser) {
+          if (msg.feedback === 'incorrect' && msg.correction) {
+            // Seção de correção destacada
+            const correctionText = cleanTextForPDF(msg.correction);
+            const correctionLines = doc.splitTextToSize(correctionText, pageWidth - (margin * 2) - 20);
+            const correctionHeight = (correctionLines.length * 5) + 15;
+            
+            // Fundo para seção de correção
+            doc.setFillColor(254, 243, 199); // amber-100 (fundo claro)
+            doc.setDrawColor(251, 191, 36); // amber-400 (borda)
+            doc.setLineWidth(1);
+            doc.roundedRect(margin, currentY, pageWidth - (margin * 2), correctionHeight, 3, 3, 'FD');
+            
+            // Título da correção
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(245, 158, 11); // amber-600
+            doc.text('Correção Sugerida pelo Cliente:', margin + 8, currentY + 8);
+            
+            // Texto original (riscado visualmente com cor diferente)
+            doc.setFontSize(9);
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(150, 150, 150); // Cinza para original
+            const originalLines = doc.splitTextToSize(`Original: ${text}`, pageWidth - (margin * 2) - 20);
+            doc.text(originalLines, margin + 8, currentY + 15);
+            
+            // Correção em verde
+            doc.setTextColor(16, 185, 129); // verde
+            const correctLines = doc.splitTextToSize(`Correção: ${correctionText}`, pageWidth - (margin * 2) - 20);
+            doc.text(correctLines, margin + 8, currentY + 15 + (originalLines.length * 5) + 5);
+            
+            currentY += correctionHeight + 8;
+          } else if (msg.feedback === 'correct') {
+            // Feedback positivo simples
+            doc.setFontSize(9);
+            doc.setTextColor(16, 185, 129); // verde
+            doc.text('[Feedback: Resposta marcada como correta]', x + padding, currentY);
+            currentY += 10;
+          }
         }
         
-        y += bubbleHeight + 8;
+        y = currentY;
       });
 
       doc.save(`historico_chat_cliente_${new Date().toISOString().split('T')[0]}.pdf`);
