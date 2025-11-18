@@ -1668,15 +1668,15 @@ export const PromptManager: React.FC = () => {
     // Mostrar loading enquanto carrega dados do Supabase
     if (isLoadingData) {
         return (
-            <div className="flex items-center justify-center h-full w-full bg-black">
-                <div className="flex flex-col items-center space-y-6">
+            <div className="flex items-center justify-center min-h-[400px] sm:min-h-[500px] md:min-h-[600px] w-full bg-black">
+                <div className="flex flex-col items-center space-y-4 sm:space-y-6 px-4">
                     <div className="relative">
-                        <div className="w-16 h-16 border-4 border-white/10 rounded-full"></div>
+                        <div className="w-12 h-12 sm:w-16 sm:h-16 border-4 border-emerald-500/30 rounded-full animate-spin border-t-emerald-500"></div>
                         <div className="absolute top-0 left-0 w-16 h-16 border-4 border-transparent border-t-emerald-400 border-r-green-500 rounded-full animate-spin"></div>
                     </div>
-                    <div className="text-center">
-                        <p className="text-white font-medium text-lg">Carregando seus dados...</p>
-                        <p className="text-white/40 text-sm mt-2">Aguarde um momento</p>
+                    <div className="text-center px-4">
+                        <p className="text-white/90 font-medium text-sm sm:text-base md:text-lg">Carregando seus prompts...</p>
+                        <p className="text-white/50 text-xs sm:text-sm mt-1 sm:mt-2">Aguarde um momento</p>
                     </div>
                 </div>
             </div>
@@ -1697,9 +1697,10 @@ export const PromptManager: React.FC = () => {
             <input type="file" ref={fileInputRef} onChange={handleFileSelected} className="hidden" accept=".txt,.md,.json" />
             
             {/* Desktop Layout */}
-            <div className="hidden lg:grid lg:grid-cols-12 lg:grid-rows-6 gap-6 p-6 h-full">
+            {/* Desktop Layout - Grid Responsivo Otimizado */}
+            <div className="hidden lg:grid lg:grid-cols-12 lg:grid-rows-6 gap-4 xl:gap-5 2xl:gap-6 p-4 lg:p-5 xl:p-6 h-full max-w-[1920px] mx-auto">
                 {/* Left Panel - Input Form */}
-                <div className="col-span-12 xl:col-span-4 lg:row-span-6 bg-white/5 backdrop-blur-sm rounded-2xl overflow-hidden border border-white/10 shadow-xl">
+                <div className="col-span-12 xl:col-span-4 lg:row-span-6 bg-white/5 backdrop-blur-sm rounded-xl xl:rounded-2xl overflow-hidden border border-white/10 shadow-xl min-h-0 flex flex-col">
                 <PromptInputForm
                     formData={formData}
                     setFormData={(newData) => {
@@ -1717,7 +1718,7 @@ export const PromptManager: React.FC = () => {
                 </div>
 
                 {/* Middle Panel - Output Display */}
-                <div className="col-span-12 xl:col-span-5 lg:row-span-4 bg-white/5 backdrop-blur-sm rounded-2xl overflow-hidden flex flex-col border border-white/10 shadow-xl">
+                <div className="col-span-12 xl:col-span-5 lg:row-span-4 bg-white/5 backdrop-blur-sm rounded-xl xl:rounded-2xl overflow-hidden flex flex-col border border-white/10 shadow-xl min-h-0">
                 <OutputDisplay 
                     version={activeVersion} 
                     isLoading={isUIBlocked} 
@@ -1729,7 +1730,7 @@ export const PromptManager: React.FC = () => {
                 </div>
 
                 {/* Top Right - Workspace Manager */}
-                <div className="col-span-12 xl:col-span-3 lg:row-span-2 bg-white/5 backdrop-blur-sm rounded-2xl overflow-hidden border border-white/10 shadow-xl">
+                <div className="col-span-12 xl:col-span-3 lg:row-span-2 bg-white/5 backdrop-blur-sm rounded-xl xl:rounded-2xl overflow-hidden border border-white/10 shadow-xl min-h-0 flex flex-col">
                     <WorkspaceManager
                         currentWorkspaceId={currentWorkspaceId}
                         onWorkspaceChange={handleWorkspaceChange}
@@ -1737,8 +1738,8 @@ export const PromptManager: React.FC = () => {
                     />
                 </div>
                 
-                {/* History Panel - Moved to another position */}
-                <div className="col-span-12 xl:col-span-3 lg:row-span-2 bg-white/5 backdrop-blur-sm rounded-2xl overflow-hidden border border-white/10 shadow-xl">
+                {/* History Panel - Top Right Middle */}
+                <div className="col-span-12 xl:col-span-3 lg:row-span-2 bg-white/5 backdrop-blur-sm rounded-xl xl:rounded-2xl overflow-hidden border border-white/10 shadow-xl min-h-0 flex flex-col">
                     <HistoryPanel
                     history={versionHistory}
                     activeVersionId={activeVersion?.id ?? null}
@@ -1751,8 +1752,8 @@ export const PromptManager: React.FC = () => {
                     />
                 </div>
 
-                {/* Top Right Bottom - Optimizer */}
-                <div className="col-span-12 xl:col-span-3 lg:row-span-2 bg-white/5 backdrop-blur-sm rounded-2xl overflow-hidden border border-white/10 shadow-xl">
+                {/* Optimizer - Top Right Bottom */}
+                <div className="col-span-12 xl:col-span-3 lg:row-span-2 bg-white/5 backdrop-blur-sm rounded-xl xl:rounded-2xl overflow-hidden border border-white/10 shadow-xl min-h-0 flex flex-col">
                     <PromptOptimizer 
                     onOptimize={handleOptimizePrompt}
                     isLoading={isOptimizing}
@@ -1765,7 +1766,7 @@ export const PromptManager: React.FC = () => {
                 </div>
 
                 {/* Bottom - Chat Interface */}
-                <div className="col-span-12 xl:col-span-5 lg:row-span-2 bg-white/5 backdrop-blur-sm rounded-2xl overflow-hidden border border-white/10 shadow-xl">
+                <div className="col-span-12 xl:col-span-5 lg:row-span-2 bg-white/5 backdrop-blur-sm rounded-xl xl:rounded-2xl overflow-hidden border border-white/10 shadow-xl min-h-0 flex flex-col">
                      <ChatInterface
                     messages={chatMessages}
                     onSendMessage={handleSendMessage}
@@ -1779,7 +1780,7 @@ export const PromptManager: React.FC = () => {
                 </div>
 
                 {/* Bottom Right - Assistant Panel */}
-                <div className="col-span-12 xl:col-span-3 lg:row-span-2 bg-white/5 backdrop-blur-sm rounded-2xl overflow-hidden border border-white/10 shadow-xl">
+                <div className="col-span-12 xl:col-span-3 lg:row-span-2 bg-white/5 backdrop-blur-sm rounded-xl xl:rounded-2xl overflow-hidden border border-white/10 shadow-xl min-h-0 flex flex-col">
                     <AssistantPanel 
                     messages={assistantMessages}
                     isRecording={isRecording}
@@ -1792,10 +1793,10 @@ export const PromptManager: React.FC = () => {
                 </div>
             </div>
 
-            {/* Mobile Layout */}
-            <div className="lg:hidden space-y-4 p-4">
+            {/* Mobile Layout - Totalmente Responsivo */}
+            <div className="lg:hidden space-y-3 sm:space-y-4 p-3 sm:p-4">
                 {/* Mobile - Input Form */}
-                <div className="bg-white/5 backdrop-blur-sm rounded-2xl overflow-hidden border border-white/10 shadow-xl">
+                <div className="bg-white/5 backdrop-blur-sm rounded-xl overflow-hidden border border-white/10 shadow-xl w-full">
                     <PromptInputForm
                         formData={formData}
                         setFormData={(newData) => {
@@ -1813,7 +1814,7 @@ export const PromptManager: React.FC = () => {
                 </div>
 
                 {/* Mobile - Output Display */}
-                <div className="bg-white/5 backdrop-blur-sm rounded-2xl overflow-hidden flex flex-col border border-white/10 shadow-xl min-h-[400px]">
+                <div className="bg-white/5 backdrop-blur-sm rounded-xl overflow-hidden flex flex-col border border-white/10 shadow-xl min-h-[300px] sm:min-h-[400px] w-full">
                     <OutputDisplay 
                         version={activeVersion} 
                         isLoading={isUIBlocked} 
@@ -1825,7 +1826,7 @@ export const PromptManager: React.FC = () => {
                 </div>
 
                 {/* Mobile - History Panel */}
-                <div className="bg-white/5 backdrop-blur-sm rounded-2xl overflow-hidden border border-white/10 shadow-xl min-h-[300px]">
+                <div className="bg-white/5 backdrop-blur-sm rounded-xl overflow-hidden border border-white/10 shadow-xl min-h-[250px] sm:min-h-[300px] w-full">
                     <HistoryPanel
                     history={versionHistory}
                     activeVersionId={activeVersion?.id ?? null}
@@ -1839,7 +1840,7 @@ export const PromptManager: React.FC = () => {
                 </div>
 
                 {/* Mobile - Optimizer */}
-                <div className="bg-white/5 backdrop-blur-sm rounded-2xl overflow-hidden border border-white/10 shadow-xl min-h-[300px]">
+                <div className="bg-white/5 backdrop-blur-sm rounded-xl overflow-hidden border border-white/10 shadow-xl min-h-[250px] sm:min-h-[300px] w-full">
                     <PromptOptimizer 
                         onOptimize={handleOptimizePrompt}
                         isLoading={isOptimizing}
@@ -1852,7 +1853,7 @@ export const PromptManager: React.FC = () => {
                 </div>
 
                 {/* Mobile - Chat Interface */}
-                <div className="bg-white/5 backdrop-blur-sm rounded-2xl overflow-hidden border border-white/10 shadow-xl min-h-[400px]">
+                <div className="bg-white/5 backdrop-blur-sm rounded-xl overflow-hidden border border-white/10 shadow-xl min-h-[300px] sm:min-h-[400px] w-full">
                      <ChatInterface 
                         messages={chatMessages}
                         onSendMessage={handleSendMessage}
@@ -1866,7 +1867,7 @@ export const PromptManager: React.FC = () => {
                 </div>
 
                 {/* Mobile - Assistant Panel */}
-                <div className="bg-white/5 backdrop-blur-sm rounded-2xl overflow-hidden border border-white/10 shadow-xl min-h-[300px]">
+                <div className="bg-white/5 backdrop-blur-sm rounded-xl overflow-hidden border border-white/10 shadow-xl min-h-[250px] sm:min-h-[300px] w-full">
                     <AssistantPanel 
                         messages={assistantMessages}
                         isRecording={isRecording}

@@ -133,11 +133,11 @@ export const SubscriptionInfo: React.FC = () => {
     planInfo.maxVersions === -1 ? 'Ilimitado' : `Máx. ${planInfo.maxVersions} versões/mês`;
 
   return (
-    <div className="bg-white/5 backdrop-blur-sm rounded-xl p-5 border border-white/10 shadow-xl">
-      <div className="flex items-center justify-between mb-4 pb-4 border-b border-white/10">
-        <div className="flex-1">
-          <div className="flex items-center space-x-2 mb-1">
-            <h3 className="text-white font-bold text-base">{planInfo.displayName}</h3>
+    <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 sm:p-5 border border-white/10 shadow-xl w-full">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 pb-4 border-b border-white/10 gap-2">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center space-x-2 mb-1 flex-wrap">
+            <h3 className="text-white font-bold text-sm sm:text-base truncate">{planInfo.displayName}</h3>
             {planInfo.isTrial && (
               <span className="px-2 py-0.5 bg-emerald-500/20 border border-emerald-500/50 rounded text-emerald-400 text-xs font-bold">
                 TRIAL
@@ -145,7 +145,7 @@ export const SubscriptionInfo: React.FC = () => {
             )}
           </div>
           {planInfo.isTrial && planInfo.trialDaysLeft !== null && (
-            <p className="text-emerald-400 text-sm font-medium mt-1">
+            <p className="text-emerald-400 text-xs sm:text-sm font-medium mt-1">
               ⏰ {planInfo.trialDaysLeft} {planInfo.trialDaysLeft === 1 ? 'dia' : 'dias'} restantes
             </p>
           )}
@@ -158,7 +158,7 @@ export const SubscriptionInfo: React.FC = () => {
             href="https://wa.me/5511999999999?text=Olá! Gostaria de fazer upgrade do meu plano."
             target="_blank"
             rel="noopener noreferrer"
-            className="text-xs text-emerald-400 hover:text-emerald-300 underline whitespace-nowrap"
+            className="text-xs sm:text-sm text-emerald-400 hover:text-emerald-300 underline whitespace-nowrap flex-shrink-0"
           >
             Upgrade
           </a>

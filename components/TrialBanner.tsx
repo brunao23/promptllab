@@ -95,7 +95,7 @@ export const TrialBanner: React.FC = () => {
 
   return (
     <div
-      className={`w-full px-4 py-3 mb-4 rounded-lg border ${
+      className={`w-full px-3 sm:px-4 md:px-5 py-3 sm:py-3.5 md:py-4 rounded-xl border shadow-lg ${
         isCritical
           ? 'bg-red-500/20 border-red-500/50'
           : isWarning
@@ -103,24 +103,24 @@ export const TrialBanner: React.FC = () => {
           : 'bg-emerald-500/20 border-emerald-500/50'
       }`}
     >
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <div className="flex items-center space-x-3">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+        <div className="flex items-start sm:items-center space-x-2 sm:space-x-3 flex-1 min-w-0">
           {isCritical ? (
-            <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5 sm:w-6 sm:h-6 text-red-400 flex-shrink-0 mt-0.5 sm:mt-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
           ) : isWarning ? (
-            <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5 sm:w-6 sm:h-6 text-amber-400 flex-shrink-0 mt-0.5 sm:mt-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
           ) : (
-            <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-400 flex-shrink-0 mt-0.5 sm:mt-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
             </svg>
           )}
-          <div>
+          <div className="min-w-0 flex-1">
             <p
-              className={`font-semibold ${
+              className={`font-semibold text-sm sm:text-base leading-tight ${
                 isCritical ? 'text-red-400' : isWarning ? 'text-amber-400' : 'text-emerald-400'
               }`}
             >
@@ -130,7 +130,7 @@ export const TrialBanner: React.FC = () => {
                 ? `⏰ Seu trial grátis expira em ${daysLeft} ${daysLeft === 1 ? 'dia' : 'dias'}`
                 : `🎉 Você está no trial grátis! ${daysLeft} ${daysLeft === 1 ? 'dia' : 'dias'} restantes`}
             </p>
-            <p className="text-white/60 text-sm mt-1">
+            <p className="text-white/60 text-xs sm:text-sm mt-1 leading-snug">
               {planInfo.displayName} • Teste completo da plataforma
             </p>
           </div>
@@ -139,7 +139,7 @@ export const TrialBanner: React.FC = () => {
           href="https://wa.me/5511999999999?text=Olá! Gostaria de fazer upgrade do meu plano."
           target="_blank"
           rel="noopener noreferrer"
-          className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-black font-semibold rounded-lg transition-colors text-sm whitespace-nowrap"
+          className="px-4 sm:px-5 py-2 sm:py-2.5 bg-emerald-500 hover:bg-emerald-600 text-black font-semibold rounded-lg transition-all duration-200 text-xs sm:text-sm whitespace-nowrap shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 hover:scale-105"
         >
           Fazer Upgrade
         </a>

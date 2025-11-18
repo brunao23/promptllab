@@ -98,7 +98,7 @@ export const PromptInputForm: React.FC<PromptInputFormProps> = ({
   const baseInputClasses = "w-full p-2 bg-white/5 border border-white/10 rounded-md text-white/80 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500";
 
   return (
-    <div className="p-4 space-y-4 overflow-y-auto h-full">
+    <div className="p-3 sm:p-4 md:p-5 lg:p-6 space-y-3 sm:space-y-4 md:space-y-5 overflow-y-auto h-full">
         
         <DocumentUploader 
             onDataExtracted={handleDataExtracted}
