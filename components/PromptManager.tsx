@@ -1139,6 +1139,91 @@ export const PromptManager: React.FC = () => {
                     isApiKeySelected={isApiKeySelected}
                     onSelectKey={handleSelectApiKey}
                  />
+                </div>
+            </div>
+
+            {/* Mobile Layout */}
+            <div className="lg:hidden space-y-4 p-4">
+                {/* Mobile - Input Form */}
+                <div className="bg-slate-900/60 backdrop-blur-sm rounded-2xl overflow-hidden border border-slate-800/50 shadow-xl shadow-black/20">
+                    <PromptInputForm
+                        formData={formData}
+                        setFormData={(newData) => {
+                            setFormData(newData);
+                            setHasUnsavedChanges(true);
+                        }}
+                        onGenerate={handleGeneratePrompt}
+                        isLoading={isLoading}
+                        onGenerateExamples={handleGenerateExamples}
+                        isGeneratingExamples={isGeneratingExamples}
+                        activePromptContent={activeVersion?.content ?? ''}
+                    />
+                </div>
+
+                {/* Mobile - Output Display */}
+                <div className="bg-slate-900/60 backdrop-blur-sm rounded-2xl overflow-hidden flex flex-col border border-slate-800/50 shadow-xl shadow-black/20 min-h-[400px]">
+                    <OutputDisplay 
+                        version={activeVersion} 
+                        isLoading={isUIBlocked} 
+                        error={error} 
+                        isValidated={!!validatedVersionId && activeVersion?.id === validatedVersionId}
+                        onValidate={handleValidateVersion}
+                        onExplain={handleExplainPrompt}
+                    />
+                </div>
+
+                {/* Mobile - History Panel */}
+                <div className="bg-slate-900/60 backdrop-blur-sm rounded-2xl overflow-hidden border border-slate-800/50 shadow-xl shadow-black/20 min-h-[300px]">
+                    <HistoryPanel
+                        history={versionHistory}
+                        activeVersionId={activeVersion?.id ?? null}
+                        onSelectVersion={handleSelectVersion}
+                        onDeleteVersion={handleDeleteVersion}
+                        validatedVersionId={validatedVersionId}
+                        onImport={handleImportClick}
+                        onPaste={handlePasteClick}
+                    />
+                </div>
+
+                {/* Mobile - Optimizer */}
+                <div className="bg-slate-900/60 backdrop-blur-sm rounded-2xl overflow-hidden border border-slate-800/50 shadow-xl shadow-black/20 min-h-[300px]">
+                    <PromptOptimizer 
+                        onOptimize={handleOptimizePrompt}
+                        isLoading={isOptimizing}
+                        disabled={!activeVersion || isUIBlocked}
+                        optimizationPairs={optimizationPairs}
+                        onClearCorrections={() => setOptimizationPairs([])}
+                        manualInstructions={manualOptInstructions}
+                        onManualInstructionsChange={setManualOptInstructions}
+                     />
+                </div>
+
+                {/* Mobile - Chat Interface */}
+                <div className="bg-slate-900/60 backdrop-blur-sm rounded-2xl overflow-hidden border border-slate-800/50 shadow-xl shadow-black/20 min-h-[400px]">
+                     <ChatInterface 
+                        messages={chatMessages}
+                        onSendMessage={handleSendMessage}
+                        onClearChat={handleClearChat}
+                        isLoading={isChatLoading}
+                        disabled={!activeVersion || isUIBlocked}
+                        onUpdateMessage={handleUpdateMessage}
+                        onSaveCorrection={handleSaveCorrection}
+                        onDownloadChat={handleDownloadChat}
+                     />
+                </div>
+
+                {/* Mobile - Assistant Panel */}
+                <div className="bg-slate-900/60 backdrop-blur-sm rounded-2xl overflow-hidden border border-slate-800/50 shadow-xl shadow-black/20 min-h-[300px]">
+                    <AssistantPanel 
+                        messages={assistantMessages}
+                        isRecording={isRecording}
+                        onToggleRecording={handleToggleRecording}
+                        isAssistantLoading={isAssistantLoading}
+                        error={assistantError}
+                        isApiKeySelected={isApiKeySelected}
+                        onSelectKey={handleSelectApiKey}
+                     />
+                </div>
             </div>
         </div>
     );
