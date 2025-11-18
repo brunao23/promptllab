@@ -152,7 +152,6 @@ END $$;
 CREATE TABLE IF NOT EXISTS public.usage_tracking (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  subscription_id UUID REFERENCES public.subscriptions(id) ON DELETE SET NULL,
   
   -- Tipo de uso
   usage_type TEXT NOT NULL, -- 'prompt_generation', 'chat', 'document_analysis'
@@ -174,6 +173,20 @@ CREATE TABLE IF NOT EXISTS public.usage_tracking (
   
   CONSTRAINT usage_tracking_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
 );
+
+-- Adicionar coluna subscription_id se não existir (para compatibilidade com tabelas já criadas)
+DO $$ 
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+    AND table_name = 'usage_tracking' 
+    AND column_name = 'subscription_id'
+  ) THEN
+    ALTER TABLE public.usage_tracking 
+    ADD COLUMN subscription_id UUID REFERENCES public.subscriptions(id) ON DELETE SET NULL;
+  END IF;
+END $$;
 
 -- =====================================================
 -- TABELA: admin_users (Usuários com acesso admin)
@@ -229,7 +242,20 @@ BEGIN
 END $$;
 
 CREATE INDEX IF NOT EXISTS idx_usage_tracking_user_id ON public.usage_tracking(user_id);
-CREATE INDEX IF NOT EXISTS idx_usage_tracking_subscription_id ON public.usage_tracking(subscription_id);
+
+-- Criar índice subscription_id apenas se a coluna existir
+DO $$ 
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+    AND table_name = 'usage_tracking' 
+    AND column_name = 'subscription_id'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS idx_usage_tracking_subscription_id ON public.usage_tracking(subscription_id);
+  END IF;
+END $$;
+
 CREATE INDEX IF NOT EXISTS idx_usage_tracking_period ON public.usage_tracking(usage_year, usage_month);
 CREATE INDEX IF NOT EXISTS idx_usage_tracking_created_at ON public.usage_tracking(created_at DESC);
 
