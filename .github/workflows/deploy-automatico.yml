@@ -26,23 +26,58 @@ jobs:
           node-version: '18'
           cache: 'npm'
 
-      - name: 📥 Instalar dependências
+      - name: 📋 Verificar estrutura
         run: |
-          if [ -f package-lock.json ]; then
-            npm ci
+          echo "📁 Estrutura do repositório:"
+          ls -la
+          echo ""
+          echo "📦 Verificando package.json:"
+          if [ -f package.json ]; then
+            echo "✅ package.json encontrado"
+            cat package.json | head -10
           else
-            npm install
+            echo "❌ package.json NÃO encontrado!"
+            exit 1
           fi
 
-      - name: 🔍 Verificar build
-        run: npm run build
-        env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      - name: 📥 Instalar dependências
+        run: |
+          echo "📥 Instalando dependências..."
+          if [ -f package-lock.json ]; then
+            echo "Usando npm ci (package-lock.json encontrado)"
+            npm ci
+          else
+            echo "Usando npm install (package-lock.json não encontrado)"
+            npm install
+          fi
+          echo "✅ Dependências instaladas"
 
-      - name: ✅ Build verificado
+      - name: 🔍 Verificar build
+        run: |
+          echo "🔍 Iniciando build..."
+          npm run build
+          echo "✅ Build concluído"
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || '' }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || '' }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || '' }}
+          API_KEY: ${{ secrets.GEMINI_API_KEY || '' }}
+
+      - name: ✅ Verificar artefatos do build
+        run: |
+          echo "📦 Verificando artefatos do build..."
+          if [ -d "dist" ]; then
+            echo "✅ Diretório dist encontrado"
+            ls -la dist/ | head -10
+            echo ""
+            echo "📊 Tamanho do build:"
+            du -sh dist/
+          else
+            echo "❌ Diretório dist NÃO encontrado!"
+            exit 1
+          fi
+          
+      - name: ✅ Build concluído
         run: |
           echo "✅ Build concluído com sucesso!"
           echo "📦 Os arquivos estão prontos em ./dist"
