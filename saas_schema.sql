@@ -68,9 +68,10 @@ CREATE TABLE IF NOT EXISTS public.subscriptions (
   CONSTRAINT subscriptions_status_check CHECK (status IN ('trial', 'active', 'cancelled', 'expired'))
 );
 
--- Adicionar coluna tenant_id se não existir (para compatibilidade com tabelas já criadas)
+-- Adicionar colunas se não existirem (para compatibilidade com tabelas já criadas)
 DO $$ 
 BEGIN
+  -- Adicionar tenant_id se não existir
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.columns 
     WHERE table_schema = 'public' 
@@ -79,6 +80,69 @@ BEGIN
   ) THEN
     ALTER TABLE public.subscriptions 
     ADD COLUMN tenant_id UUID REFERENCES public.tenants(id) ON DELETE SET NULL;
+  END IF;
+
+  -- Adicionar is_active se não existir
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+    AND table_name = 'subscriptions' 
+    AND column_name = 'is_active'
+  ) THEN
+    ALTER TABLE public.subscriptions 
+    ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT true;
+  END IF;
+
+  -- Adicionar outras colunas se não existirem
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+    AND table_name = 'subscriptions' 
+    AND column_name = 'trial_started_at'
+  ) THEN
+    ALTER TABLE public.subscriptions 
+    ADD COLUMN trial_started_at TIMESTAMPTZ;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+    AND table_name = 'subscriptions' 
+    AND column_name = 'trial_ends_at'
+  ) THEN
+    ALTER TABLE public.subscriptions 
+    ADD COLUMN trial_ends_at TIMESTAMPTZ;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+    AND table_name = 'subscriptions' 
+    AND column_name = 'subscription_started_at'
+  ) THEN
+    ALTER TABLE public.subscriptions 
+    ADD COLUMN subscription_started_at TIMESTAMPTZ;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+    AND table_name = 'subscriptions' 
+    AND column_name = 'subscription_ends_at'
+  ) THEN
+    ALTER TABLE public.subscriptions 
+    ADD COLUMN subscription_ends_at TIMESTAMPTZ;
+  END IF;
+
+  -- Garantir que status existe com valor padrão
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+    AND table_name = 'subscriptions' 
+    AND column_name = 'status'
+  ) THEN
+    ALTER TABLE public.subscriptions 
+    ADD COLUMN status TEXT NOT NULL DEFAULT 'trial';
   END IF;
 END $$;
 
@@ -150,7 +214,19 @@ BEGIN
 END $$;
 
 CREATE INDEX IF NOT EXISTS idx_subscriptions_status ON public.subscriptions(status);
-CREATE INDEX IF NOT EXISTS idx_subscriptions_is_active ON public.subscriptions(is_active);
+
+-- Criar índice is_active apenas se a coluna existir
+DO $$ 
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+    AND table_name = 'subscriptions' 
+    AND column_name = 'is_active'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS idx_subscriptions_is_active ON public.subscriptions(is_active);
+  END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_usage_tracking_user_id ON public.usage_tracking(user_id);
 CREATE INDEX IF NOT EXISTS idx_usage_tracking_subscription_id ON public.usage_tracking(subscription_id);
