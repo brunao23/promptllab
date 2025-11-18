@@ -315,43 +315,65 @@ export async function uploadAvatar(file: File): Promise<string> {
       upsert: true, // Permitir sobrescrever se já existir
     });
 
-  // Se o bucket não existir, tentar criar
-  if (error && (error.message.includes('Bucket not found') || error.message.includes('not found'))) {
-    console.log('⚠️ [uploadAvatar] Bucket não encontrado. Tentando criar...');
-    
-    // Tentar criar o bucket (requer permissões adequadas)
-    try {
-      const { error: createError } = await supabase.storage.createBucket('avatars', {
-        public: true,
-        allowedMimeTypes: ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp'],
-        fileSizeLimit: 5242880, // 5MB em bytes
-      });
-
-      if (createError && !createError.message.includes('already exists')) {
-        console.error('❌ [uploadAvatar] Erro ao criar bucket:', createError);
-        throw new Error('Erro ao configurar armazenamento. Por favor, crie o bucket "avatars" manualmente no Supabase Storage.');
-      }
-
-      // Tentar upload novamente após criar o bucket
-      const retryResult = await supabase.storage
-        .from('avatars')
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: true,
-        });
-
-      if (retryResult.error) {
-        throw retryResult.error;
-      }
-      data = retryResult.data;
-      error = null;
-    } catch (createErr: any) {
-      console.error('❌ [uploadAvatar] Erro ao criar bucket ou fazer upload:', createErr);
-      throw new Error('Erro ao fazer upload. Por favor, verifique se o bucket "avatars" existe no Supabase Storage ou contate o suporte.');
-    }
+  // Se o bucket não existir, dar mensagem clara ao usuário
+  if (error && (error.message.includes('Bucket not found') || error.message.includes('not found') || error.message.includes('does not exist'))) {
+    console.error('❌ [uploadAvatar] Bucket "avatars" não encontrado no Supabase Storage');
+    throw new Error(
+      'O bucket de armazenamento não foi configurado.\n\n' +
+      'Por favor, crie o bucket "avatars" no Supabase Storage:\n' +
+      '1. Acesse o Dashboard do Supabase\n' +
+      '2. Vá para Storage → Create bucket\n' +
+      '3. Nome: avatars\n' +
+      '4. Público: Sim\n' +
+      '5. Clique em Create\n\n' +
+      'Após criar o bucket, tente novamente. Consulte o arquivo CRIAR_BUCKET_AVATARS.md para mais detalhes.'
+    );
   } else if (error) {
     console.error('❌ [uploadAvatar] Erro ao fazer upload:', error);
-    throw new Error(error.message || 'Erro ao fazer upload da imagem. Tente novamente.');
+    
+    // Mensagens de erro mais específicas
+    if (error.message.includes('File size exceeds') || error.message.includes('size')) {
+      throw new Error('O arquivo é muito grande. O tamanho máximo permitido é 5MB.');
+    } else if (error.message.includes('Invalid file type') || error.message.includes('file type')) {
+      throw new Error('Tipo de arquivo inválido. Apenas imagens (PNG, JPG, GIF, WEBP) são permitidas.');
+    } else if (error.message.includes('Unauthorized') || error.message.includes('permission') || error.message.includes('403')) {
+      throw new Error('Erro de permissão. Verifique se o bucket "avatars" está configurado como público no Supabase Storage.');
+    } else if (error.message.includes('duplicate') || error.message.includes('already exists')) {
+      // Tentar novamente com nome diferente se o arquivo já existe
+      const newFileName = `${user.id}-${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+      const newFilePath = `avatars/${newFileName}`;
+      
+      const retryResult = await supabase.storage
+        .from('avatars')
+        .upload(newFilePath, file, {
+          cacheControl: '3600',
+          upsert: false,
+        });
+      
+      if (retryResult.error) {
+        throw new Error(retryResult.error.message || 'Erro ao fazer upload da imagem. Tente novamente.');
+      }
+      
+      // Atualizar filePath para o novo nome
+      filePath = newFilePath;
+      const { data: { publicUrl: retryUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+      
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: retryUrl })
+        .eq('id', user.id);
+
+      if (updateError) {
+        console.error('❌ [uploadAvatar] Erro ao atualizar perfil:', updateError);
+      }
+
+      console.log('✅ [uploadAvatar] Avatar enviado com sucesso (retry):', retryUrl);
+      return retryUrl;
+    }
+    
+    throw new Error(error.message || 'Erro ao fazer upload da imagem. Tente novamente ou contate o suporte.');
   }
 
   // Obter URL pública da imagem
