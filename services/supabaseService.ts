@@ -416,11 +416,10 @@ export async function uploadAvatar(file: File): Promise<string> {
         throw new Error(retryResult.error.message || 'Erro ao fazer upload da imagem. Tente novamente.');
       }
       
-      // Atualizar filePath para o novo nome
-      filePath = newFilePath;
+      // Usar o novo filePath para obter a URL pública
       const { data: { publicUrl: retryUrl } } = supabase.storage
         .from('avatars')
-        .getPublicUrl(filePath);
+        .getPublicUrl(newFilePath);
       
       const { error: updateError } = await supabase
         .from('profiles')
