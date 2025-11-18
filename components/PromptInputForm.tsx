@@ -109,7 +109,7 @@ export const PromptInputForm: React.FC<PromptInputFormProps> = ({
               <textarea value={formData.persona} onChange={(e) => handleInputChange('persona', e.target.value)} rows={3} className={baseInputClasses} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">Objetivo Principal</label>
+              <label className="block text-sm font-medium text-white/80 mb-1">Objetivo Principal</label>
               <textarea value={formData.objetivo} onChange={(e) => handleInputChange('objetivo', e.target.value)} rows={3} className={baseInputClasses} />
             </div>
           </div>

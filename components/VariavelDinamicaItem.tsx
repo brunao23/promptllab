@@ -30,7 +30,7 @@ export const VariavelDinamicaItem: React.FC<VariavelDinamicaItemProps> = ({ vari
           />
         </div>
         <div className="flex-1">
-          <label className="block text-sm font-medium text-slate-400 mb-1">Valor</label>
+          <label className="block text-sm font-medium text-white/60 mb-1">Valor</label>
            <input
             type="text"
             value={variavel.valor}

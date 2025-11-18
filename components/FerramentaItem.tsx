@@ -29,7 +29,7 @@ export const FerramentaItem: React.FC<FerramentaItemProps> = ({ ferramenta, onUp
         />
       </div>
       <div>
-        <label className="block text-sm font-medium text-slate-400 mb-1">Descrição</label>
+        <label className="block text-sm font-medium text-white/60 mb-1">Descrição</label>
         <textarea
           value={ferramenta.descricao}
           onChange={(e) => onUpdate(ferramenta.id, 'descricao', e.target.value)}

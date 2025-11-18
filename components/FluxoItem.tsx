@@ -42,15 +42,15 @@ export const FluxoItem: React.FC<FluxoItemProps> = ({ fluxo, onUpdate, onRemove 
                         <input type="text" value={fluxo.tipoPrompt} onChange={(e) => handleChange('tipoPrompt', e.target.value)} className={baseInputClasses} />
                     </div>
                      <div>
-                        <label className="text-xs text-slate-400">Objetivo</label>
+                        <label className="text-xs text-white/60">Objetivo</label>
                         <input type="text" value={fluxo.objetivo} onChange={(e) => handleChange('objetivo', e.target.value)} className={baseInputClasses} />
                     </div>
                     <div>
-                        <label className="text-xs text-slate-400">Base de Conhecimento (RAG)</label>
+                        <label className="text-xs text-white/60">Base de Conhecimento (RAG)</label>
                         <textarea value={fluxo.baseConhecimentoRAG} onChange={(e) => handleChange('baseConhecimentoRAG', e.target.value)} rows={2} className={baseInputClasses} />
                     </div>
                     <div>
-                        <label className="text-xs text-slate-400">Exemplos (Few-Shot)</label>
+                        <label className="text-xs text-white/60">Exemplos (Few-Shot)</label>
                         <textarea 
                             value={fluxo.fewShotExamples} 
                             onChange={(e) => handleChange('fewShotExamples', e.target.value)} 

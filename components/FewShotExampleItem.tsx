@@ -30,7 +30,7 @@ export const FewShotExampleItem: React.FC<FewShotExampleItemProps> = ({ example,
         />
       </div>
       <div>
-        <label className="block text-sm font-medium text-slate-400 mb-1">Agente:</label>
+        <label className="block text-sm font-medium text-white/60 mb-1">Agente:</label>
         <textarea
           value={example.agent}
           onChange={(e) => onUpdate(example.id, 'agent', e.target.value)}
