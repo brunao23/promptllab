@@ -22,6 +22,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onMobileClose })
           const profile = await getCurrentProfile();
           if (profile) {
             setUserName(profile.full_name || null);
+            setAvatarUrl(profile.avatar_url || null);
           }
         } catch (error) {
           console.error('Erro ao buscar perfil:', error);
@@ -37,6 +38,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onMobileClose })
         getCurrentProfile().then(profile => {
           if (profile) {
             setUserName(profile.full_name || null);
+            setAvatarUrl(profile.avatar_url || null);
           }
         }).catch(() => {});
       } else {
@@ -77,6 +79,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onMobileClose })
       ),
       path: '/dashboard/repository',
       active: location.pathname === '/dashboard/repository',
+    },
+    {
+      label: 'Configurações',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+      ),
+      path: '/dashboard/settings',
+      active: location.pathname === '/dashboard/settings',
     },
   ];
 
@@ -142,8 +155,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onMobileClose })
         {/* User Profile */}
         <div className="p-4 border-t border-white/5">
           <div className="flex items-center space-x-3 p-3 rounded-lg bg-white/5 border border-white/5 mb-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-amber-400 to-yellow-500 rounded-full flex items-center justify-center text-black font-bold text-sm shadow-lg shadow-amber-500/30">
-              {userName ? userName.charAt(0).toUpperCase() : userEmail?.charAt(0).toUpperCase() || 'U'}
+            <div className="w-10 h-10 bg-gradient-to-br from-amber-400 to-yellow-500 rounded-full flex items-center justify-center text-black font-bold text-sm shadow-lg shadow-amber-500/30 overflow-hidden border-2 border-white/20">
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+              ) : (
+                userName ? userName.charAt(0).toUpperCase() : userEmail?.charAt(0).toUpperCase() || 'U'
+              )}
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-white truncate">

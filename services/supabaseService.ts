@@ -225,6 +225,126 @@ export async function getCurrentProfile() {
   return data;
 }
 
+/**
+ * Atualiza o perfil do usuário atual
+ */
+export async function updateProfile(updates: { full_name?: string }) {
+  const user = await getCurrentUser();
+  if (!user) throw new Error('Usuário não autenticado');
+
+  console.log('💾 [updateProfile] Atualizando perfil:', updates);
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .update(updates)
+    .eq('id', user.id)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('❌ [updateProfile] Erro ao atualizar perfil:', error);
+    throw error;
+  }
+
+  console.log('✅ [updateProfile] Perfil atualizado com sucesso');
+  return data;
+}
+
+/**
+ * Altera a senha do usuário atual
+ */
+export async function changePassword(currentPassword: string, newPassword: string) {
+  const user = await getCurrentUser();
+  if (!user) throw new Error('Usuário não autenticado');
+
+  console.log('🔐 [changePassword] Alterando senha...');
+
+  // Primeiro, verificar a senha atual fazendo login
+  const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+    email: user.email!,
+    password: currentPassword,
+  });
+
+  if (authError || !authData.user) {
+    throw new Error('Senha atual incorreta');
+  }
+
+  // Se a senha atual está correta, atualizar para a nova senha
+  const { error: updateError } = await supabase.auth.updateUser({
+    password: newPassword,
+  });
+
+  if (updateError) {
+    console.error('❌ [changePassword] Erro ao atualizar senha:', updateError);
+    throw updateError;
+  }
+
+  console.log('✅ [changePassword] Senha alterada com sucesso');
+}
+
+/**
+ * Faz upload de avatar para Supabase Storage
+ */
+export async function uploadAvatar(file: File): Promise<string> {
+  const user = await getCurrentUser();
+  if (!user) throw new Error('Usuário não autenticado');
+
+  console.log('📤 [uploadAvatar] Fazendo upload do avatar...');
+
+  // Validar tipo de arquivo
+  if (!file.type.startsWith('image/')) {
+    throw new Error('Apenas imagens são permitidas');
+  }
+
+  // Validar tamanho (max 5MB)
+  if (file.size > 5 * 1024 * 1024) {
+    throw new Error('A imagem deve ter no máximo 5MB');
+  }
+
+  // Criar nome único para o arquivo
+  const fileExt = file.name.split('.').pop();
+  const fileName = `${user.id}-${Date.now()}.${fileExt}`;
+  const filePath = `avatars/${fileName}`;
+
+  // Fazer upload para Supabase Storage
+  const { data, error } = await supabase.storage
+    .from('avatars')
+    .upload(filePath, file, {
+      cacheControl: '3600',
+      upsert: false,
+    });
+
+  if (error) {
+    console.error('❌ [uploadAvatar] Erro ao fazer upload:', error);
+    
+    // Se o bucket não existe, criar ou usar public
+    if (error.message.includes('Bucket not found')) {
+      throw new Error('Erro ao fazer upload. Contate o suporte.');
+    }
+    
+    throw error;
+  }
+
+  // Obter URL pública da imagem
+  const { data: { publicUrl } } = supabase.storage
+    .from('avatars')
+    .getPublicUrl(filePath);
+
+  // Atualizar URL do avatar no perfil
+  const { error: updateError } = await supabase
+    .from('profiles')
+    .update({ avatar_url: publicUrl })
+    .eq('id', user.id);
+
+  if (updateError) {
+    console.error('❌ [uploadAvatar] Erro ao atualizar perfil:', updateError);
+    // Não jogar erro aqui, o upload foi bem-sucedido
+  }
+
+  console.log('✅ [uploadAvatar] Avatar enviado com sucesso:', publicUrl);
+  return publicUrl;
+}
+
 // =====================================================
 // PROMPTS
 // =====================================================

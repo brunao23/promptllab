@@ -3,6 +3,7 @@ import { Routes, Route, useLocation } from 'react-router-dom';
 import { Sidebar } from '../components/Sidebar';
 import { PromptManager } from '../components/PromptManager';
 import { RepositoryPage } from './RepositoryPage';
+import { SettingsPage } from './SettingsPage';
 
 export const Dashboard: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -56,6 +57,7 @@ export const Dashboard: React.FC = () => {
           <Routes>
             <Route path="/" element={<PromptManager />} />
             <Route path="/repository" element={<RepositoryPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
           </Routes>
         </main>
       </div>

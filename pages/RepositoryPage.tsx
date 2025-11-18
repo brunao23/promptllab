@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { getUserPrompts, getPrompt, deletePrompt } from '../services/supabaseService';
 import { useNavigate } from 'react-router-dom';
 
+
 interface Prompt {
   id: string;
   title: string | null;
@@ -85,8 +86,21 @@ export const RepositoryPage: React.FC = () => {
       <div className="max-w-7xl mx-auto p-6">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">Repositório de Prompts</h1>
-          <p className="text-white/60">Gerencie e organize todos os seus prompts</p>
+          <div className="flex items-center space-x-4 mb-4">
+            <button
+              onClick={() => navigate('/dashboard')}
+              className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors border border-white/10"
+              title="Voltar para o Workspace"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+            </button>
+            <div>
+              <h1 className="text-3xl font-bold text-white mb-2">Repositório de Prompts</h1>
+              <p className="text-white/60">Gerencie e organize todos os seus prompts</p>
+            </div>
+          </div>
         </div>
 
         {/* Search */}
