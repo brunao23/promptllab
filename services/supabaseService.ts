@@ -234,9 +234,61 @@ export async function updateProfile(updates: { full_name?: string }) {
 
   console.log('💾 [updateProfile] Atualizando perfil:', updates);
 
+  // 🔒 VALIDAÇÃO DE SEGURANÇA - sanitizar dados
+  const sanitizedUpdates: { full_name?: string } = {};
+  if (updates.full_name !== undefined) {
+    const sanitized = sanitizeText(updates.full_name.trim());
+    if (sanitized.length > 0) {
+      sanitizedUpdates.full_name = sanitized;
+    } else {
+      // Se o nome foi apagado completamente, definir como string vazia
+      sanitizedUpdates.full_name = '';
+    }
+  }
+
+  console.log('💾 [updateProfile] Updates sanitizados:', sanitizedUpdates);
+
+  // Primeiro, buscar o perfil atual para garantir que existe
+  const { data: existingProfile, error: checkError } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('id', user.id)
+    .single();
+
+  if (checkError && checkError.code !== 'PGRST116') {
+    console.error('❌ [updateProfile] Erro ao verificar perfil:', checkError);
+    throw checkError;
+  }
+
+  // Se o perfil não existe, criar um novo
+  if (!existingProfile) {
+    console.log('⚠️ [updateProfile] Perfil não encontrado, criando novo perfil...');
+    const { data: sessionData } = await supabase.auth.getSession();
+    const email = sessionData?.session?.user?.email || '';
+    
+    const { data: newProfile, error: createError } = await supabase
+      .from('profiles')
+      .insert({
+        id: user.id,
+        email: email,
+        full_name: sanitizedUpdates.full_name || '',
+      })
+      .select()
+      .single();
+
+    if (createError) {
+      console.error('❌ [updateProfile] Erro ao criar perfil:', createError);
+      throw createError;
+    }
+
+    console.log('✅ [updateProfile] Perfil criado com sucesso');
+    return newProfile;
+  }
+
+  // Atualizar perfil existente
   const { data, error } = await supabase
     .from('profiles')
-    .update(updates)
+    .update(sanitizedUpdates)
     .eq('id', user.id)
     .select()
     .single();
@@ -246,7 +298,7 @@ export async function updateProfile(updates: { full_name?: string }) {
     throw error;
   }
 
-  console.log('✅ [updateProfile] Perfil atualizado com sucesso');
+  console.log('✅ [updateProfile] Perfil atualizado com sucesso:', data);
   return data;
 }
 

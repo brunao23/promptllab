@@ -190,13 +190,25 @@ export const SettingsPage: React.FC = () => {
         return;
       }
 
-      await updateProfile({
+      const updatedProfile = await updateProfile({
         full_name: nameValidation.sanitized || '',
       });
 
+      // Atualizar estado local imediatamente com o perfil retornado
+      if (updatedProfile) {
+        setFormData(prev => ({
+          ...prev,
+          fullName: updatedProfile.full_name || nameValidation.sanitized || '',
+        }));
+      }
+
       setSuccess('Perfil atualizado com sucesso!');
       setTimeout(() => setSuccess(null), 3000);
-      await loadProfile(); // Recarregar para atualizar avatar se mudou
+      
+      // Recarregar perfil completo após um pequeno delay para garantir sincronização
+      setTimeout(async () => {
+        await loadProfile();
+      }, 500);
     } catch (error: any) {
       console.error('Erro ao salvar perfil:', error);
       setError(error.message || 'Erro ao salvar perfil');
