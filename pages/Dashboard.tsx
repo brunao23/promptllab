@@ -56,11 +56,17 @@ export const Dashboard: React.FC = () => {
         </header>
 
         {/* Content Area */}
-        <main className="flex-1 overflow-auto">
-          <div className="container mx-auto p-4 lg:p-6">
-            <TrialBanner />
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-6">
-              <div className="lg:col-span-3">
+        <main className="flex-1 overflow-auto bg-black">
+          <div className="max-w-full p-4 lg:p-6">
+            {/* Trial Banner - Sempre no topo */}
+            <div className="mb-4">
+              <TrialBanner />
+            </div>
+
+            {/* Grid Layout */}
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
+              {/* Conteúdo Principal */}
+              <div className="xl:col-span-9 order-2 xl:order-1">
                 <Routes>
                   <Route path="/" element={<PromptManager />} />
                   <Route path="/repository" element={<RepositoryPage />} />
@@ -68,8 +74,12 @@ export const Dashboard: React.FC = () => {
                   <Route path="/admin" element={<AdminPage />} />
                 </Routes>
               </div>
-              <div className="lg:col-span-1">
-                <SubscriptionInfo />
+
+              {/* Info Sidebar - Direita */}
+              <div className="xl:col-span-3 order-1 xl:order-2">
+                <div className="sticky top-4">
+                  <SubscriptionInfo />
+                </div>
               </div>
             </div>
           </div>

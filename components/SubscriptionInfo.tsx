@@ -63,14 +63,24 @@ export const SubscriptionInfo: React.FC = () => {
     planInfo.maxVersions === -1 ? 'Ilimitado' : `Máx. ${planInfo.maxVersions} versões/mês`;
 
   return (
-    <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h3 className="text-white font-semibold text-sm">{planInfo.displayName}</h3>
+    <div className="bg-white/5 backdrop-blur-sm rounded-xl p-5 border border-white/10 shadow-xl">
+      <div className="flex items-center justify-between mb-4 pb-4 border-b border-white/10">
+        <div className="flex-1">
+          <div className="flex items-center space-x-2 mb-1">
+            <h3 className="text-white font-bold text-base">{planInfo.displayName}</h3>
+            {planInfo.isTrial && (
+              <span className="px-2 py-0.5 bg-emerald-500/20 border border-emerald-500/50 rounded text-emerald-400 text-xs font-bold">
+                TRIAL
+              </span>
+            )}
+          </div>
           {planInfo.isTrial && planInfo.trialDaysLeft !== null && (
-            <p className="text-emerald-400 text-xs mt-1">
-              {planInfo.trialDaysLeft} {planInfo.trialDaysLeft === 1 ? 'dia' : 'dias'} restantes
+            <p className="text-emerald-400 text-sm font-medium mt-1">
+              ⏰ {planInfo.trialDaysLeft} {planInfo.trialDaysLeft === 1 ? 'dia' : 'dias'} restantes
             </p>
+          )}
+          {!planInfo.isTrial && (
+            <p className="text-white/60 text-xs mt-1">Plano ativo</p>
           )}
         </div>
         {!planInfo.isTrial && (
@@ -78,7 +88,7 @@ export const SubscriptionInfo: React.FC = () => {
             href="https://wa.me/5511999999999?text=Olá! Gostaria de fazer upgrade do meu plano."
             target="_blank"
             rel="noopener noreferrer"
-            className="text-xs text-emerald-400 hover:text-emerald-300 underline"
+            className="text-xs text-emerald-400 hover:text-emerald-300 underline whitespace-nowrap"
           >
             Upgrade
           </a>

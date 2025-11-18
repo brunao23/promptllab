@@ -199,9 +199,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onMobileClose })
               )}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-white truncate">
-                {userName || 'Usuário'}
-              </p>
+              <div className="flex items-center space-x-2">
+                <p className="text-sm font-medium text-white truncate">
+                  {userName || 'Usuário'}
+                </p>
+                {isAdminUser && (
+                  <span className="px-2 py-0.5 bg-gradient-to-r from-amber-500/20 to-yellow-500/20 border border-amber-500/50 rounded text-amber-400 text-xs font-bold">
+                    ADMIN
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-white/40 truncate">
                 {userEmail || ''}
               </p>
