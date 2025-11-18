@@ -353,9 +353,12 @@ const retryWithBackoff = async <T>(
     throw lastError;
 };
 
-export const analyzeDocument = async (fileBase64: string, mimeType: string): Promise<Partial<PromptData>> => {
+export const analyzeDocument = async (fileBase64: string, mimeType: string, fileName?: string): Promise<Partial<PromptData>> => {
     const ai = getAI();
 
+    // Para arquivos CSV, melhorar o prompt de análise
+    const isCsv = mimeType === 'text/csv' || fileName?.toLowerCase().endsWith('.csv');
+    
     const docPart = {
         inlineData: {
             data: fileBase64,
@@ -363,29 +366,61 @@ export const analyzeDocument = async (fileBase64: string, mimeType: string): Pro
         }
     };
 
-    const extractionPrompt = `
-Analise o documento e extraia informações para um prompt de IA.
+    const extractionPrompt = isCsv 
+        ? `
+Analise este arquivo CSV e extraia informações relevantes para criar um prompt de IA.
+Identifique padrões, estruturas de dados, contexto de negócio e regras de processamento.
+
+Para arquivos CSV, foque em:
+- Entender a estrutura e propósito dos dados
+- Identificar campos importantes e suas relações
+- Extrair contexto de negócio dos cabeçalhos e dados
+- Identificar regras de validação ou processamento implícitas
+
 Campos JSON esperados: persona, objetivo, contextoNegocio, contexto, regras (array de strings).
+Retorne sempre um JSON válido, mesmo que alguns campos estejam vazios.
+`
+        : `
+Analise o documento e extraia informações para um prompt de IA.
+${fileName ? `Nome do arquivo: ${fileName}\n` : ''}
+Campos JSON esperados: persona, objetivo, contextoNegocio, contexto, regras (array de strings).
+Retorne sempre um JSON válido, mesmo que alguns campos estejam vazios.
 `;
 
     try {
         const response = await retryWithBackoff(async () => {
+            // Para CSV, usar uma abordagem mais tolerante com o schema
+            const schema = isCsv
+                ? {
+                    type: Type.OBJECT,
+                    properties: {
+                        persona: { type: Type.STRING },
+                        objetivo: { type: Type.STRING },
+                        contextoNegocio: { type: Type.STRING },
+                        contexto: { type: Type.STRING },
+                        regras: { type: Type.ARRAY, items: { type: Type.STRING } }
+                    },
+                    // Campos não obrigatórios para CSV, permitindo análise parcial
+                    required: []
+                }
+                : {
+                    type: Type.OBJECT,
+                    properties: {
+                        persona: { type: Type.STRING },
+                        objetivo: { type: Type.STRING },
+                        contextoNegocio: { type: Type.STRING },
+                        contexto: { type: Type.STRING },
+                        regras: { type: Type.ARRAY, items: { type: Type.STRING } }
+                    },
+                    required: ['persona', 'objetivo', 'contextoNegocio', 'contexto', 'regras']
+                };
+
             return await ai.models.generateContent({
                 model: 'gemini-2.5-pro',
                 contents: { parts: [docPart, { text: extractionPrompt }] },
                 config: {
                     responseMimeType: "application/json",
-                    responseSchema: {
-                        type: Type.OBJECT,
-                        properties: {
-                            persona: { type: Type.STRING },
-                            objetivo: { type: Type.STRING },
-                            contextoNegocio: { type: Type.STRING },
-                            contexto: { type: Type.STRING },
-                            regras: { type: Type.ARRAY, items: { type: Type.STRING } }
-                        },
-                        required: ['persona', 'objetivo', 'contextoNegocio', 'contexto', 'regras']
-                    }
+                    responseSchema: schema
                 }
             });
         }, 3, 2000); // 3 tentativas, começando com 2 segundos
@@ -406,11 +441,39 @@ Campos JSON esperados: persona, objetivo, contextoNegocio, contexto, regras (arr
         // Tentar fazer parse do JSON
         try {
             const parsed = JSON.parse(responseText);
-            return parsed as Partial<PromptData>;
+            
+            // Garantir que todos os campos esperados existam (mesmo que vazios)
+            const result: Partial<PromptData> = {
+                persona: parsed.persona || '',
+                objetivo: parsed.objetivo || '',
+                contextoNegocio: parsed.contextoNegocio || '',
+                contexto: parsed.contexto || '',
+                regras: Array.isArray(parsed.regras) ? parsed.regras : []
+            };
+            
+            return result;
         } catch (parseError: any) {
             console.error("Erro ao fazer parse do JSON:", parseError);
-            console.error("Texto recebido:", responseText.substring(0, 200));
-            throw new Error("Erro ao processar a resposta da API. O formato retornado é inválido. Tente novamente.");
+            console.error("Texto recebido:", responseText.substring(0, 500));
+            
+            // Tentar extrair JSON de uma string que pode estar envolvida em markdown ou outros caracteres
+            try {
+                const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+                if (jsonMatch) {
+                    const parsed = JSON.parse(jsonMatch[0]);
+                    return {
+                        persona: parsed.persona || '',
+                        objetivo: parsed.objetivo || '',
+                        contextoNegocio: parsed.contextoNegocio || '',
+                        contexto: parsed.contexto || '',
+                        regras: Array.isArray(parsed.regras) ? parsed.regras : []
+                    };
+                }
+            } catch (secondTryError) {
+                console.error("Segunda tentativa de parse também falhou:", secondTryError);
+            }
+            
+            throw new Error(`Erro ao processar a resposta da API${fileName ? ` para ${fileName}` : ''}. O formato retornado é inválido. Tente novamente.`);
         }
     } catch (error: any) {
         console.error("Error analyzing document:", error);
