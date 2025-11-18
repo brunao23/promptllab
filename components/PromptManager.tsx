@@ -851,7 +851,7 @@ export const PromptManager: React.FC = () => {
 
                 const x = isUser ? pageWidth - bubbleWidth - margin : margin;
                 const userColor = [16, 185, 129]; // emerald-500
-                const agentColor = [255, 255, 255, 0.1]; // white/10
+                const agentColor = [40, 40, 40]; // dark gray (para texto do agente no PDF)
                 
                 doc.setFillColor(isUser ? userColor[0] : agentColor[0], isUser ? userColor[1] : agentColor[1], isUser ? userColor[2] : agentColor[2]);
                 doc.roundedRect(x, y, bubbleWidth, bubbleHeight, 3, 3, 'F');

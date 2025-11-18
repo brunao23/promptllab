@@ -180,7 +180,7 @@ export const AuthCallback: React.FC = () => {
                 </svg>
               </div>
               <h2 className="text-2xl font-bold text-white mb-2">Erro na Confirmação</h2>
-              <p className="text-slate-400 mb-6">{message}</p>
+              <p className="text-white/60 mb-6">{message}</p>
               <div className="space-y-3">
                 <button
                   onClick={() => navigate('/login')}
