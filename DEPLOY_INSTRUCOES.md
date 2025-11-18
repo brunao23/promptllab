@@ -66,7 +66,7 @@ npm run preview
    - **Build Command:** `npm run build`
    - **Output Directory:** `dist`
    - **Install Command:** `npm install`
-   - **Root Directory:** Deixe vazio ou `promptllab` se o projeto estiver em subpasta
+   - **Root Directory:** Deixe vazio (projeto está na raiz do repositório)
 
 3. **Deploy Automático:**
    - Todo push para a branch `main` faz deploy automaticamente

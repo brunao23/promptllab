@@ -11,8 +11,8 @@
 5. **Clique em:** **General** (menu lateral esquerdo)
 6. **Role até:** **Build & Development Settings**
 7. **Encontre o campo:** **Root Directory**
-8. **ALTERE DE:** `labprompt` 
-9. **PARA:** `promptllab`
+8. **REMOVA** qualquer valor que esteja lá (se houver `labprompt`, `promptllab` ou `promptlllab`)
+9. **DEIXE VAZIO** (ou coloque `.`)
 10. **Clique em:** **Save** (botão no final da página)
 
 ### Passo 2: Verificar Variáveis de Ambiente
@@ -49,7 +49,7 @@
 
 Antes de confirmar que funcionou:
 
-- [ ] Root Directory corrigido para `promptllab`
+- [ ] Root Directory corrigido para `(vazio)` - Projeto está na raiz
 - [ ] Variáveis de ambiente configuradas
 - [ ] Redeploy iniciado
 - [ ] Status do deploy: **Ready** ✅

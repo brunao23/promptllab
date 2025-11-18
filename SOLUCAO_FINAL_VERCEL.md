@@ -22,7 +22,7 @@ O arquivo `deploy-vercel.yml` foi renomeado para `.disabled`.
 #### **PASSO B: Configurar o Projeto**
 
 1. **Framework Preset**: Vite
-2. **Root Directory**: `promptllab` (clique em "Edit" e selecione)
+2. **Root Directory**: Deixe **VAZIO** (projeto está na raiz do repositório, não em subpasta)
 3. **Build Command**: `npm run build`
 4. **Output Directory**: `dist`
 5. **Install Command**: `npm install`
@@ -83,7 +83,7 @@ O Vercel vai:
 ## 📋 CHECKLIST:
 
 - [ ] Conectei o Vercel ao repositório GitHub
-- [ ] Configurei Root Directory = `promptllab`
+- [ ] Configurei Root Directory = `(vazio)` - Projeto está na raiz
 - [ ] Adicionei todas as 4 variáveis de ambiente
 - [ ] Deploy concluído com sucesso
 - [ ] Executei o script SQL no Supabase
@@ -120,7 +120,7 @@ Após configurar, **QUALQUER push** no branch `main` vai:
 ## 🆘 SE DER ERRO:
 
 1. Verifique os logs no Vercel Dashboard
-2. Confirme que o Root Directory está como `labprompt`
+2. Confirme que o Root Directory está **VAZIO** (projeto na raiz)
 3. Confirme que todas as 4 variáveis de ambiente estão configuradas
 4. Tente um Redeploy: Deployments → ⋯ → Redeploy
 

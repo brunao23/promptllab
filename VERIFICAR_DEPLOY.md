@@ -31,7 +31,7 @@
 3. **Procure por erros específicos:**
 
 #### Erro: "Root Directory does not exist"
-- **Ação:** Verifique se Root Directory = `promptllab` (não `labprompt`)
+- **Ação:** Root Directory deve estar **VAZIO** (projeto está na raiz do repositório)
 
 #### Erro: "Environment variable not found"
 - **Ação:** Verifique Settings → Environment Variables
@@ -55,7 +55,7 @@ Após o primeiro deploy funcionar, teste o automático:
 
 ## ✅ Checklist Final
 
-- [ ] Root Directory corrigido para `promptllab`
+- [ ] Root Directory corrigido para `(vazio)` - Projeto está na raiz
 - [ ] Último deploy está **Ready** ✅
 - [ ] Site está acessível e funcionando
 - [ ] Console do navegador não mostra erros (F12)
