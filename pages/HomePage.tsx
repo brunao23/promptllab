@@ -50,10 +50,16 @@ export const HomePage: React.FC = () => {
                 Avançada
               </span>
             </h1>
-            <p className="text-xl md:text-2xl text-white/80 mb-8 leading-relaxed">
+            <p className="text-xl md:text-2xl text-white/80 mb-6 leading-relaxed">
               Crie, teste, otimize e gerencie prompts de IA de forma profissional e eficiente.
               Transforme suas ideias em prompts poderosos com nossa plataforma completa.
             </p>
+            <div className="mb-8 inline-flex items-center px-6 py-3 bg-gradient-to-r from-emerald-500/20 to-green-500/20 border border-emerald-500/50 rounded-full">
+              <svg className="w-5 h-5 text-emerald-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
+              </svg>
+              <span className="text-emerald-400 font-semibold">7 dias grátis para testar</span>
+            </div>
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
               <Link
                 to="/register"
@@ -173,9 +179,15 @@ export const HomePage: React.FC = () => {
             <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
               Pronto para criar prompts profissionais?
             </h2>
-            <p className="text-xl text-white/60 mb-8">
+            <p className="text-xl text-white/60 mb-4">
               Junte-se a milhares de desenvolvedores que já estão usando o LaBPrompT
             </p>
+            <div className="mb-8 inline-flex items-center px-4 py-2 bg-emerald-500/20 border border-emerald-500/50 rounded-lg">
+              <svg className="w-4 h-4 text-emerald-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
+              </svg>
+              <span className="text-emerald-400 text-sm font-medium">Teste grátis por 7 dias - Sem necessidade de cartão</span>
+            </div>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link
                 to="/register"
