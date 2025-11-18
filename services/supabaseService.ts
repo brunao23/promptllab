@@ -472,6 +472,51 @@ export async function getUserPrompts() {
 }
 
 /**
+ * Deleta um prompt (soft delete - marca como inativo)
+ */
+export async function deletePrompt(promptId: string) {
+  const user = await getCurrentUser();
+  if (!user) throw new Error('Usuário não autenticado');
+
+  // 🔒 VALIDAÇÃO DE SEGURANÇA - UUID válido
+  if (!isValidUUID(promptId)) {
+    throw new Error('ID de prompt inválido');
+  }
+
+  console.log('🗑️ [deletePrompt] Deletando prompt:', promptId);
+
+  // Primeiro, verificar se existe profile para este usuário
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('id', user.id)
+    .single();
+
+  if (profileError) {
+    console.error('❌ [deletePrompt] Erro ao verificar profile:', profileError);
+    throw profileError;
+  }
+
+  if (!profile) {
+    throw new Error('Perfil do usuário não encontrado');
+  }
+
+  // Soft delete - marcar como inativo
+  const { error } = await supabase
+    .from('prompts')
+    .update({ is_active: false })
+    .eq('id', promptId)
+    .eq('user_id', profile.id);
+
+  if (error) {
+    console.error('❌ [deletePrompt] Erro ao deletar prompt:', error);
+    throw error;
+  }
+
+  console.log('✅ [deletePrompt] Prompt deletado com sucesso');
+}
+
+/**
  * Obtém um prompt específico com todos os relacionamentos
  */
 export async function getPrompt(promptId: string) {

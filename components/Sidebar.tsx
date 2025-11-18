@@ -68,6 +68,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onMobileClose })
       path: '/dashboard',
       active: location.pathname === '/dashboard',
     },
+    {
+      label: 'Repositório',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+        </svg>
+      ),
+      path: '/dashboard/repository',
+      active: location.pathname === '/dashboard/repository',
+    },
   ];
 
   return (
@@ -75,7 +85,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onMobileClose })
       {/* Mobile Overlay */}
       {isMobileOpen && (
         <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-40 lg:hidden"
           onClick={onMobileClose}
         />
       )}
@@ -83,30 +93,29 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onMobileClose })
       {/* Sidebar */}
       <aside
         className={`
-          fixed top-0 left-0 h-full w-72 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950
-          border-r border-slate-800/50 z-50 transform transition-transform duration-300 ease-in-out
+          fixed top-0 left-0 h-full w-72 bg-black border-r border-white/5 z-50 transform transition-transform duration-300 ease-in-out
           ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'}
           lg:translate-x-0 lg:static lg:z-auto
-          flex flex-col shadow-2xl shadow-blue-950/20
+          flex flex-col shadow-2xl
         `}
       >
         {/* Logo */}
-        <div className="p-6 border-b border-slate-800/50">
+        <div className="p-6 border-b border-white/5">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/30">
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            <div className="w-10 h-10 bg-gradient-to-br from-emerald-400 to-green-500 rounded-lg flex items-center justify-center shadow-lg shadow-emerald-500/30">
+              <svg className="w-6 h-6 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
             </div>
             <div>
               <h1 className="text-xl font-bold text-white tracking-tight">LaBPrompT</h1>
-              <p className="text-xs text-slate-400">IA Engineering</p>
+              <p className="text-xs text-white/40">IA Engineering</p>
             </div>
           </div>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
+        <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
           {menuItems.map((item) => (
             <button
               key={item.path}
@@ -115,37 +124,39 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onMobileClose })
                 onMobileClose();
               }}
               className={`
-                w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200
+                w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 group
                 ${item.active
-                  ? 'bg-gradient-to-r from-blue-600/20 to-cyan-600/20 text-blue-400 border border-blue-500/30 shadow-lg shadow-blue-500/10'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                  ? 'bg-white/5 text-emerald-400 border border-emerald-500/20 shadow-lg shadow-emerald-500/10'
+                  : 'text-white/60 hover:text-white hover:bg-white/5 border border-transparent'
                 }
               `}
             >
-              {item.icon}
-              <span className="font-medium">{item.label}</span>
+              <span className={item.active ? 'text-emerald-400' : 'text-white/40 group-hover:text-emerald-400/60'}>
+                {item.icon}
+              </span>
+              <span className="font-medium text-sm">{item.label}</span>
             </button>
           ))}
         </nav>
 
         {/* User Profile */}
-        <div className="p-4 border-t border-slate-800/50">
-          <div className="flex items-center space-x-3 p-3 rounded-xl bg-slate-800/30 border border-slate-700/50">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full flex items-center justify-center text-white font-semibold text-sm">
+        <div className="p-4 border-t border-white/5">
+          <div className="flex items-center space-x-3 p-3 rounded-lg bg-white/5 border border-white/5 mb-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-amber-400 to-yellow-500 rounded-full flex items-center justify-center text-black font-bold text-sm shadow-lg shadow-amber-500/30">
               {userName ? userName.charAt(0).toUpperCase() : userEmail?.charAt(0).toUpperCase() || 'U'}
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-white truncate">
                 {userName || 'Usuário'}
               </p>
-              <p className="text-xs text-slate-400 truncate">
+              <p className="text-xs text-white/40 truncate">
                 {userEmail || ''}
               </p>
             </div>
           </div>
           <button
             onClick={handleLogout}
-            className="mt-3 w-full px-4 py-2.5 bg-slate-800/50 hover:bg-slate-800 text-slate-300 hover:text-white rounded-xl transition-all duration-200 border border-slate-700/50 hover:border-slate-600 text-sm font-medium"
+            className="w-full px-4 py-2.5 bg-white/5 hover:bg-white/10 text-white/80 hover:text-white rounded-lg transition-all duration-200 border border-white/5 hover:border-white/10 text-sm font-medium"
           >
             Sair
           </button>
@@ -154,4 +165,3 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onMobileClose })
     </>
   );
 };
-

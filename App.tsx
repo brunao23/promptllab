@@ -4,6 +4,7 @@ import { HomePage } from './pages/HomePage';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
 import { Dashboard } from './pages/Dashboard';
+import { RepositoryPage } from './pages/RepositoryPage';
 import { AuthCallback } from './pages/AuthCallback';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
@@ -20,6 +21,14 @@ function App() {
           element={
             <ProtectedRoute>
               <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/repository"
+          element={
+            <ProtectedRoute>
+              <RepositoryPage />
             </ProtectedRoute>
           }
         />
