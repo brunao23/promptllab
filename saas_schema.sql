@@ -144,7 +144,19 @@ CREATE TABLE IF NOT EXISTS public.subscriptions (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Adicionar constraint se não existir
+-- Remover constraint antiga se existir (pode estar apontando para profiles)
+DO $$ 
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_constraint 
+    WHERE conname = 'subscriptions_user_id_fkey'
+  ) THEN
+    ALTER TABLE public.subscriptions 
+    DROP CONSTRAINT subscriptions_user_id_fkey;
+  END IF;
+END $$;
+
+-- Criar constraint correta apontando para auth.users
 DO $$ 
 BEGIN
   IF NOT EXISTS (

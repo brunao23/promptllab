@@ -25,7 +25,27 @@ LEFT JOIN public.subscriptions s ON s.user_id = u.id
 GROUP BY u.id, u.email
 HAVING COUNT(s.id) = 0;
 
--- 3. Criar subscriptions para usuários que não têm
+-- 3. Verificar se a foreign key está correta
+-- Primeiro, vamos verificar a constraint atual
+SELECT 
+  conname AS constraint_name,
+  conrelid::regclass AS table_name,
+  confrelid::regclass AS referenced_table,
+  pg_get_constraintdef(oid) AS constraint_definition
+FROM pg_constraint
+WHERE conname = 'subscriptions_user_id_fkey';
+
+-- 4. Se a foreign key estiver errada, vamos corrigi-la
+-- Remover constraint antiga se existir
+ALTER TABLE public.subscriptions 
+DROP CONSTRAINT IF EXISTS subscriptions_user_id_fkey;
+
+-- Criar constraint correta apontando para auth.users
+ALTER TABLE public.subscriptions
+ADD CONSTRAINT subscriptions_user_id_fkey
+FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+-- 5. Criar subscriptions para usuários que não têm
 -- Para usuários normais
 INSERT INTO public.subscriptions (user_id, plan_id, trial_started_at, trial_ends_at, status, is_active)
 SELECT 
@@ -39,7 +59,8 @@ FROM auth.users u
 WHERE NOT EXISTS (
   SELECT 1 FROM public.subscriptions s WHERE s.user_id = u.id
 )
-AND u.email != 'brunocostaads23@gmail.com';
+AND u.email != 'brunocostaads23@gmail.com'
+ON CONFLICT DO NOTHING;
 
 -- Para o admin master
 INSERT INTO public.subscriptions (user_id, plan_id, trial_started_at, trial_ends_at, status, is_active)
