@@ -49,7 +49,6 @@ CREATE TABLE IF NOT EXISTS public.tenants (
 CREATE TABLE IF NOT EXISTS public.subscriptions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  tenant_id UUID REFERENCES public.tenants(id) ON DELETE SET NULL,
   plan_id UUID NOT NULL REFERENCES public.plans(id),
   
   -- Datas
@@ -68,6 +67,20 @@ CREATE TABLE IF NOT EXISTS public.subscriptions (
   CONSTRAINT subscriptions_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE,
   CONSTRAINT subscriptions_status_check CHECK (status IN ('trial', 'active', 'cancelled', 'expired'))
 );
+
+-- Adicionar coluna tenant_id se não existir (para compatibilidade com tabelas já criadas)
+DO $$ 
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+    AND table_name = 'subscriptions' 
+    AND column_name = 'tenant_id'
+  ) THEN
+    ALTER TABLE public.subscriptions 
+    ADD COLUMN tenant_id UUID REFERENCES public.tenants(id) ON DELETE SET NULL;
+  END IF;
+END $$;
 
 -- =====================================================
 -- TABELA: usage_tracking (Controle de uso - tokens)
@@ -197,7 +210,9 @@ BEGIN
   SELECT 
     s.id as subscription_id,
     s.plan_id,
-    s.status
+    s.status,
+    s.trial_ends_at,
+    s.subscription_ends_at
   INTO v_subscription
   FROM public.subscriptions s
   WHERE s.user_id = p_user_id
