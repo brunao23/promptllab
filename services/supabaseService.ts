@@ -346,6 +346,7 @@ export async function changePassword(currentPassword: string, newPassword: strin
 
 /**
  * Faz upload de avatar para Supabase Storage
+ * @updated 2024-11-18 - Cache busting para Vercel
  */
 export async function uploadAvatar(file: File): Promise<string> {
   const user = await getCurrentUser();
