@@ -1,0 +1,85 @@
+name: 🚀 Deploy para Vercel
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - 'labprompt/**'
+      - '.github/workflows/deploy-vercel.yml'
+  pull_request:
+    branches:
+      - main
+      - master
+    paths:
+      - 'labprompt/**'
+      - '.github/workflows/deploy-vercel.yml'
+
+env:
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+jobs:
+  deploy:
+    name: Deploy para Vercel
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: ⬇️ Checkout do código
+        uses: actions/checkout@v4
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: labprompt/package-lock.json
+
+      - name: 📥 Instalar dependências
+        working-directory: ./labprompt
+        run: npm ci
+
+      - name: 🔍 Verificar build
+        working-directory: ./labprompt
+        run: npm run build
+
+      - name: 🚀 Instalar Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: 🔐 Fazer login na Vercel
+        run: vercel login --token ${{ secrets.VERCEL_TOKEN }}
+        continue-on-error: false
+
+      - name: 🔗 Vincular projeto
+        working-directory: ./labprompt
+        run: |
+          vercel link --yes \
+            --token ${{ secrets.VERCEL_TOKEN }} \
+            --project ${{ secrets.VERCEL_PROJECT_ID }} \
+            --scope ${{ secrets.VERCEL_ORG_ID }}
+        continue-on-error: true
+
+      - name: 📤 Deploy para Vercel (Preview)
+        if: github.event_name == 'pull_request'
+        working-directory: ./labprompt
+        run: |
+          vercel deploy \
+            --token ${{ secrets.VERCEL_TOKEN }} \
+            --prebuilt
+
+      - name: 🚀 Deploy para Vercel (Production)
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        working-directory: ./labprompt
+        run: |
+          vercel deploy \
+            --token ${{ secrets.VERCEL_TOKEN }} \
+            --prebuilt \
+            --prod
+
+      - name: ✅ Deploy concluído
+        run: |
+          echo "✅ Deploy concluído com sucesso!"
+          echo "🔗 Verifique o status no dashboard da Vercel"
+

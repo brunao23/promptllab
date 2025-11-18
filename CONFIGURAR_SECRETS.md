@@ -4,8 +4,8 @@ Este documento lista todos os valores que precisam ser configurados no GitHub e 
 
 ## 📍 Repositório GitHub
 
-**Nome:** `GenialIa25/labprompt`  
-**URL:** https://github.com/GenialIa25/labprompt
+**Nome:** `brunao23/promptllab`  
+**URL:** https://github.com/brunao23/promptllab
 
 ## 🔑 Secrets para GitHub Actions
 
@@ -45,7 +45,7 @@ Adicione para **Production**, **Preview** e **Development**:
 
 ### GitHub
 
-1. Acesse: https://github.com/GenialIa25/labprompt/settings/secrets/actions
+1. Acesse: https://github.com/brunao23/promptllab/settings/secrets/actions
 2. Clique em **"New repository secret"**
 3. Adicione cada secret conforme a tabela acima
 4. Clique em **"Add secret"**
@@ -71,7 +71,7 @@ Após configurar, verifique:
 
 ## 🔗 Links Rápidos
 
-- **GitHub Secrets:** https://github.com/GenialIa25/labprompt/settings/secrets/actions
+- **GitHub Secrets:** https://github.com/brunao23/promptllab/settings/secrets/actions
 - **Vercel Dashboard:** https://vercel.com/dashboard
 - **Vercel Tokens:** https://vercel.com/account/tokens
 - **Google AI Studio (Gemini API):** https://makersuite.google.com/app/apikey

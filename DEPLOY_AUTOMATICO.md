@@ -10,7 +10,7 @@ Configure uma vez e toda atualização no GitHub atualiza automaticamente na Ver
 2. Faça login (pode usar sua conta GitHub)
 3. Clique em **"Add New..."** → **"Project"**
 4. Clique em **"Import Git Repository"**
-5. Procure e selecione: **`GenialIa25/labprompt`**
+5. Procure e selecione: **`brunao23/promptllab`**
 6. Clique em **"Import"**
 
 ### Passo 2: Configurar o Projeto

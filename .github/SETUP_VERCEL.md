@@ -12,7 +12,7 @@ Esta é a forma mais fácil e recomendada pela Vercel:
 2. Vá para [Dashboard](https://vercel.com/dashboard)
 3. Clique em **"Add New..."** > **"Project"**
 4. Clique em **"Import Git Repository"**
-5. Selecione o repositório `GenialIa25/labprompt`
+5. Selecione o repositório `brunao23/promptllab`
 6. Autorize o acesso se necessário
 
 ### Passo 2: Configurar o Projeto
@@ -50,7 +50,7 @@ Se você quiser usar GitHub Actions em vez da conexão direta:
 
 ### Passo 2: Adicionar Secrets no GitHub
 
-1. Vá para o repositório no GitHub: `https://github.com/GenialIa25/labprompt`
+1. Vá para o repositório no GitHub: `https://github.com/brunao23/promptllab`
 2. Clique em **Settings** > **Secrets and variables** > **Actions**
 3. Adicione os seguintes secrets:
    - `VERCEL_TOKEN`: Token criado na Vercel

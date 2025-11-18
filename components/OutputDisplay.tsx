@@ -1,7 +1,8 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 // FIX: Corrected import path for types.
 import type { PromptVersion, OutputFormat } from '../types';
+import { checkAccess, getCurrentPlanInfo } from '../services/subscriptionService';
 
 interface OutputDisplayProps {
   version: PromptVersion | null;
@@ -29,10 +30,14 @@ export const OutputDisplay: React.FC<OutputDisplayProps> = ({ version, isLoading
 
   useEffect(() => {
     const checkPermissions = async () => {
-      const canShare = await checkAccess('share_chat');
-      setCanShareChat(canShare);
-      const info = await getCurrentPlanInfo();
-      setPlanInfo(info);
+      try {
+        const canShare = await checkAccess('share_chat');
+        setCanShareChat(canShare);
+        const info = await getCurrentPlanInfo();
+        setPlanInfo(info);
+      } catch (error) {
+        console.error('Erro ao verificar permissões:', error);
+      }
     };
     checkPermissions();
   }, []);
@@ -81,8 +86,7 @@ export const OutputDisplay: React.FC<OutputDisplayProps> = ({ version, isLoading
   const handleShare = async () => {
     if (!version) return;
     
-    // Importar função de verificação dinamicamente para evitar dependência circular
-    const { canShareChat } = await import('../services/subscriptionService');
+    // Verificar se pode compartilhar chat
     const shareCheck = await canShareChat();
     
     if (!shareCheck.allowed) {

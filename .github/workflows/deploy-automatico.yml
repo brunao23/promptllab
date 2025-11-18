@@ -1,0 +1,51 @@
+name: 🔄 Deploy Automático (Vercel Integration)
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+
+jobs:
+  deploy:
+    name: Build e Deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: ⬇️ Checkout do código
+        uses: actions/checkout@v4
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: labprompt/package-lock.json
+
+      - name: 📥 Instalar dependências
+        working-directory: ./labprompt
+        run: npm ci
+
+      - name: 🔍 Verificar build
+        working-directory: ./labprompt
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'placeholder' }}
+
+      - name: ✅ Build verificado
+        run: |
+          echo "✅ Build concluído com sucesso!"
+          echo "📦 Os arquivos estão prontos em ./labprompt/dist"
+          echo ""
+          echo "💡 Nota: Se você configurou a integração direta GitHub+Vercel,"
+          echo "   o deploy será feito automaticamente pela Vercel após este workflow."
+          echo ""
+          echo "🔗 Configure a integração em: https://vercel.com/dashboard"
+          echo "   Settings > Git > Connect Repository"
+

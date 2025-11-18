@@ -47,6 +47,19 @@ export interface UsageTracking {
 }
 
 /**
+ * Obtém o tenant_id do usuário atual através da subscription
+ */
+export async function getCurrentUserTenantId(): Promise<string | null> {
+  try {
+    const subscription = await getCurrentSubscription();
+    return subscription?.tenant_id || null;
+  } catch (error) {
+    console.error('❌ Erro ao obter tenant_id do usuário:', error);
+    return null;
+  }
+}
+
+/**
  * Obtém a assinatura ativa do usuário atual
  */
 export async function getCurrentSubscription(): Promise<Subscription | null> {

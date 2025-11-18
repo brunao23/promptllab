@@ -34,7 +34,7 @@ Veja o arquivo `.github/SETUP_VERCEL.md` para instruções detalhadas.
 ### Passo 2: Conectar Repositório na Vercel
 1. Acesse [vercel.com](https://vercel.com) e faça login
 2. Clique em "Add New..." > "Project"
-3. Importe o repositório `GenialIa25/labprompt`
+3. Importe o repositório `brunao23/promptllab`
 4. A Vercel detectará automaticamente que é um projeto Vite
 
 ### Passo 3: Configurar Variáveis de Ambiente

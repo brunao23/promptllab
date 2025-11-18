@@ -2,7 +2,7 @@
 // Instale o cliente: npm install @supabase/supabase-js
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import type { PromptData, PromptVersion, ChatMessage, FewShotExample, VariavelDinamica, Ferramenta, Fluxo, OptimizationPair } from '../types';
+import type { PromptData, PromptVersion, ChatMessage, FewShotExample, VariavelDinamica, Ferramenta, Fluxo, OptimizationPair, Workspace } from '../types';
 import { 
   sanitizeText, 
   validatePromptText, 
@@ -465,9 +465,17 @@ export async function uploadAvatar(file: File): Promise<string> {
 /**
  * Cria um novo prompt
  */
-export async function createPrompt(promptData: PromptData, title?: string) {
+export async function createPrompt(promptData: PromptData, title?: string, workspaceId?: string) {
   const user = await getCurrentUser();
   if (!user) throw new Error('Usuário não autenticado');
+
+  // Se não fornecido, usar workspace padrão
+  if (!workspaceId) {
+    const defaultWorkspace = await getDefaultWorkspace();
+    if (defaultWorkspace) {
+      workspaceId = defaultWorkspace.id;
+    }
+  }
 
   // 🔒 VALIDAÇÃO E SANITIZAÇÃO DE DADOS
   const maxTitleLength = 200;
@@ -541,6 +549,7 @@ export async function createPrompt(promptData: PromptData, title?: string) {
     .from('prompts')
     .insert({
       user_id: profile.id, // CRÍTICO: usar profile.id, não user.id diretamente
+      workspace_id: workspaceId || null, // Adicionar workspace_id
       title: sanitizedTitle,
       persona: personaValidation.sanitized || '',
       objetivo: objetivoValidation.sanitized || '',
@@ -647,9 +656,9 @@ export async function createPrompt(promptData: PromptData, title?: string) {
 }
 
 /**
- * Obtém todos os prompts do usuário atual
+ * Obtém todos os prompts do usuário atual, opcionalmente filtrando por workspace
  */
-export async function getUserPrompts() {
+export async function getUserPrompts(workspaceId?: string) {
   const user = await getCurrentUser();
   if (!user) throw new Error('Usuário não autenticado');
 
@@ -674,12 +683,18 @@ export async function getUserPrompts() {
 
   console.log('✅ [getUserPrompts] Profile encontrado:', profile.id);
 
-  // Agora buscar prompts usando o profile.id como user_id
-  const { data, error } = await supabase
+  // Agora buscar prompts usando o profile.id como user_id, opcionalmente filtrando por workspace
+  let query = supabase
     .from('prompts')
     .select('*')
-    .eq('user_id', profile.id) // CRÍTICO: usar profile.id, não user.id diretamente
-    .order('created_at', { ascending: false });
+    .eq('user_id', profile.id); // CRÍTICO: usar profile.id, não user.id diretamente
+
+  // Se workspace_id fornecido, filtrar por workspace
+  if (workspaceId) {
+    query = query.eq('workspace_id', workspaceId);
+  }
+
+  const { data, error } = await query.order('created_at', { ascending: false });
 
   if (error) {
     console.error('❌ [getUserPrompts] Erro ao buscar prompts:', error);
@@ -1412,5 +1427,259 @@ export async function getUserDocuments() {
 
   if (error) throw error;
   return data;
+}
+
+// =====================================================
+// WORKSPACES
+// =====================================================
+
+/**
+ * Obtém todos os workspaces do usuário atual
+ */
+export async function getUserWorkspaces(): Promise<Workspace[]> {
+  const user = await getCurrentUser();
+  if (!user) throw new Error('Usuário não autenticado');
+
+  console.log('🔍 [getUserWorkspaces] Buscando workspaces para user_id:', user.id);
+
+  const { data, error } = await supabase
+    .from('workspaces')
+    .select('*')
+    .eq('user_id', user.id)
+    .eq('is_active', true)
+    .order('is_default', { ascending: false })
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('❌ [getUserWorkspaces] Erro ao buscar workspaces:', error);
+    throw error;
+  }
+
+  console.log('✅ [getUserWorkspaces] Workspaces encontrados:', data?.length || 0);
+  return (data || []) as Workspace[];
+}
+
+/**
+ * Obtém o workspace padrão do usuário
+ */
+export async function getDefaultWorkspace(): Promise<Workspace | null> {
+  const user = await getCurrentUser();
+  if (!user) throw new Error('Usuário não autenticado');
+
+  const { data, error } = await supabase
+    .from('workspaces')
+    .select('*')
+    .eq('user_id', user.id)
+    .eq('is_active', true)
+    .eq('is_default', true)
+    .single();
+
+  if (error) {
+    if (error.code === 'PGRST116') {
+      // Nenhum workspace padrão encontrado, criar um
+      return await createDefaultWorkspace();
+    }
+    console.error('❌ [getDefaultWorkspace] Erro ao buscar workspace padrão:', error);
+    throw error;
+  }
+
+  return data as Workspace;
+}
+
+/**
+ * Cria um workspace padrão para o usuário
+ */
+async function createDefaultWorkspace(): Promise<Workspace> {
+  const user = await getCurrentUser();
+  if (!user) throw new Error('Usuário não autenticado');
+
+  const { data, error } = await supabase
+    .from('workspaces')
+    .insert({
+      user_id: user.id,
+      name: 'Meu Workspace',
+      description: 'Workspace padrão',
+      is_active: true,
+      is_default: true,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('❌ [createDefaultWorkspace] Erro ao criar workspace padrão:', error);
+    throw error;
+  }
+
+  console.log('✅ [createDefaultWorkspace] Workspace padrão criado:', data.id);
+  return data as Workspace;
+}
+
+/**
+ * Cria um novo workspace
+ */
+export async function createWorkspace(name: string, description?: string): Promise<Workspace> {
+  const user = await getCurrentUser();
+  if (!user) throw new Error('Usuário não autenticado');
+
+  // Sanitizar nome
+  const sanitizedName = sanitizeText(name.trim(), 100);
+  if (!sanitizedName || sanitizedName.length === 0) {
+    throw new Error('Nome do workspace não pode estar vazio');
+  }
+
+  console.log('💾 [createWorkspace] Criando workspace:', sanitizedName);
+
+  const { data, error } = await supabase
+    .from('workspaces')
+    .insert({
+      user_id: user.id,
+      name: sanitizedName,
+      description: description ? sanitizeText(description.trim(), 500) : null,
+      is_active: true,
+      is_default: false, // Novo workspace não é padrão por padrão
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('❌ [createWorkspace] Erro ao criar workspace:', error);
+    throw error;
+  }
+
+  console.log('✅ [createWorkspace] Workspace criado:', data.id);
+  return data as Workspace;
+}
+
+/**
+ * Atualiza um workspace
+ */
+export async function updateWorkspace(workspaceId: string, updates: { name?: string; description?: string }): Promise<Workspace> {
+  const user = await getCurrentUser();
+  if (!user) throw new Error('Usuário não autenticado');
+
+  // Validação de UUID
+  if (!isValidUUID(workspaceId)) {
+    throw new Error('ID de workspace inválido');
+  }
+
+  // Sanitizar dados
+  const sanitizedUpdates: any = {};
+  if (updates.name !== undefined) {
+    const sanitizedName = sanitizeText(updates.name.trim(), 100);
+    if (!sanitizedName || sanitizedName.length === 0) {
+      throw new Error('Nome do workspace não pode estar vazio');
+    }
+    sanitizedUpdates.name = sanitizedName;
+  }
+  if (updates.description !== undefined) {
+    sanitizedUpdates.description = updates.description ? sanitizeText(updates.description.trim(), 500) : null;
+  }
+
+  sanitizedUpdates.updated_at = new Date().toISOString();
+
+  console.log('💾 [updateWorkspace] Atualizando workspace:', workspaceId);
+
+  const { data, error } = await supabase
+    .from('workspaces')
+    .update(sanitizedUpdates)
+    .eq('id', workspaceId)
+    .eq('user_id', user.id) // Garantir que o workspace pertence ao usuário
+    .select()
+    .single();
+
+  if (error) {
+    console.error('❌ [updateWorkspace] Erro ao atualizar workspace:', error);
+    throw error;
+  }
+
+  console.log('✅ [updateWorkspace] Workspace atualizado:', data.id);
+  return data as Workspace;
+}
+
+/**
+ * Define um workspace como padrão
+ */
+export async function setDefaultWorkspace(workspaceId: string): Promise<void> {
+  const user = await getCurrentUser();
+  if (!user) throw new Error('Usuário não autenticado');
+
+  // Validação de UUID
+  if (!isValidUUID(workspaceId)) {
+    throw new Error('ID de workspace inválido');
+  }
+
+  console.log('💾 [setDefaultWorkspace] Definindo workspace como padrão:', workspaceId);
+
+  // Primeiro, desmarcar todos os outros workspaces padrão
+  const { error: unsetError } = await supabase
+    .from('workspaces')
+    .update({ is_default: false })
+    .eq('user_id', user.id)
+    .eq('is_default', true);
+
+  if (unsetError) {
+    console.error('❌ [setDefaultWorkspace] Erro ao desmarcar workspaces padrão:', unsetError);
+    throw unsetError;
+  }
+
+  // Depois, marcar o workspace selecionado como padrão
+  const { error: setError } = await supabase
+    .from('workspaces')
+    .update({ is_default: true })
+    .eq('id', workspaceId)
+    .eq('user_id', user.id); // Garantir que o workspace pertence ao usuário
+
+  if (setError) {
+    console.error('❌ [setDefaultWorkspace] Erro ao definir workspace como padrão:', setError);
+    throw setError;
+  }
+
+  console.log('✅ [setDefaultWorkspace] Workspace definido como padrão:', workspaceId);
+}
+
+/**
+ * Deleta um workspace (soft delete - marca como inativo)
+ */
+export async function deleteWorkspace(workspaceId: string): Promise<void> {
+  const user = await getCurrentUser();
+  if (!user) throw new Error('Usuário não autenticado');
+
+  // Validação de UUID
+  if (!isValidUUID(workspaceId)) {
+    throw new Error('ID de workspace inválido');
+  }
+
+  // Verificar se é o workspace padrão
+  const { data: workspace, error: fetchError } = await supabase
+    .from('workspaces')
+    .select('is_default')
+    .eq('id', workspaceId)
+    .eq('user_id', user.id)
+    .single();
+
+  if (fetchError) {
+    console.error('❌ [deleteWorkspace] Erro ao buscar workspace:', fetchError);
+    throw fetchError;
+  }
+
+  if (workspace?.is_default) {
+    throw new Error('Não é possível deletar o workspace padrão. Crie outro workspace e defina-o como padrão primeiro.');
+  }
+
+  console.log('🗑️ [deleteWorkspace] Deletando workspace:', workspaceId);
+
+  // Soft delete - marcar como inativo
+  const { error } = await supabase
+    .from('workspaces')
+    .update({ is_active: false })
+    .eq('id', workspaceId)
+    .eq('user_id', user.id); // Garantir que o workspace pertence ao usuário
+
+  if (error) {
+    console.error('❌ [deleteWorkspace] Erro ao deletar workspace:', error);
+    throw error;
+  }
+
+  console.log('✅ [deleteWorkspace] Workspace deletado:', workspaceId);
 }
 

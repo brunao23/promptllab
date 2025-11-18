@@ -10,6 +10,7 @@ import { PromptOptimizer } from './PromptOptimizer';
 import { AssistantPanel } from './AssistantPanel';
 import { PasteModal } from './PasteModal';
 import { ExplanationModal } from './ExplanationModal';
+import { WorkspaceManager } from './WorkspaceManager';
 import type { PromptData, PromptVersion, ChatMessage, FewShotExample, OptimizationPair } from '../types';
 import { INITIAL_PROMPT_DATA } from '../constants';
 import { createFinalPrompt, startChat, continueChat, optimizePrompt, generateExamples, processAudioCommand, explainPrompt } from '../services/geminiService';
@@ -25,7 +26,8 @@ import {
   getChatMessages, 
   supabase, 
   getCurrentUser, 
-  getCurrentProfile 
+  getCurrentProfile,
+  getDefaultWorkspace
 } from '../services/supabaseService';
 import { 
   checkAccess, 
@@ -102,6 +104,10 @@ export const PromptManager: React.FC = () => {
     // Estados para limites e assinatura
     const [userLimits, setUserLimits] = useState<UserLimits | null>(null);
     const [isCheckingLimits, setIsCheckingLimits] = useState(true);
+    
+    // Estados para workspace
+    const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string | null>(null);
+    const [isSavingToRepository, setIsSavingToRepository] = useState(false);
 
     // Carregar limites do usuário
     useEffect(() => {
@@ -186,11 +192,22 @@ export const PromptManager: React.FC = () => {
                     }
                 }
 
-                // Carregar prompts do usuário
-                console.log('📥 Carregando prompts do usuário...');
+                // Carregar workspace padrão primeiro
+                if (!currentWorkspaceId) {
+                    console.log('📁 Carregando workspace padrão...');
+                    const defaultWorkspace = await getDefaultWorkspace();
+                    if (defaultWorkspace) {
+                        setCurrentWorkspaceId(defaultWorkspace.id);
+                        console.log('✅ Workspace padrão carregado:', defaultWorkspace.id, defaultWorkspace.name);
+                    }
+                }
+                
+                // Carregar prompts do usuário (filtrados por workspace se houver)
+                console.log('📥 Carregando prompts do usuário...', currentWorkspaceId ? `(workspace: ${currentWorkspaceId})` : '');
                 // Dar tempo ao React para atualizar a UI
                 await new Promise(resolve => setTimeout(resolve, 10));
-                const prompts = await getUserPrompts();
+                const workspaceIdToUse = currentWorkspaceId || (await getDefaultWorkspace())?.id;
+                const prompts = await getUserPrompts(workspaceIdToUse || undefined);
                 console.log('✅ Prompts carregados:', prompts?.length || 0);
                 
                 if (prompts && prompts.length > 0) {
@@ -713,13 +730,16 @@ export const PromptManager: React.FC = () => {
         setIsLoading(true);
         setError(null);
         try {
+            // Obter workspace atual
+            const workspaceIdToUse = currentWorkspaceId || (await getDefaultWorkspace())?.id || undefined;
+            
             // Salvar ou criar prompt no banco
             let promptId = currentPromptId;
             if (!promptId) {
                 // Criar novo prompt
-                console.log('📝 Criando novo prompt no banco...');
+                console.log('📝 Criando novo prompt no banco...', workspaceIdToUse ? `(workspace: ${workspaceIdToUse})` : '');
                 try {
-                    const newPrompt = await createPrompt(formData);
+                    const newPrompt = await createPrompt(formData, undefined, workspaceIdToUse);
                     promptId = newPrompt.id;
                     setCurrentPromptId(promptId);
                     console.log('✅ Novo prompt criado:', promptId);
@@ -733,7 +753,7 @@ export const PromptManager: React.FC = () => {
                 // Criar novo registro de prompt (histórico)
                 console.log('📝 Atualizando prompt no banco:', promptId);
                 try {
-                    await createPrompt(formData, `Prompt ${new Date().toLocaleDateString('pt-BR')}`);
+                    await createPrompt(formData, `Prompt ${new Date().toLocaleDateString('pt-BR')}`, workspaceIdToUse);
                     console.log('✅ Prompt atualizado');
                 } catch (promptError: any) {
                     console.error('❌ ERRO ao atualizar prompt:', promptError);
@@ -1485,6 +1505,101 @@ export const PromptManager: React.FC = () => {
         await loadExternalPrompt(text, 'Prompt Colado');
     };
 
+    // Função para salvar no repositório
+    const handleSaveToRepository = async () => {
+        if (!formData.persona.trim()) {
+            setError('Persona não pode estar vazia para salvar no repositório');
+            return;
+        }
+
+        setIsSavingToRepository(true);
+        setError(null);
+
+        try {
+            // Obter workspace atual
+            const workspaceIdToUse = currentWorkspaceId || (await getDefaultWorkspace())?.id || undefined;
+            
+            // Criar ou atualizar prompt no banco
+            let promptId = currentPromptId;
+            if (!promptId) {
+                const newPrompt = await createPrompt(formData, undefined, workspaceIdToUse);
+                promptId = newPrompt.id;
+                setCurrentPromptId(promptId);
+                console.log('✅ Prompt salvo no repositório:', promptId);
+            } else {
+                // Atualizar prompt existente
+                await createPrompt(formData, `Prompt ${new Date().toLocaleDateString('pt-BR')}`, workspaceIdToUse);
+                console.log('✅ Prompt atualizado no repositório:', promptId);
+            }
+            
+            setHasUnsavedChanges(false);
+            alert('Prompt salvo no repositório com sucesso!');
+        } catch (err: any) {
+            console.error('❌ Erro ao salvar no repositório:', err);
+            setError(err.message || 'Erro ao salvar no repositório');
+            alert('Erro ao salvar no repositório: ' + (err.message || 'Erro desconhecido'));
+        } finally {
+            setIsSavingToRepository(false);
+        }
+    };
+
+    // Função para mudar de workspace
+    const handleWorkspaceChange = async (workspaceId: string) => {
+        console.log('📁 Mudando para workspace:', workspaceId);
+        setCurrentWorkspaceId(workspaceId);
+        
+        // Limpar área atual
+        setVersionHistory([]);
+        setActiveVersion(null);
+        setChatMessages([]);
+        setFormData(INITIAL_PROMPT_DATA);
+        setCurrentPromptId(null);
+        setHasUnsavedChanges(false);
+        
+        // Carregar prompts do novo workspace
+        try {
+            const prompts = await getUserPrompts(workspaceId);
+            console.log('✅ Prompts carregados do workspace:', prompts?.length || 0);
+            
+            if (prompts && prompts.length > 0) {
+                const latestPrompt = prompts[0];
+                setCurrentPromptId(latestPrompt.id);
+                const { promptData } = await getPrompt(latestPrompt.id);
+                setFormData(promptData);
+                
+                const versions = await getPromptVersions(latestPrompt.id);
+                if (versions && versions.length > 0) {
+                    setVersionHistory(versions);
+                    const latestVersion = versions[0];
+                    setActiveVersion(latestVersion);
+                    
+                    const messages = await getChatMessages(latestVersion.id);
+                    if (messages && messages.length > 0) {
+                        setChatMessages(messages);
+                    }
+                    
+                    if (latestVersion.content) {
+                        startChat(latestVersion.content);
+                    }
+                }
+            }
+        } catch (err: any) {
+            console.error('❌ Erro ao carregar prompts do workspace:', err);
+            setError(err.message || 'Erro ao carregar prompts do workspace');
+        }
+    };
+
+    // Função para quando criar novo workspace
+    const handleWorkspaceCreated = () => {
+        // Limpar área (já feito no handleWorkspaceChange, mas garantir)
+        setVersionHistory([]);
+        setActiveVersion(null);
+        setChatMessages([]);
+        setFormData(INITIAL_PROMPT_DATA);
+        setCurrentPromptId(null);
+        setHasUnsavedChanges(false);
+    };
+
     const handleShareVersion = async (versionId: string) => {
         // Verificar se pode compartilhar chat
         const shareCheck = await canShareChat();
@@ -1596,6 +1711,8 @@ export const PromptManager: React.FC = () => {
                     onGenerateExamples={handleGenerateExamples}
                     isGeneratingExamples={isGeneratingExamples}
                     activePromptContent={activeVersion?.content ?? ''}
+                    onSaveToRepository={handleSaveToRepository}
+                    isSavingToRepository={isSavingToRepository}
                     />
                 </div>
 
@@ -1611,7 +1728,16 @@ export const PromptManager: React.FC = () => {
                     />
                 </div>
 
-                {/* Top Right - History Panel */}
+                {/* Top Right - Workspace Manager */}
+                <div className="col-span-12 xl:col-span-3 lg:row-span-2 bg-white/5 backdrop-blur-sm rounded-2xl overflow-hidden border border-white/10 shadow-xl">
+                    <WorkspaceManager
+                        currentWorkspaceId={currentWorkspaceId}
+                        onWorkspaceChange={handleWorkspaceChange}
+                        onWorkspaceCreated={handleWorkspaceCreated}
+                    />
+                </div>
+                
+                {/* History Panel - Moved to another position */}
                 <div className="col-span-12 xl:col-span-3 lg:row-span-2 bg-white/5 backdrop-blur-sm rounded-2xl overflow-hidden border border-white/10 shadow-xl">
                     <HistoryPanel
                     history={versionHistory}
@@ -1681,6 +1807,8 @@ export const PromptManager: React.FC = () => {
                         onGenerateExamples={handleGenerateExamples}
                         isGeneratingExamples={isGeneratingExamples}
                         activePromptContent={activeVersion?.content ?? ''}
+                        onSaveToRepository={handleSaveToRepository}
+                        isSavingToRepository={isSavingToRepository}
                     />
                 </div>
 

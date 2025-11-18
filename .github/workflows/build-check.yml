@@ -1,4 +1,4 @@
-name: Build Check
+name: ✅ Verificação de Build
 
 on:
   pull_request:

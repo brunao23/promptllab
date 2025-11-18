@@ -154,7 +154,7 @@ Antes de começar, você precisa ter instalado:
 ### 1. Clone o repositório
 
 ```bash
-git clone https://github.com/GenialIa25/labprompt.git
+git clone https://github.com/brunao23/promptllab.git
 cd labprompt
 ```
 
@@ -339,7 +339,7 @@ O projeto está configurado para deploy automático na Vercel. Cada push no GitH
 
 1. Acesse [vercel.com](https://vercel.com) e faça login
 2. Clique em **"Add New..."** → **"Project"**
-3. Importe o repositório `GenialIa25/labprompt`
+3. Importe o repositório `brunao23/promptllab`
 4. Adicione a variável de ambiente `GEMINI_API_KEY`
 5. Clique em **"Deploy"**
 

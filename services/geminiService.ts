@@ -108,14 +108,113 @@ ${basePromptInfo.trim()}
 
     if (data.masterPromptFormat === 'markdown') {
         expansionPrompt += `
-**ESTRUTURA MARKDOWN ESPERADA:**
-Use títulos Markdown (#, ##) para separar as seções (PERSONA, OBJETIVO, REGRAS, etc.).
-Sua resposta deve ser APENAS o texto Markdown do prompt final.
+**ESTRUTURA MARKDOWN ESPERADA (CRÍTICO - DEVE SER MARKDOWN 100% COM HIERARQUIA):**
+
+O prompt mestre DEVE seguir uma hierarquia Markdown completa e bem estruturada:
+
+1. **TÍTULOS COM HIERARQUIA:**
+   - Use # (H1) apenas para o título principal do prompt
+   - Use ## (H2) para seções principais (PERSONA, OBJETIVO, CONTEXTO, REGRAS, etc.)
+   - Use ### (H3) para subseções dentro de cada seção principal
+   - Use #### (H4) para sub-subseções quando necessário
+   - Use ##### (H5) para detalhamentos finos quando necessário
+
+2. **FORMATAÇÃO:**
+   - Use **negrito** para destacar conceitos importantes
+   - Use *itálico* para ênfase
+   - Use código inline (backtick) para nomes de variáveis, funções ou termos técnicos
+   - Use listas ordenadas (1., 2., 3.) para instruções sequenciais
+   - Use listas não ordenadas (- ou *) para itens relacionados
+   - Use > para citações ou blocos de destaque quando apropriado
+   - Use blocos de código (três backticks) quando necessário
+
+3. **ESTRUTURA ESPERADA:**
+   - Título principal com #
+   - Seções principais com ##
+   - Subseções com ###
+   - Conteúdo formatado com listas, negrito, itálico e código inline
+   - Organização hierárquica clara para facilitar leitura por LLMs
+
+4. **EXEMPLO DE ESTRUTURA:**
+(BLOCO DE CÓDIGO MARKDOWN)
+# TÍTULO PRINCIPAL DO PROMPT
+
+## PERSONA
+
+### Identidade Central
+[conteúdo detalhado]
+
+### Especialização
+[conteúdo detalhado]
+
+## OBJETIVO
+
+### Objetivo Principal
+[conteúdo detalhado]
+
+## REGRAS
+
+### Regras Críticas
+- Regra 1: [descrição]
+- Regra 2: [descrição]
+(FIM DO BLOCO)
+
+Sua resposta deve ser APENAS o texto Markdown do prompt final, SEM explicações ou comentários adicionais.
 `;
     } else if (data.masterPromptFormat === 'json') {
         expansionPrompt += `
-**ESTRUTURA JSON ESPERADA:**
-Sua resposta deve ser APENAS um objeto JSON válido. Sugestão de chaves: "persona", "objective", "context", "rules", "instructions", "examples". O conteúdo de cada valor pode ser texto detalhado (podendo usar markdown DENTRO das strings se necessário para quebras de linha, mas o formato geral DEVE ser JSON).
+**ESTRUTURA JSON ESPERADA (CRÍTICO - DEVE SER JSON 100% ESTRUTURADO):**
+
+O prompt mestre DEVE ser um objeto JSON válido, bem formatado e estruturado:
+
+1. **FORMATAÇÃO OBRIGATÓRIA:**
+   - Use indentação de 2 espaços para cada nível
+   - Use quebras de linha após cada chave/valor
+   - Use vírgulas apropriadas (não vírgula final)
+   - Use aspas duplas para todas as strings
+   - Use arrays para listas de itens
+   - Use objetos aninhados para estruturas hierárquicas
+
+2. **ESTRUTURA SUGERIDA:**
+   {
+     "persona": {
+       "identity": "...",
+       "expertise": "...",
+       "tone": "..."
+     },
+     "objective": {
+       "primary": "...",
+       "secondary": ["...", "..."]
+     },
+     "context": {
+       "business": "...",
+       "interaction": "..."
+     },
+     "rules": [
+       "Regra 1: ...",
+       "Regra 2: ..."
+     ],
+     "instructions": {
+       "format": "...",
+       "style": "...",
+       "examples": ["...", "..."]
+     }
+   }
+
+3. **REQUISITOS CRÍTICOS:**
+   - O JSON DEVE ser válido e bem formatado (passar em JSON.parse())
+   - Use indentação consistente (2 espaços por nível)
+   - Strings podem conter quebras de linha \\n quando necessário
+   - Strings podem conter markdown DENTRO delas se apropriado
+   - Estruture de forma hierárquica para facilitar leitura por LLMs
+
+4. **NÃO FAÇA:**
+   - Não retorne JSON em um bloco de código markdown (três backticks json)
+   - Não adicione explicações antes ou depois do JSON
+   - Não use formatação compacta (tudo em uma linha)
+   - Não use aspas simples para strings
+
+Sua resposta deve ser APENAS o objeto JSON válido, SEM blocos de código markdown, SEM explicações, APENAS o JSON puro e bem formatado.
 `;
     }
 
@@ -137,7 +236,35 @@ Sua resposta deve ser APENAS um objeto JSON válido. Sugestão de chaves: "perso
     const actualTokens = estimateFullTokens(expansionPrompt, response.text);
     await incrementTokenUsage(actualTokens);
     
-    return response.text;
+    let finalText = response.text.trim();
+    
+    // Se for JSON, garantir que está bem formatado
+    if (data.masterPromptFormat === 'json') {
+        try {
+            // Remover blocos de código markdown se houver
+            finalText = finalText.replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();
+            finalText = finalText.replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
+            
+            // Fazer parse para validar e reformatar
+            const parsed = JSON.parse(finalText);
+            // Reformatar com indentação de 2 espaços
+            finalText = JSON.stringify(parsed, null, 2);
+        } catch (e) {
+            console.warn('⚠️ Erro ao formatar JSON, retornando texto original:', e);
+            // Se falhar o parse, tentar extrair JSON do texto
+            const jsonMatch = finalText.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                try {
+                    const parsed = JSON.parse(jsonMatch[0]);
+                    finalText = JSON.stringify(parsed, null, 2);
+                } catch (e2) {
+                    console.error('❌ Erro ao extrair JSON:', e2);
+                }
+            }
+        }
+    }
+    
+    return finalText;
 };
 
 let chatInstance: Chat | null = null;
