@@ -26,12 +26,25 @@ export const SettingsPage: React.FC = () => {
 
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const loadedOnceRef = React.useRef(false);
 
   useEffect(() => {
-    loadProfile();
+    // Evitar recarregamento desnecessário se já foi carregado
+    if (loadedOnceRef.current) {
+      return;
+    }
+    
+    loadProfile().then(() => {
+      loadedOnceRef.current = true;
+    });
   }, []);
 
   const loadProfile = async () => {
+    // Evitar recarregamento se já está carregando ou já carregou recentemente
+    if (isLoading && loadedOnceRef.current) {
+      return;
+    }
+    
     try {
       setIsLoading(true);
       const { data: { session } } = await supabase.auth.getSession();

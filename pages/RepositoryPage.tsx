@@ -21,8 +21,17 @@ export const RepositoryPage: React.FC = () => {
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
+  const loadedOnceRef = React.useRef(false);
+
   useEffect(() => {
-    loadPrompts();
+    // Evitar recarregamento desnecessário se já foi carregado
+    if (loadedOnceRef.current) {
+      return;
+    }
+    
+    loadPrompts().then(() => {
+      loadedOnceRef.current = true;
+    });
   }, []);
 
   const loadPrompts = async () => {
