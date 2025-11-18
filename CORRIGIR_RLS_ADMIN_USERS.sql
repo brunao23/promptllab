@@ -9,8 +9,12 @@
 -- ou verificar diretamente o user_id sem usar EXISTS na mesma tabela
 -- =====================================================
 
--- 1. Remover política problemática
+-- 1. Remover TODAS as políticas existentes (se existirem)
 DROP POLICY IF EXISTS "Admins podem ver outros admins" ON public.admin_users;
+DROP POLICY IF EXISTS "Usuários podem ver seu próprio registro admin" ON public.admin_users;
+DROP POLICY IF EXISTS "Apenas admins podem inserir novos admins" ON public.admin_users;
+DROP POLICY IF EXISTS "Apenas super admins podem atualizar admins" ON public.admin_users;
+DROP POLICY IF EXISTS "Apenas super admins podem deletar admins" ON public.admin_users;
 
 -- 2. Criar função auxiliar que contorna RLS para verificar admin
 -- Esta função usa SECURITY DEFINER, então ela pode ler admin_users
@@ -34,7 +38,29 @@ $$;
 -- Garantir que a função é acessível para authenticated users
 GRANT EXECUTE ON FUNCTION public.is_user_admin(UUID) TO authenticated;
 
+-- 2.1. Criar função auxiliar para verificar se é super_admin (sem recursão)
+CREATE OR REPLACE FUNCTION public.is_user_super_admin(check_user_id UUID)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 
+    FROM public.admin_users
+    WHERE user_id = check_user_id
+      AND role = 'super_admin'
+      AND is_active = true
+  );
+END;
+$$;
+
+-- Garantir que a função é acessível para authenticated users
+GRANT EXECUTE ON FUNCTION public.is_user_super_admin(UUID) TO authenticated;
+
 -- 3. Criar nova política que usa a função (sem recursão)
+-- Esta política permite que admins vejam outros admins
 CREATE POLICY "Admins podem ver outros admins"
   ON public.admin_users FOR SELECT
   TO authenticated
@@ -45,6 +71,7 @@ CREATE POLICY "Admins podem ver outros admins"
   );
 
 -- 4. Política para usuários verem seu próprio registro
+-- Esta política permite que qualquer usuário veja seu próprio registro de admin
 CREATE POLICY "Usuários podem ver seu próprio registro admin"
   ON public.admin_users FOR SELECT
   TO authenticated
@@ -52,7 +79,7 @@ CREATE POLICY "Usuários podem ver seu próprio registro admin"
     user_id = auth.uid()
   );
 
--- 5. Política para INSERT (apenas super admins via função)
+-- 5. Política para INSERT (apenas admins via função)
 -- Nota: Inserções normalmente devem ser feitas via triggers ou funções SECURITY DEFINER
 CREATE POLICY "Apenas admins podem inserir novos admins"
   ON public.admin_users FOR INSERT
@@ -62,31 +89,27 @@ CREATE POLICY "Apenas admins podem inserir novos admins"
   );
 
 -- 6. Política para UPDATE (apenas super admins)
+-- Usa a função is_user_super_admin para evitar recursão
 CREATE POLICY "Apenas super admins podem atualizar admins"
   ON public.admin_users FOR UPDATE
   TO authenticated
   USING (
-    public.is_user_admin(auth.uid())
-    AND EXISTS (
-      SELECT 1 FROM public.admin_users
-      WHERE user_id = auth.uid()
-        AND role = 'super_admin'
-        AND is_active = true
-    )
+    -- Verificar se é super_admin usando função (sem recursão)
+    public.is_user_super_admin(auth.uid())
+  )
+  WITH CHECK (
+    -- Verificar se é super_admin usando função (sem recursão)
+    public.is_user_super_admin(auth.uid())
   );
 
 -- 7. Política para DELETE (apenas super admins, e não pode deletar a si mesmo)
+-- Usa a função is_user_super_admin para evitar recursão
 CREATE POLICY "Apenas super admins podem deletar admins"
   ON public.admin_users FOR DELETE
   TO authenticated
   USING (
-    public.is_user_admin(auth.uid())
-    AND EXISTS (
-      SELECT 1 FROM public.admin_users
-      WHERE user_id = auth.uid()
-        AND role = 'super_admin'
-        AND is_active = true
-    )
+    -- Verificar se é super_admin usando função (sem recursão)
+    public.is_user_super_admin(auth.uid())
     AND user_id != auth.uid() -- Não pode deletar a si mesmo
   );
 
