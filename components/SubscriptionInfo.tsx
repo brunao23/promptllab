@@ -42,9 +42,13 @@ export const SubscriptionInfo: React.FC = () => {
         
         if (!plan) {
           console.warn('⚠️ [SubscriptionInfo] Nenhuma informação de plano encontrada. Usando valores padrão do trial.');
+          console.warn('💡 [SubscriptionInfo] Execute o script CORRIGIR_SAAS_COMPLETO.sql no Supabase SQL Editor.');
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('❌ [SubscriptionInfo] Erro ao carregar informações da assinatura:', error);
+        console.error('❌ [SubscriptionInfo] Erro detalhado:', error.message, error.stack);
+        // Mesmo com erro, definir como não carregando para mostrar fallback
+        setIsLoading(false);
       } finally {
         setIsLoading(false);
       }

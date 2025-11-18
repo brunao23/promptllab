@@ -23,9 +23,11 @@ export const TrialBanner: React.FC = () => {
         
         if (!info) {
           console.warn('⚠️ [TrialBanner] Nenhuma informação de plano encontrada. Verifique se a subscription foi criada.');
+          console.warn('💡 [TrialBanner] Execute o script CORRIGIR_SAAS_COMPLETO.sql no Supabase SQL Editor.');
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('❌ [TrialBanner] Erro ao carregar informações do plano:', error);
+        console.error('❌ [TrialBanner] Erro detalhado:', error.message, error.stack);
       } finally {
         setIsLoading(false);
       }
