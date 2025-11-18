@@ -143,6 +143,8 @@ export const Register: React.FC = () => {
         
         if (errorMessage.includes('User already registered') || errorMessage.includes('already registered') || errorMessage.includes('email_already_exists') || errorMessage.includes('already exists')) {
           setError('Este e-mail já está cadastrado. Tente fazer login ou recuperar sua senha.');
+        } else if (errorMessage.includes('Failed to fetch') || errorMessage.includes('NetworkError') || errorMessage.includes('network')) {
+          setError('❌ Erro de conexão com o banco de dados.\n\n🔧 Isso geralmente acontece quando as variáveis de ambiente do Supabase não estão configuradas na Vercel.\n\n📋 Verifique:\n1. Settings → Environment Variables na Vercel\n2. Se VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY estão configuradas\n3. Se estão marcadas para Production\n4. Se foi feito redeploy após adicionar\n\n📖 Consulte: CORRIGIR_CONEXAO_SUPABASE.md');
         } else if (errorMessage.includes('Password') || errorMessage.includes('password')) {
           if (errorMessage.includes('length') || errorMessage.includes('6')) {
             setError('A senha deve atender aos requisitos de segurança (mínimo 8 caracteres, maiúscula, minúscula, número e caractere especial).');

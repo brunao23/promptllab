@@ -115,6 +115,8 @@ export const Login: React.FC = () => {
           setError('❌ Usuário não encontrado. Verifique seu e-mail ou crie uma conta.');
         } else if (errorMessage.includes('Password')) {
           setError('Erro na senha. Verifique se digitou corretamente.');
+        } else if (errorMessage.includes('Failed to fetch') || errorMessage.includes('NetworkError') || errorMessage.includes('network')) {
+          setError('❌ Erro de conexão com o banco de dados.\n\n🔧 Isso geralmente acontece quando as variáveis de ambiente do Supabase não estão configuradas na Vercel.\n\n📋 Verifique:\n1. Settings → Environment Variables na Vercel\n2. Se VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY estão configuradas\n3. Se estão marcadas para Production\n4. Se foi feito redeploy após adicionar\n\n📖 Consulte: CORRIGIR_CONEXAO_SUPABASE.md');
         } else {
           setError(`Erro ao fazer login: ${authError.message || 'Por favor, verifique suas credenciais e tente novamente.'}`);
         }
