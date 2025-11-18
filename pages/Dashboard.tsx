@@ -59,10 +59,12 @@ export const Dashboard: React.FC = () => {
         {/* Content Area */}
         <main className="flex-1 overflow-auto bg-black">
           <div className="max-w-full p-4 lg:p-6">
-            {/* Diagnostic Panel - Debug */}
-            <div className="mb-4">
-              <DiagnosticPanel />
-            </div>
+            {/* Diagnostic Panel - Debug (Apenas em desenvolvimento) */}
+            {process.env.NODE_ENV === 'development' && (
+              <div className="mb-4">
+                <DiagnosticPanel />
+              </div>
+            )}
 
             {/* Trial Banner - Sempre no topo */}
             <div className="mb-4">
