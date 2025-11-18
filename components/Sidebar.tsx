@@ -28,7 +28,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onMobileClose })
             setAvatarUrl(profile.avatar_url || null);
           }
           // Verificar se é admin
+          console.log('🔍 [Sidebar] Verificando se é super admin...');
           const adminCheck = await isSuperAdmin();
+          console.log('✅ [Sidebar] É super admin?', adminCheck);
           setIsAdminUser(adminCheck);
         } catch (error) {
           console.error('Erro ao buscar perfil:', error);
@@ -47,7 +49,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onMobileClose })
             setAvatarUrl(profile.avatar_url || null);
           }
         }).catch(() => {});
-        isSuperAdmin().then(isAdmin => setIsAdminUser(isAdmin)).catch(() => {});
+        isSuperAdmin().then(isAdmin => {
+          console.log('✅ [Sidebar] Verificação de admin (onAuthStateChange):', isAdmin);
+          setIsAdminUser(isAdmin);
+        }).catch((error) => {
+          console.error('❌ [Sidebar] Erro ao verificar admin:', error);
+        });
       } else {
         setUserEmail(null);
         setUserName(null);

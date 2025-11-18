@@ -69,19 +69,74 @@ export async function isAdmin(): Promise<boolean> {
 export async function isSuperAdmin(): Promise<boolean> {
   try {
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user) return false;
+    if (!session?.user) {
+      console.log('⚠️ [isSuperAdmin] Nenhuma sessão ativa');
+      return false;
+    }
+
+    console.log('🔍 [isSuperAdmin] Verificando admin para user_id:', session.user.id);
+    console.log('🔍 [isSuperAdmin] Email do usuário:', session.user.email);
+
+    // Verificar por email também (fallback)
+    const userEmail = session.user.email;
+    if (userEmail === 'brunocostaads23@gmail.com') {
+      console.log('✅ [isSuperAdmin] Email corresponde ao admin master - verificando na tabela...');
+    }
 
     const { data, error } = await supabase
       .from('admin_users')
-      .select('role')
+      .select('role, email, is_active')
       .eq('user_id', session.user.id)
       .eq('is_active', true)
-      .single();
+      .maybeSingle();
 
-    if (error || !data) return false;
-    return data.role === 'super_admin';
-  } catch (error) {
-    console.error('❌ Erro ao verificar super admin:', error);
+    console.log('📋 [isSuperAdmin] Resultado da query:', { data, error });
+
+    if (error && error.code !== 'PGRST116') {
+      console.error('❌ [isSuperAdmin] Erro na query:', error);
+      // Se não encontrar na tabela mas o email for o admin master, retornar true (fallback)
+      if (userEmail === 'brunocostaads23@gmail.com') {
+        console.warn('⚠️ [isSuperAdmin] Admin não encontrado na tabela, mas email é admin master. Criando registro...');
+        // Tentar criar o registro de admin
+        try {
+          const { error: insertError } = await supabase
+            .from('admin_users')
+            .insert({
+              user_id: session.user.id,
+              email: userEmail,
+              role: 'super_admin',
+              can_manage_tenants: true,
+              can_manage_subscriptions: true,
+              can_view_analytics: true,
+              is_active: true,
+            });
+          if (!insertError) {
+            console.log('✅ [isSuperAdmin] Registro de admin criado automaticamente');
+            return true;
+          }
+        } catch (createError) {
+          console.error('❌ [isSuperAdmin] Erro ao criar registro de admin:', createError);
+        }
+      }
+      return false;
+    }
+
+    if (!data) {
+      console.warn('⚠️ [isSuperAdmin] Nenhum registro de admin encontrado');
+      // Fallback: se o email for o admin master, retornar true
+      if (userEmail === 'brunocostaads23@gmail.com') {
+        console.log('✅ [isSuperAdmin] Email corresponde ao admin master (fallback)');
+        return true;
+      }
+      return false;
+    }
+
+    const isSuper = data.role === 'super_admin';
+    console.log('✅ [isSuperAdmin] Resultado:', isSuper, 'Role:', data.role);
+    return isSuper;
+  } catch (error: any) {
+    console.error('❌ [isSuperAdmin] Erro ao verificar super admin:', error);
+    console.error('❌ [isSuperAdmin] Stack:', error.stack);
     return false;
   }
 }
