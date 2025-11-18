@@ -845,6 +845,30 @@ export const PromptManager: React.FC = () => {
         }
     };
     
+    // Função para limpar e normalizar texto
+    const cleanTextForPDF = (text: string): string => {
+        if (!text) return '';
+        
+        // Remover placeholders não processados como {{ $now }}, {{$now}}, etc.
+        let cleaned = text
+            .replace(/\{\{\s*\$now\s*\}\}/gi, new Date().toLocaleString('pt-BR'))
+            .replace(/\{\{[^}]*\}\}/g, '') // Remover outros placeholders genéricos
+            .replace(/Ø=[^ ]*/g, '') // Remover caracteres estranhos como Ø=ÜM, Ø=, etc.
+            .replace(/[^\x20-\x7E\u00A0-\u024F\u1E00-\u1EFF]/g, (char) => {
+                // Manter apenas caracteres ASCII e Unicode latino estendido
+                // Substituir outros caracteres problemáticos por equivalente ou espaço
+                const code = char.charCodeAt(0);
+                if (code === 8203) return ''; // Zero-width space
+                if (code === 8202) return ''; // Zero-width no-break space
+                if (code >= 0x2000 && code <= 0x200F) return ''; // Espaços especiais
+                return ' ';
+            })
+            .replace(/\s+/g, ' ') // Normalizar espaços múltiplos
+            .trim();
+        
+        return cleaned;
+    };
+
     const handleDownloadChat = (format: 'txt' | 'pdf') => {
         if (chatMessages.length === 0 || !activeVersion) return;
 
@@ -854,7 +878,8 @@ export const PromptManager: React.FC = () => {
         if (format === 'txt') {
             const chatContent = chatMessages.map(msg => {
                 const author = msg.author === 'user' ? 'Usuário' : 'Agente';
-                return `${author}: ${msg.text}`;
+                const cleanedText = cleanTextForPDF(msg.text);
+                return `${author}: ${cleanedText}`;
             }).join('\n\n');
 
             const fullContent = `${header}\n${timestamp}\n\n${chatContent}`;
@@ -869,43 +894,78 @@ export const PromptManager: React.FC = () => {
             document.body.removeChild(link);
             URL.revokeObjectURL(url);
         } else {
-            const doc = new jsPDF();
+            const doc = new jsPDF({
+                orientation: 'portrait',
+                unit: 'mm',
+                format: 'a4',
+                compress: true
+            });
+            
             let y = 20;
             const margin = 10;
             const pageWidth = doc.internal.pageSize.getWidth();
+            const pageHeight = doc.internal.pageSize.getHeight();
 
+            // Configurar fonte para melhor suporte a caracteres UTF-8
+            // jsPDF usa Helvetica por padrão que suporta bem caracteres latinos
+            doc.setFont('helvetica', 'normal');
+
+            // Cabeçalho
             doc.setFontSize(16);
-            doc.text(header, margin, y);
+            doc.setTextColor(0, 0, 0); // Preto para o cabeçalho
+            const headerText = cleanTextForPDF(header);
+            doc.text(headerText, margin, y);
             y += 7;
+            
+            // Timestamp
             doc.setFontSize(10);
-            doc.setTextColor(150);
-            doc.text(timestamp, margin, y);
+            doc.setTextColor(100, 100, 100); // Cinza
+            const timestampText = cleanTextForPDF(timestamp);
+            doc.text(timestampText, margin, y);
             y += 15;
 
+            // Mensagens do chat
             doc.setFontSize(11);
-            doc.setTextColor(255, 255, 255);
 
-            chatMessages.forEach(msg => {
+            chatMessages.forEach((msg, index) => {
                 const isUser = msg.author === 'user';
-                const text = msg.text;
-                const bubbleWidth = pageWidth * 0.7;
-                const splitText = doc.splitTextToSize(text, bubbleWidth - 10);
-                const bubbleHeight = (splitText.length * 5) + 10;
+                let text = cleanTextForPDF(msg.text);
                 
-                if (y + bubbleHeight > doc.internal.pageSize.getHeight() - margin) {
+                // Se o texto estiver vazio após limpeza, pular
+                if (!text || text.trim().length === 0) {
+                    return;
+                }
+
+                const bubbleWidth = pageWidth * 0.7;
+                
+                // Dividir texto em linhas que cabem na largura
+                const lines = doc.splitTextToSize(text, bubbleWidth - 20);
+                const lineHeight = 6;
+                const padding = 8;
+                const bubbleHeight = (lines.length * lineHeight) + (padding * 2);
+                
+                // Nova página se necessário
+                if (y + bubbleHeight > pageHeight - margin) {
                     doc.addPage();
                     y = 20;
                 }
 
                 const x = isUser ? pageWidth - bubbleWidth - margin : margin;
+                
+                // Cores: verde para usuário, cinza escuro para agente
                 const userColor = [16, 185, 129]; // emerald-500
-                const agentColor = [40, 40, 40]; // dark gray (para texto do agente no PDF)
+                const agentColor = [60, 60, 60]; // dark gray (mais escuro para melhor legibilidade)
                 
+                // Desenhar balão
                 doc.setFillColor(isUser ? userColor[0] : agentColor[0], isUser ? userColor[1] : agentColor[1], isUser ? userColor[2] : agentColor[2]);
-                doc.roundedRect(x, y, bubbleWidth, bubbleHeight, 3, 3, 'F');
-                doc.text(splitText, x + 5, y + 8);
+                doc.setDrawColor(isUser ? userColor[0] : agentColor[0], isUser ? userColor[1] : agentColor[1], isUser ? userColor[2] : agentColor[2]);
+                doc.roundedRect(x, y, bubbleWidth, bubbleHeight, 3, 3, 'FD');
                 
-                y += bubbleHeight + 5;
+                // Texto branco para melhor contraste
+                doc.setTextColor(255, 255, 255);
+                doc.text(lines, x + padding, y + padding + lineHeight);
+                
+                y += bubbleHeight + 8;
             });
 
             doc.save(`historico_chat_v${activeVersion.version}.pdf`);
