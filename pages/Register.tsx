@@ -280,7 +280,7 @@ export const Register: React.FC = () => {
             )}
 
             <div>
-              <label htmlFor="name" className="block text-sm font-medium text-slate-300 mb-2">
+              <label htmlFor="name" className="block text-sm font-medium text-white/80 mb-2">
                 Nome completo
               </label>
               <input
@@ -332,7 +332,7 @@ export const Register: React.FC = () => {
             </div>
 
             <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-slate-300 mb-2">
+              <label htmlFor="confirmPassword" className="block text-sm font-medium text-white/80 mb-2">
                 Confirmar senha
               </label>
               <input
@@ -356,7 +356,7 @@ export const Register: React.FC = () => {
                 required
                 className="mt-1 w-4 h-4 bg-white/5 border-white/10 rounded text-emerald-500 focus:ring-emerald-500 focus:ring-2"
               />
-              <label htmlFor="terms" className="ml-2 text-sm text-slate-400">
+              <label htmlFor="terms" className="ml-2 text-sm text-white/60">
                 Eu concordo com os{' '}
                 <Link to="/terms" className="text-emerald-400 hover:text-emerald-300">
                   Termos de Uso
@@ -375,7 +375,7 @@ export const Register: React.FC = () => {
             >
               {isLoading ? (
                 <>
-                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-black" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
@@ -399,7 +399,7 @@ export const Register: React.FC = () => {
 
         {/* Link para home */}
         <div className="mt-6 text-center">
-          <Link to="/" className="text-slate-400 hover:text-white text-sm transition-colors">
+          <Link to="/" className="text-white/60 hover:text-white text-sm transition-colors">
             ← Voltar para a página inicial
           </Link>
         </div>

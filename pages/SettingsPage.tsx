@@ -102,7 +102,17 @@ export const SettingsPage: React.FC = () => {
       await loadProfile(); // Recarregar perfil para atualizar
     } catch (error: any) {
       console.error('Erro ao fazer upload do avatar:', error);
-      setError(error.message || 'Erro ao fazer upload do avatar');
+      const errorMessage = error.message || 'Erro ao fazer upload do avatar';
+      
+      // Se o erro menciona bucket, mostrar mensagem mais útil
+      if (errorMessage.includes('bucket') || errorMessage.includes('Bucket')) {
+        setError(
+          errorMessage + 
+          '\n\n📋 Instruções para criar o bucket "avatars" estão disponíveis na documentação do projeto.'
+        );
+      } else {
+        setError(errorMessage);
+      }
     } finally {
       setIsUploadingAvatar(false);
     }
