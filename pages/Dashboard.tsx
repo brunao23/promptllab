@@ -58,21 +58,17 @@ export const Dashboard: React.FC = () => {
 
         {/* Content Area */}
         <main className="flex-1 overflow-auto bg-black">
-          <div className="max-w-full p-4 lg:p-6">
-            {/* Diagnostic Panel - Debug (SEMPRE VISÍVEL PARA DEBUG) */}
-            <div className="mb-4">
-              <DiagnosticPanel />
-            </div>
+          <div className="max-w-full p-4 lg:p-6 space-y-4">
+            {/* Diagnostic Panel - Apenas se houver erro (não mostrar quando tudo estiver OK) */}
+            <DiagnosticPanel />
 
-            {/* Trial Banner - Sempre no topo */}
-            <div className="mb-4">
-              <TrialBanner />
-            </div>
+            {/* Trial Banner */}
+            <TrialBanner />
 
-            {/* Grid Layout */}
-            <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
+            {/* Grid Layout - Layout Responsivo Melhorado */}
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 lg:gap-6">
               {/* Conteúdo Principal */}
-              <div className="xl:col-span-9 order-2 xl:order-1">
+              <div className="xl:col-span-9 order-2 xl:order-1 min-w-0">
                 <Routes>
                   <Route path="/" element={<PromptManager />} />
                   <Route path="/repository" element={<RepositoryPage />} />
@@ -83,7 +79,7 @@ export const Dashboard: React.FC = () => {
 
               {/* Info Sidebar - Direita */}
               <div className="xl:col-span-3 order-1 xl:order-2">
-                <div className="sticky top-4">
+                <div className="sticky top-4 space-y-4">
                   <SubscriptionInfo />
                 </div>
               </div>
