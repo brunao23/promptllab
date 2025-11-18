@@ -135,7 +135,20 @@ CREATE TABLE IF NOT EXISTS public.admin_users (
 -- ÍNDICES
 -- =====================================================
 CREATE INDEX IF NOT EXISTS idx_subscriptions_user_id ON public.subscriptions(user_id);
-CREATE INDEX IF NOT EXISTS idx_subscriptions_tenant_id ON public.subscriptions(tenant_id);
+
+-- Criar índice tenant_id apenas se a coluna existir
+DO $$ 
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+    AND table_name = 'subscriptions' 
+    AND column_name = 'tenant_id'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS idx_subscriptions_tenant_id ON public.subscriptions(tenant_id);
+  END IF;
+END $$;
+
 CREATE INDEX IF NOT EXISTS idx_subscriptions_status ON public.subscriptions(status);
 CREATE INDEX IF NOT EXISTS idx_subscriptions_is_active ON public.subscriptions(is_active);
 
