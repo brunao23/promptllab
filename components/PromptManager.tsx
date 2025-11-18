@@ -18,15 +18,23 @@ import { jsPDF } from 'jspdf';
 import { 
   createPrompt, 
   getUserPrompts, 
-  getPrompt, 
+  getPrompt,
   createPromptVersion, 
-  getPromptVersions,
-  saveChatMessage,
-  getChatMessages,
-  supabase,
-  getCurrentUser,
-  getCurrentProfile
+  getPromptVersions, 
+  saveChatMessage, 
+  getChatMessages, 
+  supabase, 
+  getCurrentUser, 
+  getCurrentProfile 
 } from '../services/supabaseService';
+import { checkAccess, getCurrentMonthVersions } from '../services/subscriptionService';
+import { 
+  canCreateVersion, 
+  canShareChat, 
+  checkUserLimits, 
+  incrementVersionCount,
+  type UserLimits 
+} from '../services/subscriptionService';
 
 export const PromptManager: React.FC = () => {
     const location = useLocation();
@@ -87,6 +95,29 @@ export const PromptManager: React.FC = () => {
     const [assistantError, setAssistantError] = useState<string | null>(null);
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const audioChunksRef = useRef<Blob[]>([]);
+    
+    // Estados para limites e assinatura
+    const [userLimits, setUserLimits] = useState<UserLimits | null>(null);
+    const [isCheckingLimits, setIsCheckingLimits] = useState(true);
+
+    // Carregar limites do usuário
+    useEffect(() => {
+        const loadLimits = async () => {
+            try {
+                setIsCheckingLimits(true);
+                const limits = await checkUserLimits();
+                setUserLimits(limits);
+                console.log('📊 Limites do usuário carregados:', limits);
+            } catch (error: any) {
+                console.error('❌ Erro ao carregar limites:', error);
+                // Continuar mesmo se houver erro ao carregar limites
+            } finally {
+                setIsCheckingLimits(false);
+            }
+        };
+        
+        loadLimits();
+    }, []);
 
     // Carregar dados do Supabase ao montar o componente E quando a sessão mudar
     useEffect(() => {
@@ -712,6 +743,14 @@ export const PromptManager: React.FC = () => {
             console.log('🤖 Gerando conteúdo do prompt...');
             const promptContent = await createFinalPrompt(formData);
             
+            // Verificar limite de versões antes de criar
+            const versionCheck = await canCreateVersion();
+            if (!versionCheck.allowed) {
+                setError(versionCheck.reason || 'Limite de versões atingido');
+                setIsLoading(false);
+                return;
+            }
+
             // Criar versão no banco
             console.log('💾 Salvando versão no banco...');
             let newVersion: PromptVersion;
@@ -723,6 +762,13 @@ export const PromptManager: React.FC = () => {
                     sourceData: formData,
                 });
                 console.log('✅ Versão salva:', newVersion.id);
+                
+                // Incrementar contador de versões
+                await incrementVersionCount();
+                
+                // Atualizar limites locais
+                const updatedLimits = await checkUserLimits();
+                setUserLimits(updatedLimits);
             } catch (versionError: any) {
                 console.error('❌ ERRO ao salvar versão:', versionError);
                 setError(`Erro ao salvar versão no banco: ${versionError.message || 'Erro desconhecido'}. Verifique o console para mais detalhes.`);
@@ -745,6 +791,13 @@ export const PromptManager: React.FC = () => {
     };
     
     const handleOptimizePrompt = async () => {
+        // Verificar limite de versões antes de otimizar
+        const canCreateVersion = await checkAccess('create_version');
+        if (!canCreateVersion) {
+            const versionsInfo = await getCurrentMonthVersions();
+            alert(`Limite de versões atingido! Você já criou ${versionsInfo.versionsCount} de ${versionsInfo.versionsLimit} versões permitidas no seu plano este mês. Upgrade para Premium para criar versões ilimitadas.`);
+            return;
+        }
         if (!activeVersion || !currentPromptId) return;
         if (optimizationPairs.length === 0 && !manualOptInstructions.trim()) return;
 
@@ -753,6 +806,14 @@ export const PromptManager: React.FC = () => {
         try {
             const optimizedContent = await optimizePrompt(activeVersion.content, optimizationPairs, manualOptInstructions);
             
+            // Verificar limite de versões antes de criar
+            const versionCheck = await canCreateVersion();
+            if (!versionCheck.allowed) {
+                setError(versionCheck.reason || 'Limite de versões atingido');
+                setIsOptimizing(false);
+                return;
+            }
+
             // Criar nova versão no banco
             const newVersion = await createPromptVersion(currentPromptId, {
                 content: optimizedContent,
@@ -760,6 +821,13 @@ export const PromptManager: React.FC = () => {
                 masterFormat: activeVersion.sourceData.masterPromptFormat,
                 sourceData: activeVersion.sourceData,
             });
+            
+            // Incrementar contador de versões
+            await incrementVersionCount();
+            
+            // Atualizar limites locais
+            const updatedLimits = await checkUserLimits();
+            setUserLimits(updatedLimits);
 
             setVersionHistory(prev => [...prev, newVersion]);
             setActiveVersion(newVersion);
@@ -1414,7 +1482,14 @@ export const PromptManager: React.FC = () => {
         await loadExternalPrompt(text, 'Prompt Colado');
     };
 
-    const handleShareVersion = (versionId: string) => {
+    const handleShareVersion = async (versionId: string) => {
+        // Verificar se pode compartilhar chat
+        const shareCheck = await canShareChat();
+        if (!shareCheck.allowed) {
+            setError(shareCheck.reason || 'Compartilhamento não disponível no seu plano');
+            return;
+        }
+        
         const baseUrl = window.location.origin;
         const shareUrl = `${baseUrl}/chat/${versionId}`;
         

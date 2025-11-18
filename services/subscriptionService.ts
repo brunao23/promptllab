@@ -298,3 +298,63 @@ export async function getCurrentPlanInfo(): Promise<{
     maxTokens: subscription.plan.max_tokens_per_month,
   };
 }
+
+/**
+ * Verifica se o usuário pode usar tokens (usado pelo geminiService)
+ */
+export async function canUseTokens(tokensToUse: number): Promise<{
+  allowed: boolean;
+  reason?: string;
+}> {
+  try {
+    const subscription = await getCurrentSubscription();
+    if (!subscription) {
+      return {
+        allowed: false,
+        reason: 'Nenhuma assinatura ativa encontrada. Por favor, entre em contato com o suporte.',
+      };
+    }
+
+    // Se o plano não tem limite (-1), permitir sempre
+    if (subscription.plan?.max_tokens_per_month === -1) {
+      return { allowed: true };
+    }
+
+    const usage = await getCurrentMonthUsage();
+    
+    if (usage.tokensLimit === -1) {
+      return { allowed: true };
+    }
+
+    const tokensAfterUsage = usage.tokensUsed + tokensToUse;
+
+    if (tokensAfterUsage > usage.tokensLimit) {
+      const remaining = Math.max(0, usage.tokensLimit - usage.tokensUsed);
+      return {
+        allowed: false,
+        reason: `Limite de tokens excedido. Você tem ${remaining.toLocaleString('pt-BR')} tokens restantes este mês. Upgrade seu plano para continuar.`,
+      };
+    }
+
+    return { allowed: true };
+  } catch (error: any) {
+    console.error('❌ Erro ao verificar tokens:', error);
+    return {
+      allowed: false,
+      reason: 'Erro ao verificar limite de tokens. Tente novamente.',
+    };
+  }
+}
+
+/**
+ * Incrementa o uso de tokens (usado pelo geminiService)
+ */
+export async function incrementTokenUsage(
+  tokensUsed: number,
+  usageType: 'prompt_generation' | 'chat' | 'document_analysis' = 'prompt_generation',
+  modelUsed: string = 'gemini-2.5-flash',
+  promptId?: string,
+  versionId?: string
+): Promise<boolean> {
+  return trackTokenUsage(tokensUsed, usageType, modelUsed, promptId, versionId);
+}
