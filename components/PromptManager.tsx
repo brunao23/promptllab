@@ -87,6 +87,39 @@ export const PromptManager: React.FC = () => {
 
                 console.log('✅ Usuário autenticado:', session.user.email);
 
+                // Verificar se há um promptId no state (vindo do repositório)
+                const promptIdFromState = (location.state as any)?.promptId;
+                
+                if (promptIdFromState) {
+                    console.log('📋 Carregando prompt específico do repositório:', promptIdFromState);
+                    try {
+                        const { promptData } = await getPrompt(promptIdFromState);
+                        setCurrentPromptId(promptIdFromState);
+                        setFormData(promptData);
+                        
+                        const versions = await getPromptVersions(promptIdFromState);
+                        if (versions && versions.length > 0) {
+                            setVersionHistory(versions);
+                            const latestVersion = versions[0];
+                            setActiveVersion(latestVersion);
+                            
+                            const messages = await getChatMessages(latestVersion.id);
+                            if (messages && messages.length > 0) {
+                                setChatMessages(messages);
+                            }
+                            
+                            if (latestVersion.content) {
+                                startChat(latestVersion.content);
+                            }
+                        }
+                        setIsLoadingData(false);
+                        return;
+                    } catch (err) {
+                        console.error('❌ Erro ao carregar prompt do repositório:', err);
+                        // Continuar com o fluxo normal se houver erro
+                    }
+                }
+
                 // Carregar prompts do usuário
                 console.log('📥 Carregando prompts do usuário...');
                 const prompts = await getUserPrompts();
