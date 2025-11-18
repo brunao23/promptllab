@@ -105,12 +105,54 @@ export const SettingsPage: React.FC = () => {
       console.error('Erro ao fazer upload do avatar:', error);
       const errorMessage = error.message || 'Erro ao fazer upload do avatar';
       
-      // Se o erro menciona bucket, mostrar mensagem mais útil
+      // Se o erro menciona bucket, tentar criar automaticamente
       if (errorMessage.includes('bucket') || errorMessage.includes('Bucket')) {
-        setError(
-          errorMessage + 
-          '\n\n📋 Instruções para criar o bucket "avatars" estão disponíveis na documentação do projeto.'
-        );
+        try {
+          console.log('⚠️ Tentando criar bucket automaticamente...');
+          setError('Criando bucket automaticamente... Aguarde...');
+          
+          // Tentar criar o bucket
+          const result = await ensureAvatarsBucket();
+          
+          if (result.success) {
+            setError(null);
+            setSuccess('Bucket verificado! Tentando fazer upload novamente...');
+            
+            // Tentar upload novamente após criar o bucket
+            setTimeout(async () => {
+              try {
+                const retryUrl = await uploadAvatar(avatarFile!);
+                setAvatarPreview(retryUrl);
+                setAvatarFile(null);
+                setSuccess('Avatar atualizado com sucesso!');
+                setTimeout(() => setSuccess(null), 3000);
+                await loadProfile();
+              } catch (retryError: any) {
+                setError(retryError.message || 'Erro ao fazer upload após criar bucket. Tente novamente.');
+              } finally {
+                setIsUploadingAvatar(false);
+              }
+            }, 2000);
+            return;
+          } else {
+            setError(
+              'Não foi possível criar o bucket automaticamente.\n\n' +
+              result.message + '\n\n' +
+              'Por favor, crie o bucket "avatars" manualmente no Supabase Storage:\n' +
+              '1. Acesse https://app.supabase.com\n' +
+              '2. Vá para Storage → Create bucket\n' +
+              '3. Nome: avatars\n' +
+              '4. Público: Sim\n' +
+              '5. Clique em Create\n\n' +
+              'Consulte INSTRUCOES_BUCKET_AVATARS.md para mais detalhes.'
+            );
+          }
+        } catch (createError: any) {
+          setError(
+            errorMessage + 
+            '\n\n📋 Não foi possível criar o bucket automaticamente. Por favor, crie manualmente seguindo as instruções em INSTRUCOES_BUCKET_AVATARS.md'
+          );
+        }
       } else {
         setError(errorMessage);
       }
