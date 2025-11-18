@@ -91,7 +91,7 @@ export const PromptInputForm: React.FC<PromptInputFormProps> = ({
       }));
   };
 
-  const baseInputClasses = "w-full p-2 bg-slate-700/50 border border-slate-600 rounded-md text-slate-300 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500";
+  const baseInputClasses = "w-full p-2 bg-white/5 border border-white/10 rounded-md text-white/80 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500";
 
   return (
     <div className="p-4 space-y-4 overflow-y-auto h-full">
@@ -105,7 +105,7 @@ export const PromptInputForm: React.FC<PromptInputFormProps> = ({
         <InputSection title="1. Persona e Objetivo">
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">Persona</label>
+              <label className="block text-sm font-medium text-white/80 mb-1">Persona</label>
               <textarea value={formData.persona} onChange={(e) => handleInputChange('persona', e.target.value)} rows={3} className={baseInputClasses} />
             </div>
             <div>
@@ -131,7 +131,7 @@ export const PromptInputForm: React.FC<PromptInputFormProps> = ({
                         <button onClick={() => removeRule(index)} className="p-2 text-red-400 hover:text-red-300">&times;</button>
                     </div>
                 ))}
-                <button onClick={addRule} className="text-cyan-400 hover:text-cyan-300">+ Adicionar Regra</button>
+                <button onClick={addRule} className="text-emerald-400 hover:text-emerald-300">+ Adicionar Regra</button>
             </div>
         </InputSection>
 
@@ -139,11 +139,11 @@ export const PromptInputForm: React.FC<PromptInputFormProps> = ({
           <div className="space-y-3">
             {formData.exemplos.map(ex => <FewShotExampleItem key={ex.id} example={ex} onUpdate={updateExample} onRemove={removeExample} />)}
              <div className="flex items-center space-x-4 pt-2">
-                <button onClick={addExample} className="text-cyan-400 hover:text-cyan-300 font-medium">+ Adicionar Exemplo</button>
+                <button onClick={addExample} className="text-emerald-400 hover:text-emerald-300 font-medium">+ Adicionar Exemplo</button>
                 <button 
                   onClick={onGenerateExamples} 
                   disabled={isGeneratingExamples || isLoading || isUploading}
-                  className="flex items-center space-x-2 text-indigo-400 hover:text-indigo-300 font-medium disabled:text-slate-500 disabled:cursor-wait"
+                  className="flex items-center space-x-2 text-emerald-400 hover:text-emerald-300 font-medium disabled:text-white/40 disabled:cursor-wait"
                 >
                   {isGeneratingExamples ? (
                       <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
@@ -159,29 +159,29 @@ export const PromptInputForm: React.FC<PromptInputFormProps> = ({
         <InputSection title="6. Variáveis Dinâmicas">
           <div className="space-y-3">
             {formData.variaveisDinamicas.map(v => <VariavelDinamicaItem key={v.id} variavel={v} onUpdate={updateVariavel} onRemove={removeVariavel} />)}
-            <button onClick={addVariavel} className="text-cyan-400 hover:text-cyan-300">+ Adicionar Variável</button>
+            <button onClick={addVariavel} className="text-emerald-400 hover:text-emerald-300">+ Adicionar Variável</button>
           </div>
         </InputSection>
         
         <InputSection title="7. Ferramentas (Tools)">
           <div className="space-y-3">
             {formData.ferramentas.map(f => <FerramentaItem key={f.id} ferramenta={f} onUpdate={updateFerramenta} onRemove={removeFerramenta} />)}
-            <button onClick={addFerramenta} className="text-cyan-400 hover:text-cyan-300">+ Adicionar Ferramenta</button>
+            <button onClick={addFerramenta} className="text-emerald-400 hover:text-emerald-300">+ Adicionar Ferramenta</button>
           </div>
         </InputSection>
         
         <InputSection title="8. Fluxos de Interação">
             <div className="space-y-3">
                 {formData.fluxos.map(fluxo => <FluxoItem key={fluxo.id} fluxo={fluxo} onUpdate={updateFluxo} onRemove={removeFluxo} />)}
-                <button onClick={addFluxo} className="text-cyan-400 hover:text-cyan-300">+ Adicionar Fluxo</button>
+                <button onClick={addFluxo} className="text-emerald-400 hover:text-emerald-300">+ Adicionar Fluxo</button>
             </div>
         </InputSection>
 
         <InputSection title="9. Formatos (Prompt e Agente)">
           <div className="space-y-4">
-            <div className="p-3 bg-slate-800/50 border border-indigo-500/30 rounded-md">
-              <label className="block text-sm font-bold text-indigo-300 mb-1">Formato do PROMPT MESTRE (Artefato Gerado)</label>
-              <p className="text-xs text-slate-500 mb-2">Escolha como você quer que o prompt final seja estruturado.</p>
+            <div className="p-3 bg-white/5 border border-emerald-500/30 rounded-md">
+              <label className="block text-sm font-bold text-emerald-300 mb-1">Formato do PROMPT MESTRE (Artefato Gerado)</label>
+              <p className="text-xs text-white/40 mb-2">Escolha como você quer que o prompt final seja estruturado.</p>
               <select value={formData.masterPromptFormat} onChange={e => handleInputChange('masterPromptFormat', e.target.value as MasterPromptFormat)} className={baseInputClasses}>
                 {masterPromptFormats.map(f => (
                     <option key={f} value={f}>
@@ -190,9 +190,9 @@ export const PromptInputForm: React.FC<PromptInputFormProps> = ({
                 ))}
               </select>
             </div>
-            <div className="p-3 bg-slate-800/50 border border-cyan-500/30 rounded-md">
-              <label className="block text-sm font-bold text-cyan-300 mb-1">Formato de Resposta do AGENTE (Final)</label>
-              <p className="text-xs text-slate-500 mb-2">Escolha como o agente deve responder ao usuário final.</p>
+            <div className="p-3 bg-white/5 border border-emerald-500/30 rounded-md">
+              <label className="block text-sm font-bold text-emerald-300 mb-1">Formato de Resposta do AGENTE (Final)</label>
+              <p className="text-xs text-white/40 mb-2">Escolha como o agente deve responder ao usuário final.</p>
               <select value={formData.formatoSaida} onChange={e => handleInputChange('formatoSaida', e.target.value as OutputFormat)} className={baseInputClasses}>
                 {agentOutputFormats.map(f => (
                     <option key={f} value={f}>
@@ -202,7 +202,7 @@ export const PromptInputForm: React.FC<PromptInputFormProps> = ({
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">Estrutura de Resposta Esperada (Opcional)</label>
+              <label className="block text-sm font-medium text-white/80 mb-1">Estrutura de Resposta Esperada (Opcional)</label>
               <textarea 
                 value={formData.estruturaSaida} 
                 onChange={(e) => handleInputChange('estruturaSaida', e.target.value)} 
@@ -216,7 +216,7 @@ export const PromptInputForm: React.FC<PromptInputFormProps> = ({
 
         <InputSection title="10. Tamanho e Complexidade">
             <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">Tamanho Alvo do Prompt: <span className="font-bold text-cyan-400">{formData.promptSize.toLocaleString('pt-BR')}</span> caracteres</label>
+                <label className="block text-sm font-medium text-white/80 mb-2">Tamanho Alvo do Prompt: <span className="font-bold text-emerald-400">{formData.promptSize.toLocaleString('pt-BR')}</span> caracteres</label>
                 <input
                     type="range"
                     min="5000"
@@ -224,21 +224,21 @@ export const PromptInputForm: React.FC<PromptInputFormProps> = ({
                     step="1000"
                     value={formData.promptSize}
                     onChange={(e) => handleInputChange('promptSize', parseInt(e.target.value, 10))}
-                    className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-cyan-500"
+                    className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-emerald-500"
                     disabled={isUploading}
                 />
-                 <div className="flex justify-between text-xs text-slate-400 mt-1">
+                 <div className="flex justify-between text-xs text-white/40 mt-1">
                     <span>Simples</span>
                     <span>Complexo</span>
                 </div>
             </div>
         </InputSection>
         
-        <div className="pt-4 sticky bottom-0 bg-slate-800 -mx-4 px-4 pb-4">
+        <div className="pt-4 sticky bottom-0 bg-black/50 -mx-4 px-4 pb-4">
             <button
                 onClick={onGenerate}
                 disabled={isLoading || isUploading}
-                className="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-3 px-4 rounded-lg transition disabled:bg-slate-500 disabled:cursor-not-allowed flex items-center justify-center text-lg"
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-4 rounded-lg transition disabled:bg-white/20 disabled:cursor-not-allowed flex items-center justify-center text-lg"
             >
                 {isLoading ? 'Gerando...' : 'Gerar Prompt Mestre'}
             </button>
