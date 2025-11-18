@@ -193,23 +193,41 @@ export const SettingsPage: React.FC = () => {
       setError(null);
       setSuccess(null);
 
-      // Validar nome
-      const nameValidation = validateName(sanitizeText(formData.fullName.trim()));
+      // Validar e sanitizar nome
+      const sanitizedName = sanitizeText(formData.fullName.trim());
+      const nameValidation = validateName(sanitizedName);
+      
       if (!nameValidation.valid) {
         setError(nameValidation.error || 'Nome inválido');
         setIsSaving(false);
         return;
       }
 
+      // Se a validação passou, usar o nome sanitizado
+      const nameToSave = sanitizedName || '';
+
+      console.log('💾 Salvando nome:', nameToSave);
+
       const updatedProfile = await updateProfile({
-        full_name: nameValidation.sanitized || '',
+        full_name: nameToSave,
       });
+
+      console.log('✅ Perfil retornado após update:', updatedProfile);
 
       // Atualizar estado local imediatamente com o perfil retornado
       if (updatedProfile) {
+        const savedName = updatedProfile.full_name || nameToSave;
+        console.log('📝 Atualizando estado local com nome:', savedName);
         setFormData(prev => ({
           ...prev,
-          fullName: updatedProfile.full_name || nameValidation.sanitized || '',
+          fullName: savedName,
+        }));
+      } else {
+        // Fallback: usar o nome sanitizado mesmo sem perfil retornado
+        console.log('⚠️ Perfil não retornado, usando nome sanitizado:', nameToSave);
+        setFormData(prev => ({
+          ...prev,
+          fullName: nameToSave,
         }));
       }
 
