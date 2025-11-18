@@ -55,7 +55,7 @@ export const DiagnosticPanel: React.FC = () => {
               ...prev,
               hasSession: true,
               userId,
-              error: `Erro ao buscar subscription: infinite recursion detected in policy for relation "admin_users". Execute o script CORRIGIR_RLS_ADMIN_USERS_FINAL.sql no Supabase SQL Editor para corrigir.`,
+              error: `Erro ao buscar subscription: infinite recursion detected in policy for relation "admin_users". Execute o script CORRIGIR_RLS_ADMIN_USERS_FINAL.sql no Supabase SQL Editor para corrigir. (⚠️ Use o arquivo FINAL, não o antigo!)`,
             }));
             return;
           }

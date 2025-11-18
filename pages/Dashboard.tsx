@@ -58,27 +58,33 @@ export const Dashboard: React.FC = () => {
 
         {/* Content Area */}
         <main className="flex-1 overflow-auto bg-black">
-          <div className="max-w-full p-4 lg:p-6 space-y-4">
-            {/* Diagnostic Panel - Apenas se houver erro (não mostrar quando tudo estiver OK) */}
-            <DiagnosticPanel />
+          <div className="container mx-auto max-w-7xl px-4 lg:px-6 py-4 lg:py-6">
+            {/* Diagnostic Panel - Apenas se houver erro */}
+            <div className="mb-4">
+              <DiagnosticPanel />
+            </div>
 
-            {/* Trial Banner */}
-            <TrialBanner />
+            {/* Trial Banner - Apenas uma vez no topo */}
+            <div className="mb-4">
+              <TrialBanner />
+            </div>
 
-            {/* Grid Layout - Layout Responsivo Melhorado */}
-            <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 lg:gap-6">
-              {/* Conteúdo Principal */}
-              <div className="xl:col-span-9 order-2 xl:order-1 min-w-0">
-                <Routes>
-                  <Route path="/" element={<PromptManager />} />
-                  <Route path="/repository" element={<RepositoryPage />} />
-                  <Route path="/settings" element={<SettingsPage />} />
-                  <Route path="/admin" element={<AdminPage />} />
-                </Routes>
+            {/* Grid Layout - Layout Responsivo Otimizado */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6">
+              {/* Conteúdo Principal - Esquerda */}
+              <div className="lg:col-span-8 xl:col-span-9 order-2 lg:order-1">
+                <div className="min-w-0">
+                  <Routes>
+                    <Route path="/" element={<PromptManager />} />
+                    <Route path="/repository" element={<RepositoryPage />} />
+                    <Route path="/settings" element={<SettingsPage />} />
+                    <Route path="/admin" element={<AdminPage />} />
+                  </Routes>
+                </div>
               </div>
 
-              {/* Info Sidebar - Direita */}
-              <div className="xl:col-span-3 order-1 xl:order-2">
+              {/* Sidebar Direita - Workspaces e Subscription */}
+              <div className="lg:col-span-4 xl:col-span-3 order-1 lg:order-2">
                 <div className="sticky top-4 space-y-4">
                   <SubscriptionInfo />
                 </div>
