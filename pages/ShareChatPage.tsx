@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { getPromptVersion } from '../services/supabaseService';
 import { startChat, continueChat } from '../services/geminiService';
 import type { ChatMessage } from '../types';
+import { jsPDF } from 'jspdf';
 
 export const ShareChatPage: React.FC = () => {
   const { versionId } = useParams<{ versionId: string }>();
@@ -13,6 +14,10 @@ export const ShareChatPage: React.FC = () => {
   const [isSending, setIsSending] = useState(false);
   const [promptContent, setPromptContent] = useState<string>('');
   const [agentName, setAgentName] = useState<string>('Agente');
+  const [editingText, setEditingText] = useState('');
+  const [isDownloadOpen, setIsDownloadOpen] = useState(false);
+  const downloadRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const loadVersion = async () => {
@@ -100,6 +105,245 @@ export const ShareChatPage: React.FC = () => {
     }
   };
 
+  // Scroll para o final das mensagens
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  // Fechar dropdown ao clicar fora
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (downloadRef.current && !downloadRef.current.contains(event.target as Node)) {
+        setIsDownloadOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleFeedback = (index: number, feedback: 'correct' | 'incorrect') => {
+    const currentMessage = messages[index];
+    if (currentMessage.feedback === feedback) {
+      setMessages(prev => prev.map((msg, i) => 
+        i === index ? { ...msg, feedback: undefined, isEditing: false } : msg
+      ));
+      return;
+    }
+
+    if (feedback === 'incorrect') {
+      setMessages(prev => prev.map((msg, i) => 
+        i === index ? { ...msg, feedback: 'incorrect', isEditing: true } : msg
+      ));
+      setEditingText(currentMessage.text);
+    } else {
+      setMessages(prev => prev.map((msg, i) => 
+        i === index ? { ...msg, feedback: 'correct', isEditing: false } : msg
+      ));
+    }
+  };
+
+  const handleSaveCorrection = (index: number) => {
+    if (editingText.trim()) {
+      setMessages(prev => prev.map((msg, i) => 
+        i === index ? { ...msg, correction: editingText.trim(), isEditing: false } : msg
+      ));
+      setEditingText('');
+    }
+  };
+
+  // Função para limpar e normalizar texto
+  const cleanTextForPDF = (text: string): string => {
+    if (!text) return '';
+    return text
+      .replace(/\{\{\s*\$now\s*\}\}/gi, new Date().toLocaleString('pt-BR'))
+      .replace(/\{\{[^}]*\}\}/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+
+  // Função para gerar PDF do chat
+  const handleDownloadChat = (format: 'txt' | 'pdf') => {
+    if (messages.length === 0) return;
+
+    const toolName = 'LaBPrompT';
+    const header = `Histórico de Chat - Cliente`;
+    const timestamp = `Exportado em: ${new Date().toLocaleString('pt-BR')}`;
+    const versionInfo = versionId ? `Versão ID: ${versionId.substring(0, 8)}...` : '';
+
+    if (format === 'txt') {
+      const chatParts: string[] = [];
+      
+      chatParts.push(toolName);
+      chatParts.push(header);
+      chatParts.push('');
+      chatParts.push(`Agente: ${agentName}`);
+      chatParts.push(versionInfo);
+      chatParts.push(timestamp);
+      chatParts.push('');
+      chatParts.push('='.repeat(50));
+      chatParts.push('');
+
+      messages.forEach((msg, index) => {
+        const author = msg.author === 'user' ? 'Cliente' : agentName;
+        const text = cleanTextForPDF(msg.text);
+        
+        chatParts.push(`${author}: ${text}`);
+        
+        // Adicionar feedback e correções
+        if (msg.feedback === 'incorrect' && msg.correction) {
+          chatParts.push(`[FEEDBACK: Resposta marcada como incorreta]`);
+          chatParts.push(`[Resposta Original]: ${text}`);
+          chatParts.push(`[Correção Sugerida pelo Cliente]: ${cleanTextForPDF(msg.correction)}`);
+        } else if (msg.feedback === 'correct') {
+          chatParts.push(`[FEEDBACK: Resposta marcada como correta ✓]`);
+        }
+        
+        chatParts.push('');
+      });
+
+      const fullContent = chatParts.join('\n');
+      const blob = new Blob([fullContent], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `historico_chat_cliente_${new Date().toISOString().split('T')[0]}.txt`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } else {
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+        compress: true
+      });
+      
+      let y = 20;
+      const margin = 10;
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+
+      doc.setFont('helvetica', 'normal');
+
+      // Logo/Nome da ferramenta
+      doc.setFontSize(24);
+      doc.setTextColor(16, 185, 129);
+      doc.text(toolName, margin, y);
+      y += 10;
+
+      // Linha divisória
+      doc.setDrawColor(200, 200, 200);
+      doc.setLineWidth(0.5);
+      doc.line(margin, y, pageWidth - margin, y);
+      y += 10;
+
+      // Cabeçalho
+      doc.setFontSize(16);
+      doc.setTextColor(0, 0, 0);
+      doc.text(header, margin, y);
+      y += 8;
+
+      // Informações
+      doc.setFontSize(11);
+      doc.setTextColor(60, 60, 60);
+      doc.text(`Agente: ${cleanTextForPDF(agentName)}`, margin, y);
+      y += 6;
+      if (versionInfo) {
+        doc.text(versionInfo, margin, y);
+        y += 6;
+      }
+      
+      // Timestamp
+      doc.setFontSize(10);
+      doc.setTextColor(100, 100, 100);
+      doc.text(timestamp, margin, y);
+      y += 12;
+
+      // Linha divisória
+      doc.setDrawColor(200, 200, 200);
+      doc.line(margin, y, pageWidth - margin, y);
+      y += 10;
+
+      // Mensagens do chat
+      doc.setFontSize(11);
+
+      messages.forEach((msg, index) => {
+        const isUser = msg.author === 'user';
+        const text = cleanTextForPDF(msg.text);
+        const bubbleWidth = pageWidth * 0.7;
+        
+        // Mensagem conversacional
+        const lines = doc.splitTextToSize(text, bubbleWidth - 20);
+        const lineHeight = 6;
+        const padding = 8;
+        const labelHeight = 5;
+        let bubbleHeight = (lines.length * lineHeight) + (padding * 2) + labelHeight;
+        
+        // Se houver correção, adicionar espaço
+        if (msg.feedback === 'incorrect' && msg.correction) {
+          const correctionLines = doc.splitTextToSize(
+            `[Correção]: ${cleanTextForPDF(msg.correction)}`,
+            bubbleWidth - 20
+          );
+          bubbleHeight += (correctionLines.length * 4) + 8;
+        }
+        
+        if (y + bubbleHeight > pageHeight - margin) {
+          doc.addPage();
+          y = 20;
+        }
+
+        const x = isUser ? pageWidth - bubbleWidth - margin : margin;
+        
+        // Cores
+        const userColor = [16, 185, 129];
+        const agentColor = [60, 60, 60];
+        
+        // Desenhar balão
+        doc.setFillColor(isUser ? userColor[0] : agentColor[0], isUser ? userColor[1] : agentColor[1], isUser ? userColor[2] : agentColor[2]);
+        doc.setDrawColor(isUser ? userColor[0] : agentColor[0], isUser ? userColor[1] : agentColor[1], isUser ? userColor[2] : agentColor[2]);
+        doc.roundedRect(x, y, bubbleWidth, bubbleHeight, 3, 3, 'FD');
+        
+        // Label do autor
+        doc.setFontSize(9);
+        doc.setTextColor(255, 255, 255, 80);
+        const authorLabel = isUser ? 'Cliente' : agentName;
+        doc.text(authorLabel, x + padding, y + padding + labelHeight);
+        
+        // Texto da mensagem
+        doc.setFontSize(11);
+        doc.setTextColor(255, 255, 255);
+        doc.text(lines, x + padding, y + padding + labelHeight + lineHeight);
+        
+        let textY = y + padding + labelHeight + lineHeight + (lines.length * lineHeight) + 4;
+        
+        // Feedback e correção
+        if (msg.feedback === 'incorrect' && msg.correction) {
+          doc.setFontSize(9);
+          doc.setTextColor(255, 100, 100);
+          doc.text('[Feedback: Incorreto]', x + padding, textY);
+          textY += 6;
+          
+          const correctionText = cleanTextForPDF(msg.correction);
+          const correctionLines = doc.splitTextToSize(`Correção: ${correctionText}`, bubbleWidth - 20);
+          doc.setTextColor(100, 255, 100);
+          doc.text(correctionLines, x + padding, textY);
+        } else if (msg.feedback === 'correct') {
+          doc.setFontSize(9);
+          doc.setTextColor(100, 255, 100);
+          doc.text('[Feedback: Correto ✓]', x + padding, textY);
+        }
+        
+        y += bubbleHeight + 8;
+      });
+
+      doc.save(`historico_chat_cliente_${new Date().toISOString().split('T')[0]}.pdf`);
+    }
+    
+    setIsDownloadOpen(false);
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
@@ -143,6 +387,35 @@ export const ShareChatPage: React.FC = () => {
               <p className="text-white/60 text-xs">Chat com {agentName}</p>
             </div>
           </div>
+          {messages.length > 0 && (
+            <div className="relative" ref={downloadRef}>
+              <button
+                onClick={() => setIsDownloadOpen(!isDownloadOpen)}
+                className="flex items-center space-x-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors text-sm"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                <span>Baixar</span>
+              </button>
+              {isDownloadOpen && (
+                <div className="absolute right-0 mt-2 w-32 bg-black/90 border border-white/20 rounded-lg shadow-xl z-10 backdrop-blur-sm">
+                  <button
+                    onClick={() => handleDownloadChat('txt')}
+                    className="block w-full text-left px-4 py-2 text-sm text-white/80 hover:bg-white/10"
+                  >
+                    Baixar TXT
+                  </button>
+                  <button
+                    onClick={() => handleDownloadChat('pdf')}
+                    className="block w-full text-left px-4 py-2 text-sm text-white/80 hover:bg-white/10"
+                  >
+                    Baixar PDF
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </header>
 
@@ -163,7 +436,7 @@ export const ShareChatPage: React.FC = () => {
             messages.map((msg, index) => (
               <div
                 key={index}
-                className={`flex ${msg.author === 'user' ? 'justify-end' : 'justify-start'}`}
+                className={`flex flex-col ${msg.author === 'user' ? 'items-end' : 'items-start'}`}
               >
                 <div
                   className={`max-w-[80%] rounded-2xl px-4 py-3 ${
@@ -172,8 +445,87 @@ export const ShareChatPage: React.FC = () => {
                       : 'bg-white/10 text-white/80'
                   }`}
                 >
-                  <p className="text-sm whitespace-pre-wrap break-words">{msg.text}</p>
+                  <p className="text-sm whitespace-pre-wrap break-words">
+                    {msg.correction && msg.feedback === 'incorrect' ? msg.correction : msg.text}
+                  </p>
+                  {msg.correction && msg.feedback === 'incorrect' && (
+                    <p className="text-xs text-white/60 mt-2 line-through italic">
+                      Resposta original: {msg.text.substring(0, 100)}...
+                    </p>
+                  )}
                 </div>
+                
+                {/* Feedback e edição para mensagens do agente */}
+                {msg.author === 'agent' && (
+                  <div className="mt-2 flex items-center space-x-2">
+                    <button
+                      onClick={() => handleFeedback(index, 'correct')}
+                      title="Resposta correta"
+                      className={`p-1.5 rounded-full transition-colors ${
+                        msg.feedback === 'correct'
+                          ? 'bg-green-500/30 text-green-400'
+                          : 'text-white/40 hover:text-green-400 hover:bg-white/10'
+                      }`}
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => handleFeedback(index, 'incorrect')}
+                      title="Resposta incorreta"
+                      className={`p-1.5 rounded-full transition-colors ${
+                        msg.feedback === 'incorrect'
+                          ? 'bg-red-500/30 text-red-400'
+                          : 'text-white/40 hover:text-red-400 hover:bg-white/10'
+                      }`}
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+
+                {/* Área de edição para correções */}
+                {msg.author === 'agent' && msg.feedback === 'incorrect' && msg.isEditing && (
+                  <div className="mt-3 w-full max-w-[80%]">
+                    <label className="block text-xs text-white/60 mb-2">
+                      Corrija a resposta do agente:
+                    </label>
+                    <textarea
+                      value={editingText}
+                      onChange={(e) => setEditingText(e.target.value)}
+                      className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white/80 placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+                      rows={3}
+                      placeholder="Digite a resposta correta..."
+                    />
+                    <div className="mt-2 flex space-x-2">
+                      <button
+                        onClick={() => handleSaveCorrection(index)}
+                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors text-sm"
+                      >
+                        Salvar Correção
+                      </button>
+                      <button
+                        onClick={() => setMessages(prev => prev.map((m, i) => 
+                          i === index ? { ...m, isEditing: false } : m
+                        ))}
+                        className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors text-sm"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Exibir correção salva */}
+                {msg.author === 'agent' && msg.feedback === 'incorrect' && msg.correction && !msg.isEditing && (
+                  <div className="mt-2 p-3 bg-emerald-900/20 border border-emerald-700/50 rounded-lg max-w-[80%]">
+                    <p className="text-xs text-emerald-300 mb-1">✓ Correção salva</p>
+                    <p className="text-sm text-white/80">{msg.correction}</p>
+                  </div>
+                )}
               </div>
             ))
           )}
@@ -189,6 +541,7 @@ export const ShareChatPage: React.FC = () => {
               </div>
             </div>
           )}
+          <div ref={messagesEndRef} />
         </div>
       </div>
 
