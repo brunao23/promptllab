@@ -412,3 +412,64 @@ export async function incrementTokenUsage(
 ): Promise<boolean> {
   return trackTokenUsage(tokensUsed, usageType, modelUsed, promptId, versionId);
 }
+
+/**
+ * Tipo para limites do usuário
+ */
+export interface UserLimits {
+  canCreateVersion: boolean;
+  canShareChat: boolean;
+  versionsCount: number;
+  versionsLimit: number;
+  tokensUsed: number;
+  tokensLimit: number;
+  trialDaysLeft: number | null;
+}
+
+/**
+ * Verifica limites do usuário
+ */
+export async function checkUserLimits(): Promise<UserLimits> {
+  const [planInfo, versionsInfo, usageInfo] = await Promise.all([
+    getCurrentPlanInfo(),
+    getCurrentMonthVersions(),
+    getCurrentMonthUsage()
+  ]);
+
+  return {
+    canCreateVersion: versionsInfo.canCreateMore,
+    canShareChat: planInfo?.canShareChat || false,
+    versionsCount: versionsInfo.versionsCount,
+    versionsLimit: versionsInfo.versionsLimit,
+    tokensUsed: usageInfo.tokensUsed,
+    tokensLimit: usageInfo.tokensLimit,
+    trialDaysLeft: planInfo?.trialDaysLeft || null
+  };
+}
+
+/**
+ * Verifica se o usuário pode criar uma nova versão
+ */
+export async function canCreateVersion(): Promise<{
+  allowed: boolean;
+  reason?: string;
+}> {
+  const canAccess = await checkAccess('create_version');
+  if (!canAccess) {
+    const versionsInfo = await getCurrentMonthVersions();
+    return {
+      allowed: false,
+      reason: `Limite de versões atingido! Você já criou ${versionsInfo.versionsCount} de ${versionsInfo.versionsLimit} versões permitidas no seu plano este mês. Upgrade para Premium para criar versões ilimitadas.`
+    };
+  }
+  return { allowed: true };
+}
+
+/**
+ * Incrementa o contador de versões (não precisa fazer nada no banco, é apenas para UI)
+ */
+export async function incrementVersionCount(): Promise<void> {
+  // A contagem é feita automaticamente pelo banco quando uma versão é criada
+  // Esta função existe apenas para manter compatibilidade com o código existente
+  console.log('📊 [incrementVersionCount] Contador de versões será atualizado automaticamente na próxima criação.');
+}

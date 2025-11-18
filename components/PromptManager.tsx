@@ -27,13 +27,16 @@ import {
   getCurrentUser, 
   getCurrentProfile 
 } from '../services/supabaseService';
-import { checkAccess, getCurrentMonthVersions } from '../services/subscriptionService';
 import { 
-  canCreateVersion, 
-  canShareChat, 
-  checkUserLimits, 
+  checkAccess, 
+  getCurrentMonthVersions,
+  getCurrentPlanInfo,
+  canUseTokens,
+  checkUserLimits,
+  canCreateVersion,
+  canShareChat,
   incrementVersionCount,
-  type UserLimits 
+  type UserLimits
 } from '../services/subscriptionService';
 
 export const PromptManager: React.FC = () => {
