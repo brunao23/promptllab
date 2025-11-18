@@ -82,6 +82,36 @@ export async function getCurrentSubscription(): Promise<Subscription | null> {
 }
 
 /**
+ * Verifica se o usuário pode compartilhar chat
+ */
+export async function canShareChat(): Promise<{ allowed: boolean; reason?: string }> {
+  try {
+    const subscription = await getCurrentSubscription();
+    if (!subscription) {
+      return {
+        allowed: false,
+        reason: 'Nenhuma assinatura ativa encontrada. Por favor, entre em contato com o suporte.',
+      };
+    }
+
+    if (!subscription.plan?.can_share_chat) {
+      return {
+        allowed: false,
+        reason: 'Compartilhamento de chat não disponível no plano Trial. Faça upgrade para acessar este recurso.',
+      };
+    }
+
+    return { allowed: true };
+  } catch (error: any) {
+    console.error('❌ Erro ao verificar compartilhamento:', error);
+    return {
+      allowed: false,
+      reason: 'Erro ao verificar permissão. Tente novamente.',
+    };
+  }
+}
+
+/**
  * Verifica se o usuário tem acesso a um recurso específico
  */
 export async function checkAccess(feature: 'share_chat' | 'create_version' | 'use_tokens'): Promise<boolean> {

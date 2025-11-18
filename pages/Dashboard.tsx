@@ -4,6 +4,9 @@ import { Sidebar } from '../components/Sidebar';
 import { PromptManager } from '../components/PromptManager';
 import { RepositoryPage } from './RepositoryPage';
 import { SettingsPage } from './SettingsPage';
+import { AdminPage } from './AdminPage';
+import { TrialBanner } from '../components/TrialBanner';
+import { SubscriptionInfo } from '../components/SubscriptionInfo';
 
 export const Dashboard: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -53,12 +56,23 @@ export const Dashboard: React.FC = () => {
         </header>
 
         {/* Content Area */}
-        <main className="flex-1 overflow-hidden">
-          <Routes>
-            <Route path="/" element={<PromptManager />} />
-            <Route path="/repository" element={<RepositoryPage />} />
-            <Route path="/settings" element={<SettingsPage />} />
-          </Routes>
+        <main className="flex-1 overflow-auto">
+          <div className="container mx-auto p-4 lg:p-6">
+            <TrialBanner />
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-6">
+              <div className="lg:col-span-3">
+                <Routes>
+                  <Route path="/" element={<PromptManager />} />
+                  <Route path="/repository" element={<RepositoryPage />} />
+                  <Route path="/settings" element={<SettingsPage />} />
+                  <Route path="/admin" element={<AdminPage />} />
+                </Routes>
+              </div>
+              <div className="lg:col-span-1">
+                <SubscriptionInfo />
+              </div>
+            </div>
+          </div>
         </main>
       </div>
     </div>

@@ -235,7 +235,13 @@ export const Register: React.FC = () => {
             </div>
           </Link>
           <h2 className="text-3xl font-bold text-white mb-2">Criar conta</h2>
-          <p className="text-white/60">Comece a criar prompts profissionais hoje</p>
+          <p className="text-white/60 mb-4">Comece a criar prompts profissionais hoje</p>
+          <div className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-emerald-500/20 to-green-500/20 border border-emerald-500/50 rounded-lg">
+            <svg className="w-4 h-4 text-emerald-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
+            </svg>
+            <span className="text-emerald-400 text-sm font-medium">7 dias grátis para testar • Sem cartão necessário</span>
+          </div>
         </div>
 
         {/* Formulário */}
