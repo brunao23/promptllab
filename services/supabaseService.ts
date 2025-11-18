@@ -221,7 +221,17 @@ export async function getCurrentProfile() {
     .eq('id', user.id)
     .single();
 
-  if (error) throw error;
+  if (error) {
+    // Se o perfil não existe (código PGRST116), retornar null em vez de lançar erro
+    if (error.code === 'PGRST116') {
+      console.log('⚠️ [getCurrentProfile] Perfil não encontrado para user_id:', user.id);
+      return null;
+    }
+    console.error('❌ [getCurrentProfile] Erro ao buscar perfil:', error);
+    throw error;
+  }
+
+  console.log('✅ [getCurrentProfile] Perfil encontrado:', { id: data?.id, full_name: data?.full_name });
   return data;
 }
 

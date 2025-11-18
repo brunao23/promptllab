@@ -49,7 +49,25 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onMobileClose })
       }
     });
 
-    return () => subscription.unsubscribe();
+    // Listener para atualizações de perfil (quando o nome é alterado)
+    const handleProfileUpdate = async () => {
+      try {
+        const profile = await getCurrentProfile();
+        if (profile) {
+          setUserName(profile.full_name || null);
+          setAvatarUrl(profile.avatar_url || null);
+        }
+      } catch (error) {
+        console.error('Erro ao atualizar perfil no Sidebar:', error);
+      }
+    };
+
+    window.addEventListener('profileUpdated', handleProfileUpdate);
+
+    return () => {
+      subscription.unsubscribe();
+      window.removeEventListener('profileUpdated', handleProfileUpdate);
+    };
   }, []);
 
   const handleLogout = async () => {
