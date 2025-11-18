@@ -174,9 +174,10 @@ CREATE TABLE IF NOT EXISTS public.usage_tracking (
   CONSTRAINT usage_tracking_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
 );
 
--- Adicionar coluna subscription_id se não existir (para compatibilidade com tabelas já criadas)
+-- Adicionar colunas se não existirem (para compatibilidade com tabelas já criadas)
 DO $$ 
 BEGIN
+  -- Adicionar subscription_id se não existir
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.columns 
     WHERE table_schema = 'public' 
@@ -185,6 +186,94 @@ BEGIN
   ) THEN
     ALTER TABLE public.usage_tracking 
     ADD COLUMN subscription_id UUID REFERENCES public.subscriptions(id) ON DELETE SET NULL;
+  END IF;
+
+  -- Adicionar usage_type se não existir
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+    AND table_name = 'usage_tracking' 
+    AND column_name = 'usage_type'
+  ) THEN
+    ALTER TABLE public.usage_tracking 
+    ADD COLUMN usage_type TEXT NOT NULL DEFAULT 'prompt_generation';
+  END IF;
+
+  -- Adicionar model_used se não existir
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+    AND table_name = 'usage_tracking' 
+    AND column_name = 'model_used'
+  ) THEN
+    ALTER TABLE public.usage_tracking 
+    ADD COLUMN model_used TEXT;
+  END IF;
+
+  -- Adicionar tokens_used se não existir
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+    AND table_name = 'usage_tracking' 
+    AND column_name = 'tokens_used'
+  ) THEN
+    ALTER TABLE public.usage_tracking 
+    ADD COLUMN tokens_used INTEGER NOT NULL DEFAULT 0;
+  END IF;
+
+  -- Adicionar requests_count se não existir
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+    AND table_name = 'usage_tracking' 
+    AND column_name = 'requests_count'
+  ) THEN
+    ALTER TABLE public.usage_tracking 
+    ADD COLUMN requests_count INTEGER NOT NULL DEFAULT 1;
+  END IF;
+
+  -- Adicionar usage_month se não existir
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+    AND table_name = 'usage_tracking' 
+    AND column_name = 'usage_month'
+  ) THEN
+    ALTER TABLE public.usage_tracking 
+    ADD COLUMN usage_month INTEGER NOT NULL DEFAULT EXTRACT(MONTH FROM NOW());
+  END IF;
+
+  -- Adicionar usage_year se não existir
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+    AND table_name = 'usage_tracking' 
+    AND column_name = 'usage_year'
+  ) THEN
+    ALTER TABLE public.usage_tracking 
+    ADD COLUMN usage_year INTEGER NOT NULL DEFAULT EXTRACT(YEAR FROM NOW());
+  END IF;
+
+  -- Adicionar prompt_id se não existir
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+    AND table_name = 'usage_tracking' 
+    AND column_name = 'prompt_id'
+  ) THEN
+    ALTER TABLE public.usage_tracking 
+    ADD COLUMN prompt_id UUID REFERENCES public.prompts(id) ON DELETE SET NULL;
+  END IF;
+
+  -- Adicionar version_id se não existir
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+    AND table_name = 'usage_tracking' 
+    AND column_name = 'version_id'
+  ) THEN
+    ALTER TABLE public.usage_tracking 
+    ADD COLUMN version_id UUID REFERENCES public.prompt_versions(id) ON DELETE SET NULL;
   END IF;
 END $$;
 
@@ -256,8 +345,32 @@ BEGIN
   END IF;
 END $$;
 
-CREATE INDEX IF NOT EXISTS idx_usage_tracking_period ON public.usage_tracking(usage_year, usage_month);
-CREATE INDEX IF NOT EXISTS idx_usage_tracking_created_at ON public.usage_tracking(created_at DESC);
+-- Criar índices apenas se as colunas existirem
+DO $$ 
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+    AND table_name = 'usage_tracking' 
+    AND column_name = 'usage_year'
+  ) AND EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+    AND table_name = 'usage_tracking' 
+    AND column_name = 'usage_month'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS idx_usage_tracking_period ON public.usage_tracking(usage_year, usage_month);
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+    AND table_name = 'usage_tracking' 
+    AND column_name = 'created_at'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS idx_usage_tracking_created_at ON public.usage_tracking(created_at DESC);
+  END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_tenants_slug ON public.tenants(slug);
 CREATE INDEX IF NOT EXISTS idx_tenants_is_active ON public.tenants(is_active);
