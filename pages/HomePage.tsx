@@ -54,26 +54,33 @@ export const HomePage: React.FC = () => {
               Crie, teste, otimize e gerencie prompts de IA de forma profissional e eficiente.
               Transforme suas ideias em prompts poderosos com nossa plataforma completa.
             </p>
-            <div className="mb-8 inline-flex items-center px-6 py-3 bg-gradient-to-r from-emerald-500/20 to-green-500/20 border border-emerald-500/50 rounded-full">
-              <svg className="w-5 h-5 text-emerald-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            {/* Badge Trial - Muito Destacado */}
+            <div className="mb-8 inline-flex items-center px-8 py-4 bg-gradient-to-r from-emerald-500 to-green-500 rounded-full shadow-2xl shadow-emerald-500/50 transform hover:scale-105 transition-all">
+              <svg className="w-6 h-6 text-black mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
               </svg>
-              <span className="text-emerald-400 font-semibold">7 dias grátis para testar</span>
+              <div className="text-left">
+                <div className="text-black font-black text-xl leading-tight">🎉 7 DIAS GRÁTIS</div>
+                <div className="text-black/80 font-semibold text-sm">Sem cartão de crédito • Cancele quando quiser</div>
+              </div>
             </div>
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
               <Link
                 to="/register"
-                className="px-8 py-4 bg-emerald-500 hover:bg-emerald-600 text-black font-bold text-lg rounded-lg transition-all transform hover:scale-105 shadow-lg shadow-emerald-500/50"
+                className="px-10 py-5 bg-emerald-500 hover:bg-emerald-600 text-black font-black text-xl rounded-xl transition-all transform hover:scale-105 shadow-2xl shadow-emerald-500/50 border-2 border-emerald-400"
               >
-                Começar Gratuitamente
+                🚀 Começar Gratuitamente Agora
               </Link>
               <Link
                 to="/login"
-                className="px-8 py-4 bg-white/5 hover:bg-white/10 text-white font-bold text-lg rounded-lg transition-all border border-white/10"
+                className="px-10 py-5 bg-white/5 hover:bg-white/10 text-white font-bold text-lg rounded-xl transition-all border-2 border-white/20 hover:border-white/40"
               >
                 Já Tenho Conta
               </Link>
             </div>
+            <p className="text-white/60 text-sm mt-4">
+              ✅ 100% Grátis nos primeiros 7 dias • ✅ Sem necessidade de cartão • ✅ Cancele a qualquer momento
+            </p>
           </div>
         </div>
       </div>
@@ -182,26 +189,33 @@ export const HomePage: React.FC = () => {
             <p className="text-xl text-white/60 mb-4">
               Junte-se a milhares de desenvolvedores que já estão usando o LaBPrompT
             </p>
-            <div className="mb-8 inline-flex items-center px-4 py-2 bg-emerald-500/20 border border-emerald-500/50 rounded-lg">
-              <svg className="w-4 h-4 text-emerald-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            {/* Badge Trial CTA Section - Muito Destacado */}
+            <div className="mb-8 inline-flex items-center px-8 py-4 bg-gradient-to-r from-emerald-500 to-green-500 rounded-xl shadow-2xl shadow-emerald-500/50">
+              <svg className="w-6 h-6 text-black mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
               </svg>
-              <span className="text-emerald-400 text-sm font-medium">Teste grátis por 7 dias - Sem necessidade de cartão</span>
+              <div className="text-left">
+                <div className="text-black font-black text-xl leading-tight">🎉 TESTE 7 DIAS GRÁTIS</div>
+                <div className="text-black/80 font-bold text-sm">Sem cartão de crédito • Sem compromisso</div>
+              </div>
             </div>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link
                 to="/register"
-                className="px-8 py-4 bg-emerald-500 hover:bg-emerald-600 text-black font-bold text-lg rounded-lg transition-all transform hover:scale-105 shadow-lg shadow-emerald-500/50"
+                className="px-10 py-5 bg-emerald-500 hover:bg-emerald-600 text-black font-black text-xl rounded-xl transition-all transform hover:scale-105 shadow-2xl shadow-emerald-500/50 border-2 border-emerald-400"
               >
-                Criar Conta Gratuita
+                🚀 Criar Conta Gratuita Agora
               </Link>
               <Link
                 to="/login"
-                className="px-8 py-4 bg-white/5 hover:bg-white/10 text-white font-bold text-lg rounded-lg transition-all border border-white/10"
+                className="px-10 py-5 bg-white/5 hover:bg-white/10 text-white font-bold text-lg rounded-xl transition-all border-2 border-white/20 hover:border-white/40"
               >
                 Fazer Login
               </Link>
             </div>
+            <p className="text-white/60 text-sm mt-4">
+              ✅ Comece agora • ✅ Teste por 7 dias sem pagar nada • ✅ Cancele quando quiser
+            </p>
           </div>
         </div>
       </div>
