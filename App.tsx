@@ -8,6 +8,7 @@ import { RepositoryPage } from './pages/RepositoryPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { AuthCallback } from './pages/AuthCallback';
 import { ShareChatPage } from './pages/ShareChatPage';
+import { AdminPage } from './pages/AdminPage';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
 function App() {
@@ -40,6 +41,14 @@ function App() {
           element={
             <ProtectedRoute>
               <SettingsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute>
+              <AdminPage />
             </ProtectedRoute>
           }
         />
