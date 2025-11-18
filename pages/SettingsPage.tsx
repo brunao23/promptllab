@@ -49,26 +49,37 @@ export const SettingsPage: React.FC = () => {
       setIsLoading(true);
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
-        setFormData({
-          fullName: '',
-          email: session.user.email || '',
-        });
-        
         const profile = await getCurrentProfile();
+        
+        // Atualizar formData com todos os dados de uma vez
         if (profile) {
-          setFormData(prev => ({
-            ...prev,
+          setFormData({
             fullName: profile.full_name || '',
-          }));
+            email: session.user.email || profile.email || '',
+          });
           
           if (profile.avatar_url) {
             setAvatarPreview(profile.avatar_url);
+          } else {
+            setAvatarPreview(null);
           }
+        } else {
+          // Se não houver perfil, pelo menos definir email
+          setFormData({
+            fullName: '',
+            email: session.user.email || '',
+          });
         }
       }
     } catch (error: any) {
       console.error('Erro ao carregar perfil:', error);
       setError('Erro ao carregar dados do perfil');
+      // Mesmo com erro, manter dados atuais se houver
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user && formData.email) {
+        // Não sobrescrever se já temos dados
+        console.log('⚠️ Mantendo dados atuais após erro');
+      }
     } finally {
       setIsLoading(false);
     }
