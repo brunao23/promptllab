@@ -191,12 +191,15 @@ DECLARE
   v_tokens_limit BIGINT;
   v_versions_count INTEGER;
   v_versions_limit INTEGER;
+  v_plan_id UUID;
 BEGIN
   -- Buscar assinatura ativa do usuário
-  SELECT s.*, p.*
+  SELECT 
+    s.id as subscription_id,
+    s.plan_id,
+    s.status
   INTO v_subscription
   FROM public.subscriptions s
-  JOIN public.plans p ON p.id = s.plan_id
   WHERE s.user_id = p_user_id
     AND s.is_active = true
     AND (
@@ -211,10 +214,24 @@ BEGIN
     RETURN false;
   END IF;
 
+  -- Buscar dados do plano separadamente para evitar conflitos
+  SELECT 
+    can_share_chat,
+    max_prompt_versions,
+    max_tokens_per_month
+  INTO v_plan
+  FROM public.plans
+  WHERE id = v_subscription.plan_id;
+
+  -- Se plano não encontrado, negar acesso
+  IF v_plan IS NULL THEN
+    RETURN false;
+  END IF;
+
   -- Verificar limitações por feature
   CASE p_feature
     WHEN 'share_chat' THEN
-      RETURN v_subscription.can_share_chat;
+      RETURN v_plan.can_share_chat;
     
     WHEN 'create_version' THEN
       -- Contar versões do usuário
@@ -225,7 +242,11 @@ BEGIN
       WHERE p.user_id = p_user_id
         AND pv.created_at >= DATE_TRUNC('month', NOW());
       
-      v_versions_limit := v_subscription.max_prompt_versions;
+      v_versions_limit := v_plan.max_prompt_versions;
+      -- Se limite é -1 (ilimitado), sempre permitir
+      IF v_versions_limit = -1 THEN
+        RETURN true;
+      END IF;
       RETURN v_versions_count < v_versions_limit;
     
     WHEN 'use_tokens' THEN
@@ -237,7 +258,11 @@ BEGIN
         AND usage_year = EXTRACT(YEAR FROM NOW())
         AND usage_month = EXTRACT(MONTH FROM NOW());
       
-      v_tokens_limit := v_subscription.max_tokens_per_month;
+      v_tokens_limit := v_plan.max_tokens_per_month;
+      -- Se limite é -1 (ilimitado), sempre permitir
+      IF v_tokens_limit = -1 THEN
+        RETURN true;
+      END IF;
       RETURN v_tokens_used < v_tokens_limit;
     
     ELSE
