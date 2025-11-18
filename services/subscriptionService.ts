@@ -1,0 +1,300 @@
+/**
+ * 🔐 SERVIÇO DE ASSINATURAS E LIMITAÇÕES
+ * Gerencia subscriptions, plans e limitações do SaaS
+ */
+
+import { supabase } from './supabaseService';
+
+export interface Plan {
+  id: string;
+  name: string;
+  display_name: string;
+  description: string | null;
+  max_prompt_versions: number;
+  max_tokens_per_month: number;
+  can_share_chat: boolean;
+  trial_days: number | null;
+  price_monthly: number | null;
+  price_yearly: number | null;
+  is_active: boolean;
+}
+
+export interface Subscription {
+  id: string;
+  user_id: string;
+  tenant_id: string | null;
+  plan_id: string;
+  trial_started_at: string | null;
+  trial_ends_at: string | null;
+  subscription_started_at: string | null;
+  subscription_ends_at: string | null;
+  status: 'trial' | 'active' | 'cancelled' | 'expired';
+  is_active: boolean;
+  plan?: Plan;
+}
+
+export interface UsageTracking {
+  id: string;
+  user_id: string;
+  subscription_id: string | null;
+  usage_type: string;
+  model_used: string | null;
+  tokens_used: number;
+  requests_count: number;
+  usage_month: number;
+  usage_year: number;
+  created_at: string;
+}
+
+/**
+ * Obtém a assinatura ativa do usuário atual
+ */
+export async function getCurrentSubscription(): Promise<Subscription | null> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) return null;
+
+    const { data, error } = await supabase
+      .from('subscriptions')
+      .select(`
+        *,
+        plan:plans(*)
+      `)
+      .eq('user_id', session.user.id)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        console.log('⚠️ Nenhuma assinatura encontrada para o usuário');
+        return null;
+      }
+      throw error;
+    }
+
+    return data as Subscription;
+  } catch (error: any) {
+    console.error('❌ Erro ao buscar subscription:', error);
+    return null;
+  }
+}
+
+/**
+ * Verifica se o usuário tem acesso a um recurso específico
+ */
+export async function checkAccess(feature: 'share_chat' | 'create_version' | 'use_tokens'): Promise<boolean> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) return false;
+
+    const { data, error } = await supabase.rpc('check_user_access', {
+      p_user_id: session.user.id,
+      p_feature: feature,
+    });
+
+    if (error) {
+      console.error('❌ Erro ao verificar acesso:', error);
+      return false;
+    }
+
+    return data === true;
+  } catch (error: any) {
+    console.error('❌ Erro ao verificar acesso:', error);
+    return false;
+  }
+}
+
+/**
+ * Registra uso de tokens
+ */
+export async function trackTokenUsage(
+  tokensUsed: number,
+  usageType: 'prompt_generation' | 'chat' | 'document_analysis',
+  modelUsed: string,
+  promptId?: string,
+  versionId?: string
+): Promise<boolean> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) {
+      console.error('❌ Usuário não autenticado para registrar uso');
+      return false;
+    }
+
+    const { error } = await supabase.rpc('track_token_usage', {
+      p_user_id: session.user.id,
+      p_tokens_used: tokensUsed,
+      p_usage_type: usageType,
+      p_model_used: modelUsed,
+      p_prompt_id: promptId || null,
+      p_version_id: versionId || null,
+    });
+
+    if (error) {
+      console.error('❌ Erro ao registrar uso de tokens:', error);
+      return false;
+    }
+
+    console.log(`✅ Uso registrado: ${tokensUsed} tokens (${usageType})`);
+    return true;
+  } catch (error: any) {
+    console.error('❌ Erro ao registrar uso de tokens:', error);
+    return false;
+  }
+}
+
+/**
+ * Obtém o uso de tokens do mês atual
+ */
+export async function getCurrentMonthUsage(): Promise<{
+  tokensUsed: number;
+  tokensLimit: number;
+  percentage: number;
+}> {
+  try {
+    const subscription = await getCurrentSubscription();
+    if (!subscription) {
+      return { tokensUsed: 0, tokensLimit: 1000000, percentage: 0 };
+    }
+
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) {
+      return { tokensUsed: 0, tokensLimit: subscription.plan?.max_tokens_per_month || 1000000, percentage: 0 };
+    }
+
+    const currentDate = new Date();
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth() + 1;
+
+    const { data, error } = await supabase
+      .from('usage_tracking')
+      .select('tokens_used')
+      .eq('user_id', session.user.id)
+      .eq('usage_year', year)
+      .eq('usage_month', month);
+
+    if (error) {
+      console.error('❌ Erro ao buscar uso:', error);
+      return { tokensUsed: 0, tokensLimit: subscription.plan?.max_tokens_per_month || 1000000, percentage: 0 };
+    }
+
+    const tokensUsed = data?.reduce((sum, item) => sum + (item.tokens_used || 0), 0) || 0;
+    const tokensLimit = subscription.plan?.max_tokens_per_month || 1000000;
+    const percentage = tokensLimit > 0 ? Math.round((tokensUsed / tokensLimit) * 100) : 0;
+
+    return { tokensUsed, tokensLimit, percentage };
+  } catch (error: any) {
+    console.error('❌ Erro ao buscar uso do mês:', error);
+    return { tokensUsed: 0, tokensLimit: 1000000, percentage: 0 };
+  }
+}
+
+/**
+ * Conta versões de prompt criadas no mês atual
+ */
+export async function getCurrentMonthVersions(): Promise<{
+  versionsCount: number;
+  versionsLimit: number;
+  canCreateMore: boolean;
+}> {
+  try {
+    const subscription = await getCurrentSubscription();
+    if (!subscription) {
+      return { versionsCount: 0, versionsLimit: 4, canCreateMore: true };
+    }
+
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) {
+      return { versionsCount: 0, versionsLimit: subscription.plan?.max_prompt_versions || 4, canCreateMore: true };
+    }
+
+    const currentDate = new Date();
+    const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+
+    const { data: prompts, error: promptsError } = await supabase
+      .from('prompts')
+      .select('id')
+      .eq('user_id', session.user.id);
+
+    if (promptsError || !prompts?.length) {
+      return { versionsCount: 0, versionsLimit: subscription.plan?.max_prompt_versions || 4, canCreateMore: true };
+    }
+
+    const promptIds = prompts.map(p => p.id);
+
+    const { data: versions, error } = await supabase
+      .from('prompt_versions')
+      .select('id')
+      .in('prompt_id', promptIds)
+      .gte('created_at', startOfMonth.toISOString());
+
+    if (error) {
+      console.error('❌ Erro ao contar versões:', error);
+      return { versionsCount: 0, versionsLimit: subscription.plan?.max_prompt_versions || 4, canCreateMore: true };
+    }
+
+    const versionsCount = versions?.length || 0;
+    const versionsLimit = subscription.plan?.max_prompt_versions || 4;
+    const canCreateMore = versionsLimit === -1 || versionsCount < versionsLimit;
+
+    return { versionsCount, versionsLimit, canCreateMore };
+  } catch (error: any) {
+    console.error('❌ Erro ao contar versões:', error);
+    return { versionsCount: 0, versionsLimit: 4, canCreateMore: true };
+  }
+}
+
+/**
+ * Verifica se o trial ainda está ativo
+ */
+export async function isTrialActive(): Promise<boolean> {
+  const subscription = await getCurrentSubscription();
+  if (!subscription) return false;
+
+  if (subscription.status !== 'trial') return false;
+
+  if (!subscription.trial_ends_at) return false;
+
+  const trialEndsAt = new Date(subscription.trial_ends_at);
+  return trialEndsAt > new Date();
+}
+
+/**
+ * Obtém informações do plano atual
+ */
+export async function getCurrentPlanInfo(): Promise<{
+  planName: string;
+  displayName: string;
+  isTrial: boolean;
+  trialDaysLeft: number | null;
+  canShareChat: boolean;
+  maxVersions: number;
+  maxTokens: number;
+} | null> {
+  const subscription = await getCurrentSubscription();
+  if (!subscription || !subscription.plan) {
+    return null;
+  }
+
+  const isTrial = subscription.status === 'trial';
+  let trialDaysLeft: number | null = null;
+
+  if (isTrial && subscription.trial_ends_at) {
+    const trialEndsAt = new Date(subscription.trial_ends_at);
+    const now = new Date();
+    const diff = trialEndsAt.getTime() - now.getTime();
+    trialDaysLeft = Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+  }
+
+  return {
+    planName: subscription.plan.name,
+    displayName: subscription.plan.display_name,
+    isTrial,
+    trialDaysLeft,
+    canShareChat: subscription.plan.can_share_chat,
+    maxVersions: subscription.plan.max_prompt_versions,
+    maxTokens: subscription.plan.max_tokens_per_month,
+  };
+}

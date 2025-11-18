@@ -1,6 +1,8 @@
 
 import { GoogleGenAI, Chat, GenerateContentResponse, Type, FunctionDeclaration } from '@google/genai';
 import type { PromptData, FewShotExample, OptimizationPair } from '../types';
+import { canUseTokens, incrementTokenUsage } from './subscriptionService';
+import { estimateFullTokens } from '../utils/tokenEstimator';
 
 // Helper function to get the API key and initialize the AI client
 const getAI = () => {
@@ -117,11 +119,23 @@ Sua resposta deve ser APENAS um objeto JSON válido. Sugestão de chaves: "perso
 `;
     }
 
+    // Verificar limite de tokens antes de fazer a chamada
+    const estimatedTokens = estimateFullTokens(expansionPrompt, '');
+    const tokenCheck = await canUseTokens(estimatedTokens);
+    
+    if (!tokenCheck.allowed) {
+        throw new Error(tokenCheck.reason || 'Limite de tokens excedido');
+    }
+
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-pro',
         contents: expansionPrompt,
         config: data.masterPromptFormat === 'json' ? { responseMimeType: "application/json" } : undefined
     });
+    
+    // Incrementar uso de tokens após a chamada
+    const actualTokens = estimateFullTokens(expansionPrompt, response.text);
+    await incrementTokenUsage(actualTokens);
     
     return response.text;
 };
@@ -149,16 +163,34 @@ export const startChat = (systemInstruction: string): void => {
     });
 };
 
-export const continueChat = async (message: string): Promise<string> => {
+export const continueChat = async (message: string, promptContent?: string): Promise<string> => {
     if (!chatInstance) {
         throw new Error("Chat não iniciado. Selecione uma versão de prompt para começar.");
     }
+    
     try {
+        // Verificar limite de tokens antes de fazer a chamada
+        const estimatedTokens = estimateFullTokens(message + (promptContent || ''), '');
+        const tokenCheck = await canUseTokens(estimatedTokens);
+        
+        if (!tokenCheck.allowed) {
+            throw new Error(tokenCheck.reason || 'Limite de tokens excedido');
+        }
+
         const response: GenerateContentResponse = await chatInstance.sendMessage({ message });
+        
+        // Incrementar uso de tokens após a chamada
+        const actualTokens = estimateFullTokens(message, response.text);
+        await incrementTokenUsage(actualTokens);
+        
         return response.text;
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error in chat:", error);
-        throw new Error("Falha ao se comunicar com a API da Gemini no chat.");
+        // Se o erro já é uma mensagem de limite, re-lançar
+        if (error.message && error.message.includes('Limite de tokens')) {
+            throw error;
+        }
+        throw new Error(error.message || "Falha ao se comunicar com a API da Gemini no chat.");
     }
 };
 
@@ -415,7 +447,15 @@ Retorne sempre um JSON válido, mesmo que alguns campos estejam vazios.
                     required: ['persona', 'objetivo', 'contextoNegocio', 'contexto', 'regras']
                 };
 
-            return await ai.models.generateContent({
+            // Estimar tokens para o documento (aproximação)
+            const estimatedDocTokens = estimateFullTokens(extractionPrompt, '');
+            const tokenCheck = await canUseTokens(estimatedDocTokens);
+            
+            if (!tokenCheck.allowed) {
+                throw new Error(tokenCheck.reason || 'Limite de tokens excedido');
+            }
+
+            const response = await ai.models.generateContent({
                 model: 'gemini-2.5-pro',
                 contents: { parts: [docPart, { text: extractionPrompt }] },
                 config: {
@@ -423,6 +463,12 @@ Retorne sempre um JSON válido, mesmo que alguns campos estejam vazios.
                     responseSchema: schema
                 }
             });
+            
+            // Incrementar uso de tokens após a chamada
+            const actualTokens = estimateFullTokens(extractionPrompt, response.text);
+            await incrementTokenUsage(actualTokens);
+            
+            return response;
         }, 3, 500); // 3 tentativas, começando com 500ms (reduzido de 2s para acelerar)
         
         // Verificar se a resposta tem texto
