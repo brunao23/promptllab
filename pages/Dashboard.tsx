@@ -7,6 +7,7 @@ import { SettingsPage } from './SettingsPage';
 import { AdminPage } from './AdminPage';
 import { TrialBanner } from '../components/TrialBanner';
 import { SubscriptionInfo } from '../components/SubscriptionInfo';
+import { DiagnosticPanel } from '../components/DiagnosticPanel';
 
 export const Dashboard: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -58,6 +59,11 @@ export const Dashboard: React.FC = () => {
         {/* Content Area */}
         <main className="flex-1 overflow-auto bg-black">
           <div className="max-w-full p-4 lg:p-6">
+            {/* Diagnostic Panel - Debug */}
+            <div className="mb-4">
+              <DiagnosticPanel />
+            </div>
+
             {/* Trial Banner - Sempre no topo */}
             <div className="mb-4">
               <TrialBanner />
