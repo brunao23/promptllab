@@ -1190,20 +1190,16 @@ export const PromptManager: React.FC = () => {
                     const toolsX = margin;
                     const toolsY = y;
                     
-                    // Fundo para seção de ferramentas (amarelo/amber claro)
-                    doc.setFillColor(251, 191, 36); // amber-400
-                    doc.setDrawColor(251, 191, 36);
-                    doc.roundedRect(toolsX, toolsY, toolsWidth, toolsHeight, 3, 3, 'F');
-                    
-                    // Borda para destacar
-                    doc.setDrawColor(245, 158, 11); // amber-500 para borda
-                    doc.setLineWidth(0.5);
-                    doc.roundedRect(toolsX, toolsY, toolsWidth, toolsHeight, 3, 3, 'D');
+                    // Fundo claro para seção de ferramentas (cinza muito claro)
+                    doc.setFillColor(249, 250, 251); // gray-50
+                    doc.setDrawColor(251, 191, 36); // amber-400 para borda
+                    doc.setLineWidth(1);
+                    doc.roundedRect(toolsX, toolsY, toolsWidth, toolsHeight, 3, 3, 'FD');
                     
                     // Título da seção
                     doc.setFontSize(10);
                     doc.setFont('helvetica', 'bold');
-                    doc.setTextColor(0, 0, 0); // Preto para melhor contraste sobre fundo amarelo
+                    doc.setTextColor(245, 158, 11); // amber-600 para título
                     doc.text('🔧 Ferramentas Utilizadas:', toolsX + 8, toolsY + 8);
                     
                     let toolY = toolsY + 15;
@@ -1212,7 +1208,7 @@ export const PromptManager: React.FC = () => {
                     tools.forEach(tool => {
                         doc.setFontSize(9);
                         doc.setFont('helvetica', 'bold');
-                        doc.setTextColor(0, 0, 0);
+                        doc.setTextColor(0, 0, 0); // Preto para nome da ferramenta
                         doc.text(`• ${tool.name}`, toolsX + 12, toolY);
                         toolY += 6;
                         
@@ -1221,7 +1217,7 @@ export const PromptManager: React.FC = () => {
                         if (argsText !== '(sem argumentos)') {
                             const argsLines = doc.splitTextToSize(argsText, toolsWidth - 24);
                             doc.setFont('helvetica', 'normal');
-                            doc.setTextColor(60, 60, 60);
+                            doc.setTextColor(40, 40, 40); // Cinza escuro para argumentos
                             doc.text(argsLines, toolsX + 16, toolY);
                             toolY += argsLines.length * 4 + 2;
                         } else {
