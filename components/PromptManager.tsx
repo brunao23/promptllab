@@ -846,6 +846,91 @@ export const PromptManager: React.FC = () => {
         }
     };
     
+    // Função para detectar e extrair ferramentas do texto
+    interface ExtractedTool {
+        name: string;
+        args: any;
+        rawText: string;
+    }
+
+    const extractTools = (text: string): { conversationText: string; tools: ExtractedTool[] } => {
+        const tools: ExtractedTool[] = [];
+        let conversationText = text;
+
+        // Padrão 1: [CALL: functionName(...args...)]
+        const callPattern = /\[CALL:\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\(([^)]*)\)\]/gi;
+        let match;
+        
+        while ((match = callPattern.exec(text)) !== null) {
+            const toolName = match[1];
+            const argsText = match[2];
+            let args: any = {};
+            
+            // Tentar parsear argumentos JSON
+            try {
+                // Se os argumentos estão em formato de objeto JavaScript
+                if (argsText.trim().startsWith('{') || argsText.includes(':')) {
+                    // Tentar extrair objeto JSON
+                    const jsonMatch = argsText.match(/\{[\s\S]*\}/);
+                    if (jsonMatch) {
+                        args = JSON.parse(jsonMatch[0]);
+                    } else {
+                        // Tentar parsear argumentos nomeados simples
+                        const argPairs = argsText.split(',').map(arg => arg.trim());
+                        argPairs.forEach(pair => {
+                            const [key, ...valueParts] = pair.split(':');
+                            if (key && valueParts.length > 0) {
+                                const value = valueParts.join(':').trim().replace(/^['"]|['"]$/g, '');
+                                try {
+                                    args[key.trim()] = JSON.parse(value);
+                                } catch {
+                                    args[key.trim()] = value;
+                                }
+                            }
+                        });
+                    }
+                } else if (argsText.trim()) {
+                    // Argumentos simples como string
+                    args = { value: argsText.trim().replace(/^['"]|['"]$/g, '') };
+                }
+            } catch (e) {
+                // Se falhar, armazenar como string
+                args = { raw: argsText };
+            }
+
+            tools.push({
+                name: toolName,
+                args: args,
+                rawText: match[0]
+            });
+
+            // Remover do texto conversacional
+            conversationText = conversationText.replace(match[0], '').trim();
+        }
+
+        // Padrão 2: Chamadas de função diretas no formato "functionName(arg1, arg2)"
+        // (mais simples, apenas para detectar)
+        const functionPattern = /([a-zA-Z_][a-zA-Z0-9_]*)\s*\([^)]*\)/g;
+        const functionCalls = [...text.matchAll(functionPattern)];
+        
+        // Adicionar apenas se não foram capturadas pelo padrão CALL
+        functionCalls.forEach(funcMatch => {
+            const funcName = funcMatch[1];
+            if (!tools.find(t => t.name === funcName) && funcName !== 'CALL') {
+                tools.push({
+                    name: funcName,
+                    args: {},
+                    rawText: funcMatch[0]
+                });
+            }
+        });
+
+        // Limpar espaços extras do texto conversacional
+        conversationText = conversationText.replace(/\n\s*\n\s*\n/g, '\n\n').trim();
+
+        return { conversationText, tools };
+    };
+
     // Função para limpar e normalizar texto
     const cleanTextForPDF = (text: string): string => {
         if (!text) return '';
@@ -868,6 +953,32 @@ export const PromptManager: React.FC = () => {
             .trim();
         
         return cleaned;
+    };
+
+    // Função para formatar argumentos de ferramenta para exibição
+    const formatToolArgs = (args: any): string => {
+        if (!args || Object.keys(args).length === 0) {
+            return '(sem argumentos)';
+        }
+
+        try {
+            // Formatar de forma legível
+            const formatted = Object.entries(args)
+                .map(([key, value]) => {
+                    if (typeof value === 'object' && value !== null) {
+                        return `  • ${key}: ${JSON.stringify(value, null, 2).replace(/\n/g, '\n    ')}`;
+                    } else if (typeof value === 'string' && value.length > 100) {
+                        return `  • ${key}: ${value.substring(0, 100)}...`;
+                    } else {
+                        return `  • ${key}: ${String(value)}`;
+                    }
+                })
+                .join('\n');
+            
+            return formatted;
+        } catch (e) {
+            return String(args);
+        }
     };
 
     const handleDownloadChat = async (format: 'txt' | 'pdf') => {
@@ -911,13 +1022,33 @@ export const PromptManager: React.FC = () => {
         const timestamp = `Exportado em: ${new Date().toLocaleString('pt-BR')}`;
         
         if (format === 'txt') {
-            const chatContent = chatMessages.map(msg => {
+            const chatParts: string[] = [];
+            
+            chatMessages.forEach(msg => {
                 const author = msg.author === 'user' ? 'Usuário' : agentName;
-                const cleanedText = cleanTextForPDF(msg.text);
-                return `${author}: ${cleanedText}`;
-            }).join('\n\n');
+                const { conversationText, tools } = extractTools(msg.text);
+                
+                // Adicionar mensagem conversacional
+                if (conversationText.trim()) {
+                    const cleanedText = cleanTextForPDF(conversationText);
+                    chatParts.push(`${author}: ${cleanedText}`);
+                }
+                
+                // Adicionar ferramentas usadas (se houver)
+                if (tools.length > 0) {
+                    chatParts.push(`\n🔧 Ferramentas Utilizadas por ${author}:`);
+                    tools.forEach(tool => {
+                        chatParts.push(`  • ${tool.name}`);
+                        const argsFormatted = formatToolArgs(tool.args);
+                        if (argsFormatted !== '(sem argumentos)') {
+                            chatParts.push(`    ${argsFormatted.replace(/\n/g, '\n    ')}`);
+                        }
+                    });
+                    chatParts.push(''); // Linha em branco após ferramentas
+                }
+            });
 
-            const fullContent = `${toolName}\n${header}\n\nEspecialista: ${specialistName}\nAgente: ${agentName}\n\n${timestamp}\n\n${chatContent}`;
+            const fullContent = `${toolName}\n${header}\n\nEspecialista: ${specialistName}\nAgente: ${agentName}\n\n${timestamp}\n\n${chatParts.join('\n')}`;
 
             const blob = new Blob([fullContent], { type: 'text/plain;charset=utf-8' });
             const url = URL.createObjectURL(blob);
@@ -991,51 +1122,110 @@ export const PromptManager: React.FC = () => {
 
             chatMessages.forEach((msg, index) => {
                 const isUser = msg.author === 'user';
-                let text = cleanTextForPDF(msg.text);
+                const { conversationText, tools } = extractTools(msg.text);
                 
-                // Se o texto estiver vazio após limpeza, pular
-                if (!text || text.trim().length === 0) {
-                    return;
+                // Renderizar mensagem conversacional (se houver)
+                if (conversationText.trim()) {
+                    const text = cleanTextForPDF(conversationText);
+                    const bubbleWidth = pageWidth * 0.7;
+                    
+                    // Dividir texto em linhas que cabem na largura
+                    const lines = doc.splitTextToSize(text, bubbleWidth - 20);
+                    const lineHeight = 6;
+                    const padding = 8;
+                    const labelHeight = 5;
+                    const bubbleHeight = (lines.length * lineHeight) + (padding * 2) + labelHeight;
+                    
+                    // Nova página se necessário
+                    if (y + bubbleHeight > pageHeight - margin) {
+                        doc.addPage();
+                        y = 20;
+                    }
+
+                    const x = isUser ? pageWidth - bubbleWidth - margin : margin;
+                    
+                    // Cores: verde para usuário, cinza escuro para agente
+                    const userColor = [16, 185, 129]; // emerald-500
+                    const agentColor = [60, 60, 60]; // dark gray (mais escuro para melhor legibilidade)
+                    
+                    // Desenhar balão
+                    doc.setFillColor(isUser ? userColor[0] : agentColor[0], isUser ? userColor[1] : agentColor[1], isUser ? userColor[2] : agentColor[2]);
+                    doc.setDrawColor(isUser ? userColor[0] : agentColor[0], isUser ? userColor[1] : agentColor[1], isUser ? userColor[2] : agentColor[2]);
+                    doc.roundedRect(x, y, bubbleWidth, bubbleHeight, 3, 3, 'FD');
+                    
+                    // Label do autor (pequeno)
+                    doc.setFontSize(9);
+                    doc.setTextColor(255, 255, 255, 80); // Branco semi-transparente
+                    const authorLabel = isUser ? 'Usuário' : agentName;
+                    doc.text(authorLabel, x + padding, y + padding + labelHeight);
+                    
+                    // Texto branco para melhor contraste
+                    doc.setFontSize(11);
+                    doc.setTextColor(255, 255, 255);
+                    doc.text(lines, x + padding, y + padding + labelHeight + lineHeight);
+                    
+                    y += bubbleHeight + 8;
                 }
 
-                const bubbleWidth = pageWidth * 0.7;
-                
-                // Dividir texto em linhas que cabem na largura
-                const lines = doc.splitTextToSize(text, bubbleWidth - 20);
-                const lineHeight = 6;
-                const padding = 8;
-                const labelHeight = 5;
-                const bubbleHeight = (lines.length * lineHeight) + (padding * 2) + labelHeight;
-                
-                // Nova página se necessário
-                if (y + bubbleHeight > pageHeight - margin) {
-                    doc.addPage();
-                    y = 20;
-                }
+                // Renderizar ferramentas utilizadas (se houver) - apenas para mensagens do agente
+                if (tools.length > 0 && !isUser) {
+                    const toolsWidth = pageWidth - (margin * 2);
+                    let toolsHeight = 15; // Altura inicial para título
+                    
+                    // Calcular altura total necessária
+                    tools.forEach(tool => {
+                        const toolNameHeight = 6;
+                        const argsText = formatToolArgs(tool.args);
+                        const argsLines = doc.splitTextToSize(argsText, toolsWidth - 20);
+                        toolsHeight += toolNameHeight + (argsLines.length * 4) + 4;
+                    });
 
-                const x = isUser ? pageWidth - bubbleWidth - margin : margin;
-                
-                // Cores: verde para usuário, cinza escuro para agente
-                const userColor = [16, 185, 129]; // emerald-500
-                const agentColor = [60, 60, 60]; // dark gray (mais escuro para melhor legibilidade)
-                
-                // Desenhar balão
-                doc.setFillColor(isUser ? userColor[0] : agentColor[0], isUser ? userColor[1] : agentColor[1], isUser ? userColor[2] : agentColor[2]);
-                doc.setDrawColor(isUser ? userColor[0] : agentColor[0], isUser ? userColor[1] : agentColor[1], isUser ? userColor[2] : agentColor[2]);
-                doc.roundedRect(x, y, bubbleWidth, bubbleHeight, 3, 3, 'FD');
-                
-                // Label do autor (pequeno)
-                doc.setFontSize(9);
-                doc.setTextColor(255, 255, 255, 80); // Branco semi-transparente
-                const authorLabel = isUser ? 'Usuário' : agentName;
-                doc.text(authorLabel, x + padding, y + padding + labelHeight);
-                
-                // Texto branco para melhor contraste
-                doc.setFontSize(11);
-                doc.setTextColor(255, 255, 255);
-                doc.text(lines, x + padding, y + padding + labelHeight + lineHeight);
-                
-                y += bubbleHeight + 8;
+                    // Nova página se necessário
+                    if (y + toolsHeight > pageHeight - margin) {
+                        doc.addPage();
+                        y = 20;
+                    }
+
+                    // Container para ferramentas (fundo diferente)
+                    const toolsX = margin;
+                    const toolsY = y;
+                    
+                    // Fundo para seção de ferramentas (amarelo/amber claro)
+                    doc.setFillColor(251, 191, 36, 20); // amber-400 com transparência
+                    doc.setDrawColor(251, 191, 36, 50);
+                    doc.roundedRect(toolsX, toolsY, toolsWidth, toolsHeight, 3, 3, 'FD');
+                    
+                    // Título da seção
+                    doc.setFontSize(10);
+                    doc.setFont('helvetica', 'bold');
+                    doc.setTextColor(251, 191, 36); // amber-400
+                    doc.text('🔧 Ferramentas Utilizadas:', toolsX + 8, toolsY + 8);
+                    
+                    let toolY = toolsY + 15;
+                    
+                    // Listar cada ferramenta
+                    tools.forEach(tool => {
+                        doc.setFontSize(9);
+                        doc.setFont('helvetica', 'bold');
+                        doc.setTextColor(0, 0, 0);
+                        doc.text(`• ${tool.name}`, toolsX + 12, toolY);
+                        toolY += 6;
+                        
+                        // Argumentos da ferramenta
+                        const argsText = formatToolArgs(tool.args);
+                        if (argsText !== '(sem argumentos)') {
+                            const argsLines = doc.splitTextToSize(argsText, toolsWidth - 24);
+                            doc.setFont('helvetica', 'normal');
+                            doc.setTextColor(60, 60, 60);
+                            doc.text(argsLines, toolsX + 16, toolY);
+                            toolY += argsLines.length * 4 + 2;
+                        } else {
+                            toolY += 2;
+                        }
+                    });
+                    
+                    y = toolY + 8;
+                }
             });
 
             doc.save(`historico_chat_v${activeVersion.version}.pdf`);
