@@ -18,7 +18,7 @@ Configure uma vez e toda atualização no GitHub atualiza automaticamente na Ver
 Na tela de configuração:
 
 1. **Framework Preset:** Vite (detectado automaticamente)
-2. **Root Directory:** Deixe em branco (se o projeto estiver na raiz) ou `promptllab` se estiver em subpasta
+2. **Root Directory:** Deixe em branco (projeto está na raiz do repositório)
 3. **Build Command:** `npm run build` (já vem preenchido)
 4. **Output Directory:** `dist` (já vem preenchido)
 5. **Install Command:** `npm install` (já vem preenchido)

@@ -4,14 +4,14 @@
 
 **Projeto Vercel:** `promptlllab`  
 **Repositório GitHub:** `brunao23/promptllab`  
-**Root Directory:** `promptlllab`
+**Root Directory:** `(vazio)` - O projeto está na raiz do repositório
 
 ## ✅ Configurações Corretas na Vercel
 
 ### 1. Settings → General
 
 **Build & Development Settings:**
-- **Root Directory:** `promptlllab` ✅
+- **Root Directory:** `(vazio)` ✅ - Projeto está na raiz do repositório
 - **Framework Preset:** Vite
 - **Build Command:** `npm run build`
 - **Output Directory:** `dist`
@@ -73,7 +73,7 @@ Após o primeiro deploy, você terá:
 
 Antes de confirmar que está tudo funcionando:
 
-- [ ] Root Directory = `promptlllab`
+- [ ] Root Directory = `(vazio)` - Projeto está na raiz
 - [ ] Todas as variáveis de ambiente configuradas
 - [ ] Variáveis marcadas para Production, Preview e Development
 - [ ] Repositório conectado: `brunao23/promptllab`
@@ -112,7 +112,7 @@ Antes de confirmar que está tudo funcionando:
 
 ## 📝 Notas Importantes
 
-- ✅ **Root Directory é:** `promptlllab` (não `labprompt` ou `promptllab`)
+- ✅ **Root Directory é:** `(vazio)` - Projeto está na raiz do repositório, não em subpasta
 - ✅ **Repositório é:** `brunao23/promptllab`
 - ✅ **Branch principal:** `main`
 - ✅ **Deploy automático:** Configurado e funcionando

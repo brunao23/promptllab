@@ -18,7 +18,7 @@ Esta é a forma mais fácil e recomendada pela Vercel:
 ### Passo 2: Configurar o Projeto
 
 1. **Framework Preset:** A Vercel detectará automaticamente como "Vite"
-2. **Root Directory:** Se o projeto estiver na raiz, deixe em branco. Se estiver em uma subpasta, especifique `promptllab`
+2. **Root Directory:** Deixe em branco (projeto está na raiz do repositório)
 3. **Build Command:** `npm run build`
 4. **Output Directory:** `dist`
 5. **Install Command:** `npm install`

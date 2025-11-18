@@ -36,7 +36,8 @@ Acesse: https://vercel.com/dashboard → Seu Projeto → Settings → General
 
 1. **Root Directory:**
    - Se `package.json` está na raiz → Deixe **VAZIO** ou `.`
-   - Se `package.json` está em subpasta → Coloque `promptlllab`
+   - Se `package.json` está na raiz → Deixe **VAZIO** ou `.`
+   - Se `package.json` está em subpasta → Coloque o nome da subpasta
 
 2. **Build Command:**
    - Deve ser: `npm run build`
