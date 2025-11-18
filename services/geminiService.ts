@@ -423,7 +423,7 @@ Retorne sempre um JSON válido, mesmo que alguns campos estejam vazios.
                     responseSchema: schema
                 }
             });
-        }, 3, 2000); // 3 tentativas, começando com 2 segundos
+        }, 3, 500); // 3 tentativas, começando com 500ms (reduzido de 2s para acelerar)
         
         // Verificar se a resposta tem texto
         if (!response || !response.text) {

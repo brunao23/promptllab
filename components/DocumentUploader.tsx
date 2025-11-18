@@ -132,15 +132,22 @@ export const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onDataExtrac
         setOverallProgress({ current: 0, total: valid.length });
 
         // Processar arquivos sequencialmente para evitar sobrecarga
+        // Mas adicionar pequenos delays para não bloquear a UI
         const allExtractedData: Partial<PromptData>[] = [];
         
         for (let i = 0; i < valid.length; i++) {
             const file = valid[i];
             
+            // Dar tempo ao React para atualizar a UI antes de processar o próximo arquivo
+            await new Promise(resolve => setTimeout(resolve, 50));
+            
             // Atualizar status para processando
             progressMap.set(file.name, { name: file.name, status: 'processing' });
             setFileProgress(new Map(progressMap));
             setOverallProgress({ current: i, total: valid.length });
+
+            // Atualizar UI novamente
+            await new Promise(resolve => setTimeout(resolve, 10));
 
             try {
                 const base64String = await readFileAsBase64(file);
@@ -152,6 +159,9 @@ export const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onDataExtrac
                 // Marcar como completo
                 progressMap.set(file.name, { name: file.name, status: 'completed' });
                 setFileProgress(new Map(progressMap));
+                
+                // Atualizar progresso
+                setOverallProgress({ current: i + 1, total: valid.length });
             } catch (err: any) {
                 console.error(`Erro ao analisar ${file.name}:`, err);
                 const errorMessage = err.message || 'Falha na análise do documento.';
@@ -163,6 +173,7 @@ export const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onDataExtrac
                 setFileProgress(new Map(progressMap));
                 
                 // Continuar processando outros arquivos mesmo se um falhar
+                setOverallProgress({ current: i + 1, total: valid.length });
             }
         }
 

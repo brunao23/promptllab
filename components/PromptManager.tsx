@@ -153,6 +153,8 @@ export const PromptManager: React.FC = () => {
 
                 // Carregar prompts do usuário
                 console.log('📥 Carregando prompts do usuário...');
+                // Dar tempo ao React para atualizar a UI
+                await new Promise(resolve => setTimeout(resolve, 10));
                 const prompts = await getUserPrompts();
                 console.log('✅ Prompts carregados:', prompts?.length || 0);
                 
@@ -181,6 +183,8 @@ export const PromptManager: React.FC = () => {
                     
                     // Carregar TODAS as versões do prompt - CRÍTICO: SEMPRE tentar carregar
                     console.log('📜 Carregando TODAS as versões do prompt do ID:', latestPrompt.id);
+                    // Dar tempo ao React para atualizar a UI
+                    await new Promise(resolve => setTimeout(resolve, 10));
                     let versions: PromptVersion[] = [];
                     try {
                         versions = await getPromptVersions(latestPrompt.id);
