@@ -352,6 +352,11 @@ export const PromptManager: React.FC = () => {
                 }
             } else if (event === 'TOKEN_REFRESHED') {
                 // Token refreshed - não recarregar dados, apenas logar
+                // Verifica se a aba está visível antes de fazer qualquer operação
+                if (!isVisibleRef.current) {
+                    console.log('⏸️ TOKEN_REFRESHED ignorado - aba não está visível');
+                    return;
+                }
                 console.log('🔄 Token atualizado (refresh automático), mantendo dados carregados');
                 // NÃO recarregar dados para evitar spinner desnecessário
             } else if (event === 'SIGNED_OUT') {
