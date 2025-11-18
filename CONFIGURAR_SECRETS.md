@@ -15,8 +15,8 @@ Configure estes secrets em: **Settings** > **Secrets and variables** > **Actions
 
 | Secret | Valor | Descrição |
 |--------|-------|-----------|
-| `VITE_SUPABASE_URL` | `https://zmagqrcymbletqymclig.supabase.co` | URL do Supabase |
-| `VITE_SUPABASE_ANON_KEY` | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InptYWdxcmN5bWJsZXRxeW1jbGlnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMzOTM3NzQsImV4cCI6MjA3ODk2OTc3NH0._8CwBY_ao6CWwbLqu7VN_sAfyUFMOSK8sp8XpullAFY` | Chave anônima do Supabase |
+| `VITE_SUPABASE_URL` | `https://seu-projeto.supabase.co` | URL do Supabase (obtenha em: Dashboard → Settings → API) |
+| `VITE_SUPABASE_ANON_KEY` | `sua-chave-anon-key-aqui` | Chave anônima do Supabase (obtenha em: Dashboard → Settings → API) |
 | `GEMINI_API_KEY` | *(Sua chave da API Gemini)* | Chave da API do Google Gemini |
 
 ### Secrets para Deploy via GitHub Actions (Opcional)
@@ -37,8 +37,8 @@ Adicione para **Production**, **Preview** e **Development**:
 
 | Variável | Valor |
 |----------|-------|
-| `VITE_SUPABASE_URL` | `https://zmagqrcymbletqymclig.supabase.co` |
-| `VITE_SUPABASE_ANON_KEY` | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InptYWdxcmN5bWJsZXRxeW1jbGlnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMzOTM3NzQsImV4cCI6MjA3ODk2OTc3NH0._8CwBY_ao6CWwbLqu7VN_sAfyUFMOSK8sp8XpullAFY` |
+| `VITE_SUPABASE_URL` | `https://seu-projeto.supabase.co` |
+| `VITE_SUPABASE_ANON_KEY` | `sua-chave-anon-key-aqui` |
 | `GEMINI_API_KEY` | *(Sua chave da API Gemini)* |
 
 ## ⚡ Configuração Rápida via Interface

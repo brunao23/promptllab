@@ -45,8 +45,10 @@ O pacote `@supabase/supabase-js` já foi adicionado ao `package.json`.
 Crie um arquivo `.env` na raiz do projeto (dentro da pasta `labprompt`) com:
 
 ```env
-VITE_SUPABASE_URL=https://zmagqrcymbletqymclig.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InptYWdxcmN5bWJsZXRxeW1jbGlnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMzOTM3NzQsImV4cCI6MjA3ODk2OTc3NH0._8CwBY_ao6CWwbLqu7VN_sAfyUFMOSK8sp8XpullAFY
+VITE_SUPABASE_URL=https://seu-projeto.supabase.co
+VITE_SUPABASE_ANON_KEY=sua-chave-anon-key-aqui
+
+> ⚠️ **IMPORTANTE**: Obtenha a chave real em: https://supabase.com/dashboard → Settings → API
 ```
 
 **Importante**: No Vite, as variáveis de ambiente devem ter o prefixo `VITE_` para serem acessíveis no código.

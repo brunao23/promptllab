@@ -35,8 +35,8 @@ As variáveis de ambiente precisam estar configuradas no dashboard da Vercel:
 2. Selecione seu projeto
 3. Vá em **Settings** → **Environment Variables**
 4. Adicione as seguintes variáveis:
-   - `VITE_SUPABASE_URL` = `https://zmagqrcymbletqymclig.supabase.co`
-   - `VITE_SUPABASE_ANON_KEY` = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InptYWdxcmN5bWJsZXRxeW1jbGlnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMzOTM3NzQsImV4cCI6MjA3ODk2OTc3NH0._8CwBY_ao6CWwbLqu7VN_sAfyUFMOSK8sp8XpullAFY`
+   - `VITE_SUPABASE_URL` = `https://seu-projeto.supabase.co` (obtenha em: Dashboard → Settings → API)
+   - `VITE_SUPABASE_ANON_KEY` = `sua-chave-anon-key-aqui` (obtenha em: Dashboard → Settings → API)
 5. Marque todas as opções: **Production**, **Preview**, **Development**
 6. Clique em **Save**
 7. Faça um novo deploy (ou aguarde o próximo push no GitHub)
@@ -52,8 +52,8 @@ cat .env | grep VITE_SUPABASE
 
 Você deve ver:
 ```
-VITE_SUPABASE_URL=https://zmagqrcymbletqymclig.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+VITE_SUPABASE_URL=https://seu-projeto.supabase.co
+VITE_SUPABASE_ANON_KEY=sua-chave-anon-key-aqui
 ```
 
 ## ⚠️ Importante

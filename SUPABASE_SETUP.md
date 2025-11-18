@@ -57,10 +57,14 @@ Vá em **Authentication** > **Providers** para configurar.
 Adicione as seguintes variáveis no seu arquivo `.env` ou `.env.local`:
 
 ```env
-NEXT_PUBLIC_SUPABASE_URL=https://zmagqrcymbletqymclig.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InptYWdxcmN5bWJsZXRxeW1jbGlnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMzOTM3NzQsImV4cCI6MjA3ODk2OTc3NH0._8CwBY_ao6CWwbLqu7VN_sAfyUFMOSK8sp8XpullAFY
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InptYWdxcmN5bWJsZXRxeW1jbGlnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MzM5Mzc3NCwiZXhwIjoyMDc4OTY5Nzc0fQ.M6hbcsr-XkktX84LTdIGI4QnTKEXUFYU8aFx5u0LrAE
+NEXT_PUBLIC_SUPABASE_URL=https://seu-projeto.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=sua-chave-anon-key-aqui
+SUPABASE_SERVICE_ROLE_KEY=sua-service-role-key-aqui
 ```
+
+> ⚠️ **IMPORTANTE**: Obtenha as chaves reais em:
+> - **Dashboard do Supabase**: https://supabase.com/dashboard → Settings → API
+> - **Nunca commite estas chaves no repositório!** Use apenas em variáveis de ambiente ou arquivos `.env.local` (que devem estar no `.gitignore`)
 
 ## 📊 Estrutura do Banco de Dados
 

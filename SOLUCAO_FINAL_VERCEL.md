@@ -32,11 +32,15 @@ O arquivo `deploy-vercel.yml` foi renomeado para `.disabled`.
 Na seção **"Environment Variables"**, adicione:
 
 ```
-VITE_SUPABASE_URL=https://zmagqrcymbletqymclig.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InptYWdxcmN5bWJsZXRxeW1jbGlnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMzOTM3NzQsImV4cCI6MjA3ODk2OTc3NH0._8CwBY_ao6CWwbLqu7VN_sAfyUFMOSK8sp8XpullAFY
-GEMINI_API_KEY=AIzaSyC5NFjPC1agckBYc2WUzCf0W-ua_AhXMrQ
-API_KEY=AIzaSyC5NFjPC1agckBYc2WUzCf0W-ua_AhXMrQ
+VITE_SUPABASE_URL=https://seu-projeto.supabase.co
+VITE_SUPABASE_ANON_KEY=sua-chave-anon-key-aqui
+GEMINI_API_KEY=sua-chave-gemini-aqui
+API_KEY=sua-chave-gemini-aqui
 ```
+
+> ⚠️ **IMPORTANTE**: Substitua os valores acima pelas suas chaves reais:
+> - Obtenha `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` em: https://supabase.com/dashboard → Settings → API
+> - Obtenha `GEMINI_API_KEY` em: https://makersuite.google.com/app/apikey
 
 **IMPORTANTE**: Marque todos como **"Production"**, **"Preview"** e **"Development"**
 
