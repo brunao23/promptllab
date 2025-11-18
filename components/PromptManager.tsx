@@ -49,6 +49,8 @@ export const PromptManager: React.FC = () => {
     const [isLoadingData, setIsLoadingData] = useState(true);
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
     const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const dataLoadedRef = useRef<boolean>(false);
+    const lastLoadTimeRef = useRef<number>(0);
 
     // Explanation State
     const [isExplanationModalOpen, setIsExplanationModalOpen] = useState(false);
@@ -67,10 +69,19 @@ export const PromptManager: React.FC = () => {
 
     // Carregar dados do Supabase ao montar o componente E quando a sessão mudar
     useEffect(() => {
-        const loadUserData = async () => {
+        const loadUserData = async (forceReload = false) => {
+            // Proteção: evitar recarregamento se já foi carregado recentemente (menos de 5 segundos)
+            const now = Date.now();
+            const timeSinceLastLoad = now - lastLoadTimeRef.current;
+            if (!forceReload && dataLoadedRef.current && timeSinceLastLoad < 5000) {
+                console.log('⏭️ Dados já foram carregados recentemente, pulando recarregamento desnecessário');
+                return;
+            }
+
             try {
                 console.log('🔄 Iniciando carregamento de dados do usuário...');
                 setIsLoadingData(true);
+                lastLoadTimeRef.current = now;
                 
                 // Verificar se usuário está autenticado
                 const { data: { session } } = await supabase.auth.getSession();
@@ -324,6 +335,7 @@ export const PromptManager: React.FC = () => {
             } finally {
                 console.log('✅ Carregamento de dados finalizado. isLoadingData = false');
                 setIsLoadingData(false);
+                dataLoadedRef.current = true;
             }
         };
 
@@ -332,13 +344,20 @@ export const PromptManager: React.FC = () => {
         // Listener para mudanças de autenticação (logout/login)
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
             console.log('🔐 Mudança de autenticação:', event);
-            if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+            if (event === 'SIGNED_IN') {
                 if (session) {
                     console.log('✅ Usuário fez login, recarregando dados...');
-                    await loadUserData();
+                    dataLoadedRef.current = false; // Forçar recarregamento em login
+                    await loadUserData(true);
                 }
+            } else if (event === 'TOKEN_REFRESHED') {
+                // Token refreshed - não recarregar dados, apenas logar
+                console.log('🔄 Token atualizado (refresh automático), mantendo dados carregados');
+                // NÃO recarregar dados para evitar spinner desnecessário
             } else if (event === 'SIGNED_OUT') {
                 console.log('🚪 Usuário fez logout, limpando dados...');
+                dataLoadedRef.current = false;
+                lastLoadTimeRef.current = 0;
                 setCurrentPromptId(null);
                 setVersionHistory([]);
                 setActiveVersion(null);
