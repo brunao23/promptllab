@@ -10,7 +10,7 @@
 1. Acesse: https://vercel.com/dashboard → Seu Projeto → Settings → General
 2. Verifique **Root Directory:**
    - Se `package.json` está na **raiz do repositório** → Deixe **VAZIO**
-   - Se `package.json` está em **pasta `labprompt`** → Coloque `labprompt`
+   - Se `package.json` está em **pasta `promptllab`** → Coloque `promptllab`
 3. Salve e faça Redeploy
 
 ### 2. "Build Command failed" ou "Build Error"
@@ -60,7 +60,7 @@
 
 Antes de tudo, verifique:
 
-- [ ] Root Directory configurado? (vazio ou `labprompt`)
+- [ ] Root Directory configurado? (vazio ou `promptllab`)
 - [ ] Build Command = `npm run build`?
 - [ ] Output Directory = `dist`?
 - [ ] Variáveis de ambiente configuradas?
@@ -74,7 +74,7 @@ Antes de tudo, verifique:
    https://vercel.com/dashboard
 
 2. **Vá em Settings → General:**
-   - Root Directory: `labprompt` (ou vazio, dependendo da estrutura)
+   - Root Directory: `promptllab` (ou vazio, dependendo da estrutura)
    - Build Command: `npm run build`
    - Output Directory: `dist`
 

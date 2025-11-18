@@ -40,7 +40,7 @@ Este guia explica como configurar o deploy automático para o Git e Vercel.
 3. Conecte seu repositório GitHub
 4. Configure o projeto:
    - **Framework Preset**: Vite
-   - **Root Directory**: `labprompt`
+   - **Root Directory**: `promptllab`
    - **Build Command**: `npm run build`
    - **Output Directory**: `dist`
    - **Install Command**: `npm install`
