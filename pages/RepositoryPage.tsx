@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getUserPrompts, getPrompt, deletePrompt as deletePromptService } from '../services/supabaseService';
+import { getUserPrompts, getPrompt, deletePrompt } from '../services/supabaseService';
 import { useNavigate } from 'react-router-dom';
 
 interface Prompt {
