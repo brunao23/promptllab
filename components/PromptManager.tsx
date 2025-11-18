@@ -1191,14 +1191,19 @@ export const PromptManager: React.FC = () => {
                     const toolsY = y;
                     
                     // Fundo para seção de ferramentas (amarelo/amber claro)
-                    doc.setFillColor(251, 191, 36, 20); // amber-400 com transparência
-                    doc.setDrawColor(251, 191, 36, 50);
-                    doc.roundedRect(toolsX, toolsY, toolsWidth, toolsHeight, 3, 3, 'FD');
+                    doc.setFillColor(251, 191, 36); // amber-400
+                    doc.setDrawColor(251, 191, 36);
+                    doc.roundedRect(toolsX, toolsY, toolsWidth, toolsHeight, 3, 3, 'F');
+                    
+                    // Borda para destacar
+                    doc.setDrawColor(245, 158, 11); // amber-500 para borda
+                    doc.setLineWidth(0.5);
+                    doc.roundedRect(toolsX, toolsY, toolsWidth, toolsHeight, 3, 3, 'D');
                     
                     // Título da seção
                     doc.setFontSize(10);
                     doc.setFont('helvetica', 'bold');
-                    doc.setTextColor(251, 191, 36); // amber-400
+                    doc.setTextColor(0, 0, 0); // Preto para melhor contraste sobre fundo amarelo
                     doc.text('🔧 Ferramentas Utilizadas:', toolsX + 8, toolsY + 8);
                     
                     let toolY = toolsY + 15;
