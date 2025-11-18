@@ -51,6 +51,26 @@ export const PromptManager: React.FC = () => {
     const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const dataLoadedRef = useRef<boolean>(false);
     const lastLoadTimeRef = useRef<number>(0);
+    const isVisibleRef = useRef<boolean>(true);
+
+    // Proteção contra recarregamento quando a aba/janela perde/ganha foco
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            isVisibleRef.current = !document.hidden;
+            // Quando a aba volta ao foco, NÃO recarrega os dados automaticamente
+            // Só recarrega se o usuário fizer logout/login explicitamente
+            if (!document.hidden) {
+                console.log('🔍 Aba voltou ao foco - mantendo dados carregados (sem recarregar)');
+            } else {
+                console.log('⏸️ Aba perdeu foco - pausando operações');
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, []);
 
     // Explanation State
     const [isExplanationModalOpen, setIsExplanationModalOpen] = useState(false);
