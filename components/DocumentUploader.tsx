@@ -2,6 +2,7 @@ import React, { useCallback, useState } from 'react';
 import { analyzeDocument } from '../services/geminiService';
 import { validateFileSize, validateFileType } from '../utils/security';
 import type { PromptData } from '../types';
+import * as XLSX from 'xlsx';
 
 interface DocumentUploaderProps {
     onDataExtracted: (data: Partial<PromptData>) => void;
@@ -150,10 +151,41 @@ export const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onDataExtrac
             await new Promise(resolve => setTimeout(resolve, 10));
 
             try {
-                const base64String = await readFileAsBase64(file);
-                const mimeType = getFileMimeType(file);
+                const isExcelExt = file.name.toLowerCase().endsWith('.xlsx') || file.name.toLowerCase().endsWith('.xls');
+                let base64String: string;
+                let mimeType: string;
+                let finalFileName: string = file.name;
+
+                // Se for Excel, converter para CSV primeiro
+                if (isExcelExt) {
+                    console.log(`📊 Convertendo ${file.name} de Excel para CSV...`);
+                    const csvContent = await convertExcelToCsv(file);
+                    
+                    // Converter CSV string para base64
+                    const csvBlob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                    base64String = await new Promise<string>((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                            const result = reader.result?.toString().split(',')[1];
+                            if (result) {
+                                resolve(result);
+                            } else {
+                                reject(new Error('Falha ao converter CSV para base64.'));
+                            }
+                        };
+                        reader.onerror = () => reject(new Error('Erro ao ler CSV convertido.'));
+                        reader.readAsDataURL(csvBlob);
+                    });
+                    
+                    mimeType = 'text/csv';
+                    finalFileName = file.name.replace(/\.(xlsx|xls)$/i, '.csv');
+                    console.log(`✅ Conversão concluída: ${file.name} -> ${finalFileName}`);
+                } else {
+                    base64String = await readFileAsBase64(file);
+                    mimeType = getFileMimeType(file);
+                }
                 
-                const extractedData = await analyzeDocument(base64String, mimeType, file.name);
+                const extractedData = await analyzeDocument(base64String, mimeType, finalFileName);
                 allExtractedData.push(extractedData);
                 
                 // Marcar como completo
@@ -271,7 +303,7 @@ export const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onDataExtrac
                     type="file"
                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 disabled:cursor-not-allowed"
                     onChange={handleChange}
-                    accept=".pdf,.txt,.md,.html,.csv"
+                    accept=".pdf,.txt,.md,.html,.csv,.xlsx,.xls"
                     disabled={isLoading}
                     multiple
                 />
@@ -292,7 +324,7 @@ export const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onDataExtrac
                                 Arraste ou clique para upload
                             </p>
                             <p className="text-xs text-white/40">
-                                Suporta múltiplos arquivos: PDF, TXT, MD, HTML, CSV
+                                Suporta múltiplos arquivos: PDF, TXT, MD, HTML, CSV, XLSX, XLS
                             </p>
                         </>
                     )}

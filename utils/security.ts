@@ -384,18 +384,22 @@ const ALLOWED_FILE_TYPES = [
   'text/csv',
   'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
 ];
 
 export function validateFileType(file: File): { valid: boolean; error?: string } {
   const isValidType = ALLOWED_FILE_TYPES.includes(file.type) || 
                       file.name.toLowerCase().endsWith('.md') ||
                       file.name.toLowerCase().endsWith('.txt') ||
-                      file.name.toLowerCase().endsWith('.csv');
+                      file.name.toLowerCase().endsWith('.csv') ||
+                      file.name.toLowerCase().endsWith('.xlsx') ||
+                      file.name.toLowerCase().endsWith('.xls');
   
   if (!isValidType) {
     return { 
       valid: false, 
-      error: 'Tipo de arquivo não permitido. Use PDF, TXT, MD, HTML, CSV, DOC ou DOCX.' 
+      error: 'Tipo de arquivo não permitido. Use PDF, TXT, MD, HTML, CSV, XLSX, XLS, DOC ou DOCX.' 
     };
   }
 
