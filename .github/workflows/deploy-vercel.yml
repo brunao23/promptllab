@@ -5,16 +5,10 @@ on:
     branches:
       - main
       - master
-    paths:
-      - 'labprompt/**'
-      - '.github/workflows/deploy-vercel.yml'
   pull_request:
     branches:
       - main
       - master
-    paths:
-      - 'labprompt/**'
-      - '.github/workflows/deploy-vercel.yml'
 
 env:
   VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
@@ -35,15 +29,18 @@ jobs:
         with:
           node-version: '18'
           cache: 'npm'
-          cache-dependency-path: labprompt/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: 📥 Instalar dependências
-        working-directory: ./labprompt
         run: npm ci
 
       - name: 🔍 Verificar build
-        working-directory: ./labprompt
         run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'placeholder' }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || '' }}
+          API_KEY: ${{ secrets.GEMINI_API_KEY || '' }}
 
       - name: 🚀 Instalar Vercel CLI
         run: npm install --global vercel@latest
@@ -53,7 +50,6 @@ jobs:
         continue-on-error: false
 
       - name: 🔗 Vincular projeto
-        working-directory: ./labprompt
         run: |
           vercel link --yes \
             --token ${{ secrets.VERCEL_TOKEN }} \
@@ -63,7 +59,6 @@ jobs:
 
       - name: 📤 Deploy para Vercel (Preview)
         if: github.event_name == 'pull_request'
-        working-directory: ./labprompt
         run: |
           vercel deploy \
             --token ${{ secrets.VERCEL_TOKEN }} \
@@ -71,7 +66,6 @@ jobs:
 
       - name: 🚀 Deploy para Vercel (Production)
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
-        working-directory: ./labprompt
         run: |
           vercel deploy \
             --token ${{ secrets.VERCEL_TOKEN }} \

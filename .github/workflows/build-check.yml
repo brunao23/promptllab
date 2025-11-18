@@ -23,28 +23,24 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: labprompt/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        working-directory: ./labprompt
         run: npm ci
 
       - name: Run linter (if configured)
-        working-directory: ./labprompt
         continue-on-error: true
         run: npm run lint || true
 
       - name: Build project
-        working-directory: ./labprompt
         env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'placeholder' }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || '' }}
+          API_KEY: ${{ secrets.GEMINI_API_KEY || '' }}
         run: npm run build
 
       - name: Check build artifacts
-        working-directory: ./labprompt
         run: |
           if [ ! -d "dist" ]; then
             echo "Build failed: dist directory not found"

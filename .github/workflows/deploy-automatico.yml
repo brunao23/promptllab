@@ -25,23 +25,23 @@ jobs:
         with:
           node-version: '18'
           cache: 'npm'
-          cache-dependency-path: labprompt/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: 📥 Instalar dependências
-        working-directory: ./labprompt
         run: npm ci
 
       - name: 🔍 Verificar build
-        working-directory: ./labprompt
         run: npm run build
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://placeholder.supabase.co' }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'placeholder' }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || '' }}
+          API_KEY: ${{ secrets.GEMINI_API_KEY || '' }}
 
       - name: ✅ Build verificado
         run: |
           echo "✅ Build concluído com sucesso!"
-          echo "📦 Os arquivos estão prontos em ./labprompt/dist"
+          echo "📦 Os arquivos estão prontos em ./dist"
           echo ""
           echo "💡 Nota: Se você configurou a integração direta GitHub+Vercel,"
           echo "   o deploy será feito automaticamente pela Vercel após este workflow."
