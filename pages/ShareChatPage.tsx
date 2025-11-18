@@ -35,10 +35,25 @@ export const ShareChatPage: React.FC = () => {
 
         setPromptContent(version.content);
         
-        // Extrair nome do agente do prompt (se possível)
-        const personaMatch = version.content.match(/(?:eu sou (?:a|o)?|meu nome é|sou (?:a|o)?|chamo-me|me chamo)\s+([A-ZÁÉÍÓÚÀÈÌÒÙÂÊÎÔÛÃÕÇ][a-záéíóúàèìòùâêîôûãõç]+)/i);
-        if (personaMatch && personaMatch[1]) {
-          setAgentName(personaMatch[1]);
+        // Extrair nome do agente da persona (se possível)
+        if (version.sourceData?.persona) {
+          const personaText = version.sourceData.persona;
+          const personaMatch = personaText.match(/(?:eu sou (?:a|o)?|meu nome é|sou (?:a|o)?|chamo-me|me chamo)\s+([A-ZÁÉÍÓÚÀÈÌÒÙÂÊÎÔÛÃÕÇ][a-záéíóúàèìòùâêîôûãõç]+)/i);
+          if (personaMatch && personaMatch[1]) {
+            setAgentName(personaMatch[1]);
+          } else {
+            // Tentar extrair do conteúdo do prompt como fallback
+            const contentMatch = version.content.match(/(?:eu sou (?:a|o)?|meu nome é|sou (?:a|o)?|chamo-me|me chamo)\s+([A-ZÁÉÍÓÚÀÈÌÒÙÂÊÎÔÛÃÕÇ][a-záéíóúàèìòùâêîôûãõç]+)/i);
+            if (contentMatch && contentMatch[1]) {
+              setAgentName(contentMatch[1]);
+            }
+          }
+        } else {
+          // Tentar extrair do conteúdo do prompt diretamente
+          const contentMatch = version.content.match(/(?:eu sou (?:a|o)?|meu nome é|sou (?:a|o)?|chamo-me|me chamo)\s+([A-ZÁÉÍÓÚÀÈÌÒÙÂÊÎÔÛÃÕÇ][a-záéíóúàèìòùâêîôûãõç]+)/i);
+          if (contentMatch && contentMatch[1]) {
+            setAgentName(contentMatch[1]);
+          }
         }
 
         // Inicializar chat
