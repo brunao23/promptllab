@@ -1069,7 +1069,7 @@ export const PromptManager: React.FC = () => {
                 <div className="flex flex-col items-center space-y-6">
                     <div className="relative">
                         <div className="w-16 h-16 border-4 border-white/10 rounded-full"></div>
-                        <div className="absolute top-0 left-0 w-16 h-16 border-4 border-transparent border-t-emerald-400 border-r-emerald-500 rounded-full animate-spin"></div>
+                        <div className="absolute top-0 left-0 w-16 h-16 border-4 border-transparent border-t-emerald-400 border-r-green-500 rounded-full animate-spin"></div>
                     </div>
                     <div className="text-center">
                         <p className="text-white font-medium text-lg">Carregando seus dados...</p>
