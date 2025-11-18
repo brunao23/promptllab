@@ -65,12 +65,12 @@ export const Header: React.FC = () => {
   };
 
   return (
-    <header className="bg-slate-900 border-b border-slate-700/50">
+    <header className="bg-black border-b border-white/10">
       <div className="container mx-auto px-4 py-3 lg:px-8">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <svg
-              className="w-10 h-10 text-cyan-400"
+              className="w-10 h-10 text-emerald-400"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -87,7 +87,7 @@ export const Header: React.FC = () => {
               <h1 className="text-3xl font-bold text-white tracking-wider">
                 LaBPrompT
               </h1>
-              <p className="text-sm text-cyan-400/80">Laboratório de Engenharia de Prompt</p>
+              <p className="text-sm text-emerald-400/80">Laboratório de Engenharia de Prompt</p>
             </div>
           </div>
 
@@ -95,11 +95,11 @@ export const Header: React.FC = () => {
             <div className="flex items-center space-x-4">
               <div className="text-right hidden sm:block">
                 <p className="text-sm text-white font-medium">{userName || userEmail}</p>
-                <p className="text-xs text-slate-400">{userEmail}</p>
+                <p className="text-xs text-white/60">{userEmail}</p>
               </div>
               <button
                 onClick={handleLogout}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition-colors text-sm font-medium"
+                className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors text-sm font-medium"
               >
                 Sair
               </button>

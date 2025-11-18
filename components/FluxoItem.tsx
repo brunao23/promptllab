@@ -15,11 +15,11 @@ export const FluxoItem: React.FC<FluxoItemProps> = ({ fluxo, onUpdate, onRemove 
         onUpdate(fluxo.id, { [field]: value });
     };
 
-    const baseInputClasses = "w-full text-sm p-1 bg-slate-600/50 border border-slate-500 rounded focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500";
+    const baseInputClasses = "w-full text-sm p-1 bg-white/5 border border-white/10 rounded focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500";
 
     return (
-        <div className="border border-slate-600 rounded-lg">
-            <div className="bg-slate-700 p-2 flex justify-between items-center">
+        <div className="border border-white/10 rounded-lg">
+            <div className="bg-white/10 p-2 flex justify-between items-center">
                 <input 
                     type="text"
                     value={fluxo.nome}
@@ -27,7 +27,7 @@ export const FluxoItem: React.FC<FluxoItemProps> = ({ fluxo, onUpdate, onRemove 
                     className="bg-transparent font-semibold text-white w-full focus:outline-none"
                 />
                 <div>
-                    <button onClick={() => setIsExpanded(!isExpanded)} className="p-1 text-slate-400 hover:text-white">
+                    <button onClick={() => setIsExpanded(!isExpanded)} className="p-1 text-white/60 hover:text-white">
                          <svg className={`w-5 h-5 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                     </button>
                     <button onClick={() => onRemove(fluxo.id)} className="p-1 text-red-400 hover:text-red-300">
@@ -36,9 +36,9 @@ export const FluxoItem: React.FC<FluxoItemProps> = ({ fluxo, onUpdate, onRemove 
                 </div>
             </div>
             {isExpanded && (
-                <div className="p-3 space-y-3 bg-slate-700 bg-opacity-50">
+                <div className="p-3 space-y-3 bg-white/5">
                      <div>
-                        <label className="text-xs text-slate-400">Tipo</label>
+                        <label className="text-xs text-white/60">Tipo</label>
                         <input type="text" value={fluxo.tipoPrompt} onChange={(e) => handleChange('tipoPrompt', e.target.value)} className={baseInputClasses} />
                     </div>
                      <div>
@@ -60,12 +60,12 @@ export const FluxoItem: React.FC<FluxoItemProps> = ({ fluxo, onUpdate, onRemove 
                         />
                     </div>
                     <div className="flex items-center justify-between">
-                         <label className="flex items-center space-x-2 text-sm text-slate-300">
-                             <input type="checkbox" checked={fluxo.reforcarCoT} onChange={(e) => handleChange('reforcarCoT', e.target.checked)} className="form-checkbox h-4 w-4 text-cyan-600 bg-slate-800 border-slate-600 rounded focus:ring-cyan-500" />
+                         <label className="flex items-center space-x-2 text-sm text-white/80">
+                             <input type="checkbox" checked={fluxo.reforcarCoT} onChange={(e) => handleChange('reforcarCoT', e.target.checked)} className="form-checkbox h-4 w-4 text-emerald-500 bg-white/5 border-white/10 rounded focus:ring-emerald-500" />
                              <span>Reforçar CoT</span>
                          </label>
-                         <label className="flex items-center space-x-2 text-sm text-slate-300">
-                             <input type="checkbox" checked={fluxo.ativarGuardrails} onChange={(e) => handleChange('ativarGuardrails', e.target.checked)} className="form-checkbox h-4 w-4 text-cyan-600 bg-slate-800 border-slate-600 rounded focus:ring-cyan-500" />
+                         <label className="flex items-center space-x-2 text-sm text-white/80">
+                             <input type="checkbox" checked={fluxo.ativarGuardrails} onChange={(e) => handleChange('ativarGuardrails', e.target.checked)} className="form-checkbox h-4 w-4 text-emerald-500 bg-white/5 border-white/10 rounded focus:ring-emerald-500" />
                              <span>Guardrails</span>
                          </label>
                     </div>

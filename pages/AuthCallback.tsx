@@ -108,14 +108,14 @@ export const AuthCallback: React.FC = () => {
   }, [navigate]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center px-4 py-12">
+    <div className="min-h-screen bg-black flex items-center justify-center px-4 py-12">
       <div className="max-w-md w-full">
-        <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl p-8 border border-slate-700/50 shadow-xl text-center">
+        <div className="bg-white/5 backdrop-blur-sm rounded-xl p-8 border border-white/10 shadow-xl text-center">
           {status === 'loading' && (
             <>
               <div className="mb-6 flex justify-center">
                 <svg
-                  className="animate-spin h-12 w-12 text-cyan-400"
+                  className="animate-spin h-12 w-12 text-emerald-400"
                   xmlns="http://www.w3.org/2000/svg"
                   fill="none"
                   viewBox="0 0 24 24"
@@ -136,7 +136,7 @@ export const AuthCallback: React.FC = () => {
                 </svg>
               </div>
               <h2 className="text-2xl font-bold text-white mb-2">Verificando...</h2>
-              <p className="text-slate-400">{message}</p>
+              <p className="text-white/60">{message}</p>
             </>
           )}
 
@@ -158,7 +158,7 @@ export const AuthCallback: React.FC = () => {
                 </svg>
               </div>
               <h2 className="text-2xl font-bold text-white mb-2">Email Confirmado!</h2>
-              <p className="text-slate-400">{message}</p>
+              <p className="text-white/60">{message}</p>
             </>
           )}
 
@@ -184,13 +184,13 @@ export const AuthCallback: React.FC = () => {
               <div className="space-y-3">
                 <button
                   onClick={() => navigate('/login')}
-                  className="w-full py-3 bg-cyan-600 hover:bg-cyan-700 text-white font-bold rounded-lg transition-all"
+                  className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg transition-all"
                 >
                   Ir para Login
                 </button>
                 <button
                   onClick={() => navigate('/register')}
-                  className="w-full py-3 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-lg transition-all"
+                  className="w-full py-3 bg-white/10 hover:bg-white/20 text-white font-bold rounded-lg transition-all"
                 >
                   Criar Nova Conta
                 </button>
