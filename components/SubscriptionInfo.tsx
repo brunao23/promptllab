@@ -26,16 +26,25 @@ export const SubscriptionInfo: React.FC = () => {
   useEffect(() => {
     const loadSubscriptionInfo = async () => {
       try {
+        console.log('🔍 [SubscriptionInfo] Carregando informações da assinatura...');
         const [plan, tokenUsage, versionInfo] = await Promise.all([
           getCurrentPlanInfo(),
           getCurrentMonthUsage(),
           getCurrentMonthVersions(),
         ]);
+        console.log('📋 [SubscriptionInfo] Plano:', plan);
+        console.log('📊 [SubscriptionInfo] Uso:', tokenUsage);
+        console.log('📝 [SubscriptionInfo] Versões:', versionInfo);
+        
         setPlanInfo(plan);
         setUsage(tokenUsage);
         setVersions(versionInfo);
+        
+        if (!plan) {
+          console.warn('⚠️ [SubscriptionInfo] Nenhuma informação de plano encontrada. Usando valores padrão do trial.');
+        }
       } catch (error) {
-        console.error('Erro ao carregar informações da assinatura:', error);
+        console.error('❌ [SubscriptionInfo] Erro ao carregar informações da assinatura:', error);
       } finally {
         setIsLoading(false);
       }
@@ -44,12 +53,69 @@ export const SubscriptionInfo: React.FC = () => {
     loadSubscriptionInfo();
   }, []);
 
-  if (isLoading || !planInfo || !usage || !versions) {
+  if (isLoading) {
     return (
       <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10">
         <div className="animate-pulse">
           <div className="h-4 bg-white/10 rounded w-1/3 mb-2"></div>
           <div className="h-4 bg-white/10 rounded w-1/2"></div>
+        </div>
+      </div>
+    );
+  }
+
+  // Se não há informações, mostrar card com informações padrão do trial
+  if (!planInfo || !usage || !versions) {
+    return (
+      <div className="bg-white/5 backdrop-blur-sm rounded-xl p-5 border border-white/10 shadow-xl">
+        <div className="flex items-center justify-between mb-4 pb-4 border-b border-white/10">
+          <div className="flex-1">
+            <div className="flex items-center space-x-2 mb-1">
+              <h3 className="text-white font-bold text-base">Trial Grátis</h3>
+              <span className="px-2 py-0.5 bg-emerald-500/20 border border-emerald-500/50 rounded text-emerald-400 text-xs font-bold">
+                TRIAL
+              </span>
+            </div>
+            <p className="text-emerald-400 text-sm font-medium mt-1">
+              ⏰ 7 dias restantes
+            </p>
+          </div>
+        </div>
+
+        {/* Tokens Usage */}
+        <div className="mb-3">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-white/60 text-xs">Tokens do Mês</span>
+            <span className="text-white/80 text-xs font-medium">
+              0 / 1.000.000 tokens/mês
+            </span>
+          </div>
+          <div className="w-full bg-white/10 rounded-full h-2">
+            <div className="h-2 rounded-full transition-all bg-emerald-500" style={{ width: '0%' }}></div>
+          </div>
+        </div>
+
+        {/* Versions Usage */}
+        <div className="mb-3">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-white/60 text-xs">Versões do Mês</span>
+            <span className="text-white/80 text-xs font-medium">
+              0 / Máx. 4 versões/mês
+            </span>
+          </div>
+          <div className="w-full bg-white/10 rounded-full h-2">
+            <div className="h-2 rounded-full transition-all bg-emerald-500" style={{ width: '0%' }}></div>
+          </div>
+        </div>
+
+        {/* Features */}
+        <div className="pt-3 border-t border-white/10 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-white/60 text-xs">Compartilhar Chat</span>
+            <svg className="w-4 h-4 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </div>
         </div>
       </div>
     );

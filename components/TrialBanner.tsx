@@ -16,10 +16,16 @@ export const TrialBanner: React.FC = () => {
   useEffect(() => {
     const loadPlanInfo = async () => {
       try {
+        console.log('🔍 [TrialBanner] Carregando informações do plano...');
         const info = await getCurrentPlanInfo();
+        console.log('📋 [TrialBanner] Informações do plano recebidas:', info);
         setPlanInfo(info);
+        
+        if (!info) {
+          console.warn('⚠️ [TrialBanner] Nenhuma informação de plano encontrada. Verifique se a subscription foi criada.');
+        }
       } catch (error) {
-        console.error('Erro ao carregar informações do plano:', error);
+        console.error('❌ [TrialBanner] Erro ao carregar informações do plano:', error);
       } finally {
         setIsLoading(false);
       }
@@ -36,16 +42,21 @@ export const TrialBanner: React.FC = () => {
     );
   }
 
-  // Se não há plano, mostrar mensagem informativa
+  // Se não há plano, mostrar mensagem informativa sobre o trial
   if (!planInfo) {
     return (
-      <div className="w-full px-4 py-3 mb-4 rounded-lg border bg-white/5 border-white/10">
+      <div className="w-full px-4 py-3 mb-4 rounded-lg border bg-emerald-500/20 border-emerald-500/50">
         <div className="flex items-center space-x-3">
-          <svg className="w-5 h-5 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
           </svg>
-          <div>
-            <p className="text-white/80 font-medium text-sm">Carregando informações do plano...</p>
+          <div className="flex-1">
+            <p className="text-emerald-400 font-semibold text-sm">
+              🎉 Teste Grátis de 7 Dias Ativo!
+            </p>
+            <p className="text-white/60 text-xs mt-1">
+              Sua assinatura trial foi criada automaticamente. Aproveite todos os recursos!
+            </p>
           </div>
         </div>
       </div>

@@ -52,7 +52,12 @@ export interface UsageTracking {
 export async function getCurrentSubscription(): Promise<Subscription | null> {
   try {
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user) return null;
+    if (!session?.user) {
+      console.log('⚠️ [getCurrentSubscription] Nenhuma sessão ativa');
+      return null;
+    }
+
+    console.log('🔍 [getCurrentSubscription] Buscando subscription para usuário:', session.user.id);
 
     const { data, error } = await supabase
       .from('subscriptions')
@@ -68,15 +73,24 @@ export async function getCurrentSubscription(): Promise<Subscription | null> {
 
     if (error) {
       if (error.code === 'PGRST116') {
-        console.log('⚠️ Nenhuma assinatura encontrada para o usuário');
+        console.warn('⚠️ [getCurrentSubscription] Nenhuma assinatura encontrada para o usuário. Verifique se o trigger está criando subscriptions automaticamente.');
+        console.log('💡 [getCurrentSubscription] O trigger `on_auth_user_created` deve criar uma subscription automaticamente quando um usuário se registra.');
         return null;
       }
+      console.error('❌ [getCurrentSubscription] Erro ao buscar subscription:', error);
       throw error;
     }
 
+    console.log('✅ [getCurrentSubscription] Subscription encontrada:', {
+      id: data.id,
+      status: data.status,
+      plan: data.plan?.display_name || 'Sem plano',
+      trial_ends_at: data.trial_ends_at
+    });
+
     return data as Subscription;
   } catch (error: any) {
-    console.error('❌ Erro ao buscar subscription:', error);
+    console.error('❌ [getCurrentSubscription] Erro ao buscar subscription:', error);
     return null;
   }
 }
@@ -303,10 +317,20 @@ export async function getCurrentPlanInfo(): Promise<{
   maxVersions: number;
   maxTokens: number;
 } | null> {
+  console.log('🔍 [getCurrentPlanInfo] Buscando informações do plano...');
   const subscription = await getCurrentSubscription();
+  
   if (!subscription || !subscription.plan) {
+    console.warn('⚠️ [getCurrentPlanInfo] Nenhuma subscription ou plano encontrado.');
+    console.log('💡 [getCurrentPlanInfo] Verifique se o trigger `create_master_admin()` está criando subscriptions corretamente.');
     return null;
   }
+  
+  console.log('📋 [getCurrentPlanInfo] Subscription encontrada:', {
+    status: subscription.status,
+    plan_name: subscription.plan.name,
+    trial_ends_at: subscription.trial_ends_at
+  });
 
   const isTrial = subscription.status === 'trial';
   let trialDaysLeft: number | null = null;
