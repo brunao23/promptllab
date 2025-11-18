@@ -1,6 +1,7 @@
 
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import { PromptInputForm } from './PromptInputForm';
 import { OutputDisplay } from './OutputDisplay';
 import { HistoryPanel } from './HistoryPanel';
@@ -27,6 +28,7 @@ import {
 } from '../services/supabaseService';
 
 export const PromptManager: React.FC = () => {
+    const location = useLocation();
     const [versionHistory, setVersionHistory] = useState<PromptVersion[]>([]);
     const [activeVersion, setActiveVersion] = useState<PromptVersion | null>(null);
     const [validatedVersionId, setValidatedVersionId] = useState<string | null>(null);
@@ -1033,12 +1035,12 @@ export const PromptManager: React.FC = () => {
             <div className="flex items-center justify-center h-full w-full bg-black">
                 <div className="flex flex-col items-center space-y-6">
                     <div className="relative">
-                        <div className="w-16 h-16 border-4 border-slate-800 rounded-full"></div>
-                        <div className="absolute top-0 left-0 w-16 h-16 border-4 border-transparent border-t-blue-500 border-r-cyan-500 rounded-full animate-spin"></div>
+                        <div className="w-16 h-16 border-4 border-white/10 rounded-full"></div>
+                        <div className="absolute top-0 left-0 w-16 h-16 border-4 border-transparent border-t-emerald-400 border-r-emerald-500 rounded-full animate-spin"></div>
                     </div>
                     <div className="text-center">
-                        <p className="text-slate-300 font-medium text-lg">Carregando seus dados...</p>
-                        <p className="text-slate-500 text-sm mt-2">Aguarde um momento</p>
+                        <p className="text-white font-medium text-lg">Carregando seus dados...</p>
+                        <p className="text-white/40 text-sm mt-2">Aguarde um momento</p>
                     </div>
                 </div>
             </div>

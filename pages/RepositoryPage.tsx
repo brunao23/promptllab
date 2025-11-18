@@ -53,7 +53,7 @@ export const RepositoryPage: React.FC = () => {
     if (!confirm('Tem certeza que deseja excluir este prompt?')) return;
     
     try {
-      await deletePromptService(promptId);
+      await deletePrompt(promptId);
       setPrompts(prompts.filter(p => p.id !== promptId));
       if (selectedPrompt?.id === promptId) {
         setSelectedPrompt(null);
@@ -67,7 +67,10 @@ export const RepositoryPage: React.FC = () => {
 
   const handleUsePrompt = () => {
     if (selectedPrompt) {
-      navigate('/dashboard', { state: { promptId: selectedPrompt.id } });
+      navigate('/dashboard', { 
+        state: { promptId: selectedPrompt.id },
+        replace: false 
+      });
     }
   };
 
