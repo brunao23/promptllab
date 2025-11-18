@@ -22,6 +22,8 @@ const fileExtensions: Record<OutputFormat, string> = {
 
 export const OutputDisplay: React.FC<OutputDisplayProps> = ({ version, isLoading, error, isValidated, onValidate, onExplain }) => {
   const [copySuccess, setCopySuccess] = useState('');
+  const [shareLink, setShareLink] = useState<string>('');
+  const [showShareModal, setShowShareModal] = useState(false);
 
   // Debug: Log quando version muda
   React.useEffect(() => {
@@ -62,6 +64,25 @@ export const OutputDisplay: React.FC<OutputDisplayProps> = ({ version, isLoading
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+  };
+
+  const handleShare = () => {
+    if (!version) return;
+    const baseUrl = window.location.origin;
+    const shareUrl = `${baseUrl}/chat/${version.id}`;
+    setShareLink(shareUrl);
+    setShowShareModal(true);
+  };
+
+  const handleCopyShareLink = () => {
+    if (!shareLink) return;
+    navigator.clipboard.writeText(shareLink).then(() => {
+      setCopySuccess('Link copiado!');
+      setTimeout(() => {
+        setCopySuccess('');
+        setShowShareModal(false);
+      }, 2000);
+    });
   };
 
   const renderContent = () => {
@@ -114,8 +135,52 @@ export const OutputDisplay: React.FC<OutputDisplayProps> = ({ version, isLoading
               <button onClick={() => onExplain(formattedContent)} disabled={!formattedContent} className="bg-white/10 hover:bg-white/20 text-white font-bold py-2 px-3 rounded-lg transition text-sm">Explicar</button>
               <button onClick={handleCopy} className="bg-white/10 hover:bg-white/20 text-white font-bold py-2 px-3 rounded-lg transition text-sm">{copySuccess || 'Copiar'}</button>
               <button onClick={handleDownload} className="bg-white/10 hover:bg-white/20 text-white font-bold py-2 px-3 rounded-lg transition text-sm">Baixar</button>
+              <button onClick={handleShare} disabled={!version} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-3 rounded-lg transition text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                </svg>
+                <span>Compartilhar</span>
+              </button>
           </div>
       </div>
+      
+      {/* Modal de Compartilhamento */}
+      {showShareModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 backdrop-blur-sm" onClick={() => setShowShareModal(false)}>
+          <div className="bg-black/90 backdrop-blur-sm p-6 rounded-xl shadow-2xl w-full max-w-md border border-white/10 animate-in fade-in zoom-in duration-200" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold text-white">Compartilhar Chat</h3>
+              <button onClick={() => setShowShareModal(false)} className="text-white/60 hover:text-white transition">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <p className="text-white/60 text-sm mb-4">
+              Compartilhe este link para que clientes testem o chat com esta versão do prompt:
+            </p>
+            <div className="flex space-x-2 mb-4">
+              <input
+                type="text"
+                value={shareLink}
+                readOnly
+                className="flex-1 px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white/80 text-sm"
+              />
+              <button
+                onClick={handleCopyShareLink}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 rounded-lg transition text-sm"
+              >
+                {copySuccess ? 'Copiado!' : 'Copiar'}
+              </button>
+            </div>
+            <div className="bg-emerald-900/20 border border-emerald-700/50 rounded-lg p-3">
+              <p className="text-emerald-300 text-xs">
+                💡 <strong>Dica:</strong> O link abrirá uma nova aba com o chat conversacional. O cliente poderá interagir com o agente usando esta versão do prompt.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="flex-grow p-4 overflow-auto font-mono">
           <pre className="text-sm text-white/80 whitespace-pre-wrap break-all">
               <code>{formattedContent}</code>

@@ -7,6 +7,7 @@ import { Dashboard } from './pages/Dashboard';
 import { RepositoryPage } from './pages/RepositoryPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { AuthCallback } from './pages/AuthCallback';
+import { ShareChatPage } from './pages/ShareChatPage';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
 function App() {
@@ -17,6 +18,7 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
+        <Route path="/chat/:versionId" element={<ShareChatPage />} />
         <Route
           path="/dashboard"
           element={

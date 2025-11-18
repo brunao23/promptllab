@@ -957,6 +957,121 @@ export async function getPromptVersions(promptId: string) {
   return versions;
 }
 
+/**
+ * Obtém uma versão específica do prompt por ID (público - para compartilhamento)
+ */
+export async function getPromptVersion(versionId: string): Promise<PromptVersion> {
+  // 🔒 VALIDAÇÃO DE SEGURANÇA - UUID válido
+  if (!isValidUUID(versionId)) {
+    throw new Error('ID de versão inválido');
+  }
+
+  console.log('🔍 [getPromptVersion] Buscando versão pública:', versionId);
+
+  // Buscar versão (sem autenticação necessária para compartilhamento público)
+  const { data: version, error: versionError } = await supabase
+    .from('prompt_versions')
+    .select('*')
+    .eq('id', versionId)
+    .single();
+
+  if (versionError) {
+    console.error('❌ [getPromptVersion] Erro ao buscar versão:', versionError);
+    throw versionError;
+  }
+
+  if (!version) {
+    throw new Error('Versão não encontrada');
+  }
+
+  // Buscar prompt relacionado para obter dados completos
+  const { data: prompt, error: promptError } = await supabase
+    .from('prompts')
+    .select('*')
+    .eq('id', version.prompt_id)
+    .single();
+
+  let promptData: PromptData;
+  
+  if (promptError || !prompt) {
+    console.warn('⚠️ [getPromptVersion] Erro ao buscar prompt relacionado, usando dados mínimos:', promptError);
+    // Usar dados mínimos se não encontrar o prompt
+    promptData = {
+      persona: '',
+      objetivo: '',
+      contextoNegocio: '',
+      contexto: '',
+      regras: [],
+      exemplos: [],
+      variaveisDinamicas: [],
+      ferramentas: [],
+      formatoSaida: 'text',
+      masterPromptFormat: 'markdown',
+      estruturaSaida: '',
+      fluxos: [],
+      promptSize: 5000,
+    };
+  } else {
+    // Buscar relacionamentos do prompt se disponível
+    const [examples, variaveis, ferramentas, fluxos] = await Promise.all([
+      supabase.from('few_shot_examples').select('*').eq('prompt_id', prompt.id).order('order_index'),
+      supabase.from('variaveis_dinamicas').select('*').eq('prompt_id', prompt.id).order('order_index'),
+      supabase.from('ferramentas').select('*').eq('prompt_id', prompt.id).order('order_index'),
+      supabase.from('fluxos').select('*').eq('prompt_id', prompt.id).order('order_index'),
+    ]);
+
+    promptData = {
+      persona: prompt.persona || '',
+      objetivo: prompt.objetivo || '',
+      contextoNegocio: prompt.contexto_negocio || '',
+      contexto: prompt.contexto || '',
+      regras: prompt.regras || [],
+      exemplos: (examples.data || []).map(ex => ({
+        id: ex.id,
+        user: ex.user_text,
+        agent: ex.agent_text,
+      })),
+      variaveisDinamicas: (variaveis.data || []).map(v => ({
+        id: v.id,
+        chave: v.chave,
+        valor: v.valor,
+      })),
+      ferramentas: (ferramentas.data || []).map(f => ({
+        id: f.id,
+        nome: f.nome,
+        descricao: f.descricao,
+      })),
+      formatoSaida: prompt.formato_saida as any,
+      masterPromptFormat: prompt.master_prompt_format as 'markdown' | 'json',
+      estruturaSaida: prompt.estrutura_saida || '',
+      fluxos: (fluxos.data || []).map(f => ({
+        id: f.id,
+        nome: f.nome,
+        tipoPrompt: f.tipo_prompt,
+        objetivo: f.objetivo,
+        baseConhecimentoRAG: f.base_conhecimento_rag || '',
+        fewShotExamples: f.few_shot_examples || '',
+        reforcarCoT: f.reforcar_cot || false,
+        ativarGuardrails: f.ativar_guardrails || false,
+      })),
+      promptSize: prompt.prompt_size || 5000,
+    };
+  }
+
+  const result: PromptVersion = {
+    id: version.id,
+    version: version.version_number,
+    content: version.content,
+    format: (version.format || 'markdown') as any,
+    masterFormat: (version.master_format || 'markdown') as 'markdown' | 'json',
+    timestamp: version.created_at ? new Date(version.created_at).toLocaleString('pt-BR') : new Date().toLocaleString('pt-BR'),
+    sourceData: promptData,
+  };
+
+  console.log('✅ [getPromptVersion] Versão encontrada:', result.id);
+  return result;
+}
+
 // =====================================================
 // CHAT MESSAGES
 // =====================================================

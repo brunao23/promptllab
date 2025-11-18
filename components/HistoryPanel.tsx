@@ -10,9 +10,10 @@ interface HistoryPanelProps {
   validatedVersionId: string | null;
   onImport: () => void;
   onPaste: () => void;
+  onShare?: (versionId: string) => void;
 }
 
-export const HistoryPanel: React.FC<HistoryPanelProps> = ({ history, activeVersionId, onSelectVersion, onDeleteVersion, validatedVersionId, onImport, onPaste }) => {
+export const HistoryPanel: React.FC<HistoryPanelProps> = ({ history, activeVersionId, onSelectVersion, onDeleteVersion, validatedVersionId, onImport, onPaste, onShare }) => {
   return (
     <div className="p-4 h-full flex flex-col">
       <div className="flex justify-between items-center mb-4 border-b border-white/10 pb-2">
@@ -65,16 +66,32 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({ history, activeVersi
                         <p className="text-xs text-white/40">{version.timestamp}</p>
                     </div>
                   </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDeleteVersion(version.id);
-                    }}
-                    className="text-white/40 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 ml-2"
-                    title="Deletar versão"
-                  >
-                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                  </button>
+                  <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {onShare && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onShare(version.id);
+                        }}
+                        className="text-white/40 hover:text-emerald-400 flex-shrink-0"
+                        title="Compartilhar versão"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                        </svg>
+                      </button>
+                    )}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteVersion(version.id);
+                      }}
+                      className="text-white/40 hover:text-red-400 flex-shrink-0"
+                      title="Deletar versão"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                    </button>
+                  </div>
                 </div>
               </li>
             ))}

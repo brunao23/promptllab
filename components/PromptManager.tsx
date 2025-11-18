@@ -24,7 +24,8 @@ import {
   saveChatMessage,
   getChatMessages,
   supabase,
-  getCurrentUser
+  getCurrentUser,
+  getCurrentProfile
 } from '../services/supabaseService';
 
 export const PromptManager: React.FC = () => {
@@ -869,20 +870,54 @@ export const PromptManager: React.FC = () => {
         return cleaned;
     };
 
-    const handleDownloadChat = (format: 'txt' | 'pdf') => {
+    const handleDownloadChat = async (format: 'txt' | 'pdf') => {
         if (chatMessages.length === 0 || !activeVersion) return;
 
+        // Buscar informações do especialista e agente
+        let specialistName = 'Especialista';
+        let agentName = 'Agente de IA';
+        
+        try {
+            const profile = await getCurrentProfile();
+            if (profile?.full_name) {
+                specialistName = profile.full_name;
+            }
+        } catch (err) {
+            console.error('Erro ao buscar nome do especialista:', err);
+        }
+
+        // Extrair nome do agente da persona
+        try {
+            if (formData.persona) {
+                const personaText = cleanTextForPDF(formData.persona);
+                // Tentar extrair nome comum da persona (ex: "Eu sou a Isa", "Meu nome é X", "Eu sou X")
+                const nameMatch = personaText.match(/(?:eu sou (?:a|o)?|meu nome é|sou (?:a|o)?|chamo-me|me chamo)\s+([A-ZÁÉÍÓÚÀÈÌÒÙÂÊÎÔÛÃÕÇ][a-záéíóúàèìòùâêîôûãõç]+)/i);
+                if (nameMatch && nameMatch[1]) {
+                    agentName = nameMatch[1];
+                } else {
+                    // Se não encontrar, usar primeira palavra após "sou" ou similar
+                    const fallbackMatch = personaText.match(/(?:sou|é)\s+([A-ZÁÉÍÓÚÀÈÌÒÙÂÊÎÔÛÃÕÇ][a-záéíóúàèìòùâêîôûãõç]+(?:\s+[a-záéíóúàèìòùâêîôûãõç]+)?)/i);
+                    if (fallbackMatch && fallbackMatch[1]) {
+                        agentName = fallbackMatch[1].trim();
+                    }
+                }
+            }
+        } catch (err) {
+            console.error('Erro ao extrair nome do agente:', err);
+        }
+
+        const toolName = 'LaBPrompT';
         const header = `Histórico de Chat - Prompt v${activeVersion.version}`;
         const timestamp = `Exportado em: ${new Date().toLocaleString('pt-BR')}`;
         
         if (format === 'txt') {
             const chatContent = chatMessages.map(msg => {
-                const author = msg.author === 'user' ? 'Usuário' : 'Agente';
+                const author = msg.author === 'user' ? 'Usuário' : agentName;
                 const cleanedText = cleanTextForPDF(msg.text);
                 return `${author}: ${cleanedText}`;
             }).join('\n\n');
 
-            const fullContent = `${header}\n${timestamp}\n\n${chatContent}`;
+            const fullContent = `${toolName}\n${header}\n\nEspecialista: ${specialistName}\nAgente: ${agentName}\n\n${timestamp}\n\n${chatContent}`;
 
             const blob = new Blob([fullContent], { type: 'text/plain;charset=utf-8' });
             const url = URL.createObjectURL(blob);
@@ -910,19 +945,46 @@ export const PromptManager: React.FC = () => {
             // jsPDF usa Helvetica por padrão que suporta bem caracteres latinos
             doc.setFont('helvetica', 'normal');
 
+            // Logo/Ícone (usando texto estilizado como logo)
+            doc.setFontSize(24);
+            doc.setTextColor(16, 185, 129); // Verde esmeralda
+            const toolNameText = cleanTextForPDF(toolName);
+            doc.text(toolNameText, margin, y);
+            y += 10;
+
+            // Linha divisória
+            doc.setDrawColor(200, 200, 200);
+            doc.setLineWidth(0.5);
+            doc.line(margin, y, pageWidth - margin, y);
+            y += 10;
+
             // Cabeçalho
             doc.setFontSize(16);
             doc.setTextColor(0, 0, 0); // Preto para o cabeçalho
             const headerText = cleanTextForPDF(header);
             doc.text(headerText, margin, y);
-            y += 7;
+            y += 8;
+
+            // Informações do especialista e agente
+            doc.setFontSize(11);
+            doc.setTextColor(60, 60, 60);
+            doc.text(`Especialista: ${cleanTextForPDF(specialistName)}`, margin, y);
+            y += 6;
+            doc.text(`Agente: ${cleanTextForPDF(agentName)}`, margin, y);
+            y += 8;
             
             // Timestamp
             doc.setFontSize(10);
             doc.setTextColor(100, 100, 100); // Cinza
             const timestampText = cleanTextForPDF(timestamp);
             doc.text(timestampText, margin, y);
-            y += 15;
+            y += 12;
+
+            // Linha divisória antes das mensagens
+            doc.setDrawColor(200, 200, 200);
+            doc.setLineWidth(0.5);
+            doc.line(margin, y, pageWidth - margin, y);
+            y += 10;
 
             // Mensagens do chat
             doc.setFontSize(11);
@@ -942,7 +1004,8 @@ export const PromptManager: React.FC = () => {
                 const lines = doc.splitTextToSize(text, bubbleWidth - 20);
                 const lineHeight = 6;
                 const padding = 8;
-                const bubbleHeight = (lines.length * lineHeight) + (padding * 2);
+                const labelHeight = 5;
+                const bubbleHeight = (lines.length * lineHeight) + (padding * 2) + labelHeight;
                 
                 // Nova página se necessário
                 if (y + bubbleHeight > pageHeight - margin) {
@@ -961,9 +1024,16 @@ export const PromptManager: React.FC = () => {
                 doc.setDrawColor(isUser ? userColor[0] : agentColor[0], isUser ? userColor[1] : agentColor[1], isUser ? userColor[2] : agentColor[2]);
                 doc.roundedRect(x, y, bubbleWidth, bubbleHeight, 3, 3, 'FD');
                 
+                // Label do autor (pequeno)
+                doc.setFontSize(9);
+                doc.setTextColor(255, 255, 255, 80); // Branco semi-transparente
+                const authorLabel = isUser ? 'Usuário' : agentName;
+                doc.text(authorLabel, x + padding, y + padding + labelHeight);
+                
                 // Texto branco para melhor contraste
+                doc.setFontSize(11);
                 doc.setTextColor(255, 255, 255);
-                doc.text(lines, x + padding, y + padding + lineHeight);
+                doc.text(lines, x + padding, y + padding + labelHeight + lineHeight);
                 
                 y += bubbleHeight + 8;
             });
@@ -1168,6 +1238,62 @@ export const PromptManager: React.FC = () => {
         await loadExternalPrompt(text, 'Prompt Colado');
     };
 
+    const handleShareVersion = (versionId: string) => {
+        const baseUrl = window.location.origin;
+        const shareUrl = `${baseUrl}/chat/${versionId}`;
+        
+        // Criar modal de compartilhamento
+        const shareModal = document.createElement('div');
+        shareModal.className = 'fixed inset-0 bg-black/70 flex items-center justify-center z-50 backdrop-blur-sm';
+        shareModal.innerHTML = `
+            <div class="bg-black/90 backdrop-blur-sm p-6 rounded-xl shadow-2xl w-full max-w-md border border-white/10 animate-in fade-in zoom-in duration-200" style="animation: fadeIn 0.2s ease-out">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-bold text-white">Compartilhar Chat</h3>
+                    <button onclick="this.closest('.fixed').remove()" class="text-white/60 hover:text-white transition">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                <p class="text-white/60 text-sm mb-4">
+                    Compartilhe este link para que clientes testem o chat com esta versão do prompt:
+                </p>
+                <div class="flex space-x-2 mb-4">
+                    <input
+                        type="text"
+                        value="${shareUrl}"
+                        readonly
+                        id="shareLinkInput"
+                        class="flex-1 px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white/80 text-sm"
+                    />
+                    <button
+                        onclick="navigator.clipboard.writeText('${shareUrl}').then(() => { this.textContent = 'Copiado!'; setTimeout(() => this.closest('.fixed').remove(), 2000); })"
+                        class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 rounded-lg transition text-sm"
+                    >
+                        Copiar
+                    </button>
+                </div>
+                <div class="bg-emerald-900/20 border border-emerald-700/50 rounded-lg p-3">
+                    <p class="text-emerald-300 text-xs">
+                        💡 <strong>Dica:</strong> O link abrirá uma nova aba com o chat conversacional. O cliente poderá interagir com o agente usando esta versão do prompt.
+                    </p>
+                </div>
+            </div>
+        `;
+        shareModal.onclick = (e) => {
+            if (e.target === shareModal) {
+                shareModal.remove();
+            }
+        };
+        document.body.appendChild(shareModal);
+        
+        // Auto-selecionar e copiar
+        const input = shareModal.querySelector('#shareLinkInput') as HTMLInputElement;
+        if (input) {
+            input.select();
+        }
+    };
+
     const isUIBlocked = isLoading || isOptimizing;
 
     // Mostrar loading enquanto carrega dados do Supabase
@@ -1241,6 +1367,7 @@ export const PromptManager: React.FC = () => {
                     validatedVersionId={validatedVersionId}
                     onImport={handleImportClick}
                     onPaste={handlePasteClick}
+                    onShare={handleShareVersion}
                     />
                 </div>
 
@@ -1318,13 +1445,14 @@ export const PromptManager: React.FC = () => {
                 {/* Mobile - History Panel */}
                 <div className="bg-white/5 backdrop-blur-sm rounded-2xl overflow-hidden border border-white/10 shadow-xl min-h-[300px]">
                     <HistoryPanel
-                        history={versionHistory}
-                        activeVersionId={activeVersion?.id ?? null}
-                        onSelectVersion={handleSelectVersion}
-                        onDeleteVersion={handleDeleteVersion}
-                        validatedVersionId={validatedVersionId}
-                        onImport={handleImportClick}
-                        onPaste={handlePasteClick}
+                    history={versionHistory}
+                    activeVersionId={activeVersion?.id ?? null}
+                    onSelectVersion={handleSelectVersion}
+                    onDeleteVersion={handleDeleteVersion}
+                    validatedVersionId={validatedVersionId}
+                    onImport={handleImportClick}
+                    onPaste={handlePasteClick}
+                    onShare={handleShareVersion}
                     />
                 </div>
 
