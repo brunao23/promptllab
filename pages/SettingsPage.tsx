@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getCurrentProfile, supabase, updateProfile, changePassword, uploadAvatar } from '../services/supabaseService';
+import { ensureAvatarsBucket } from '../services/bucketService';
 import { validateName, validatePassword, sanitizeText } from '../utils/security';
 
 export const SettingsPage: React.FC = () => {
