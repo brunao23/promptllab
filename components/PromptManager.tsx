@@ -857,7 +857,7 @@ export const PromptManager: React.FC = () => {
         const tools: ExtractedTool[] = [];
         let conversationText = text;
 
-        // Padrão 1: [CALL: functionName(...args...)]
+        // Padrão 1: [CALL: functionName(...args...)] - padrão específico para chamadas de ferramentas
         const callPattern = /\[CALL:\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\(([^)]*)\)\]/gi;
         let match;
         
@@ -908,22 +908,7 @@ export const PromptManager: React.FC = () => {
             conversationText = conversationText.replace(match[0], '').trim();
         }
 
-        // Padrão 2: Chamadas de função diretas no formato "functionName(arg1, arg2)"
-        // (mais simples, apenas para detectar)
-        const functionPattern = /([a-zA-Z_][a-zA-Z0-9_]*)\s*\([^)]*\)/g;
-        const functionCalls = [...text.matchAll(functionPattern)];
-        
-        // Adicionar apenas se não foram capturadas pelo padrão CALL
-        functionCalls.forEach(funcMatch => {
-            const funcName = funcMatch[1];
-            if (!tools.find(t => t.name === funcName) && funcName !== 'CALL') {
-                tools.push({
-                    name: funcName,
-                    args: {},
-                    rawText: funcMatch[0]
-                });
-            }
-        });
+        // NÃO detectar funções genéricas - apenas [CALL: ...] para evitar falsos positivos
 
         // Limpar espaços extras do texto conversacional
         conversationText = conversationText.replace(/\n\s*\n\s*\n/g, '\n\n').trim();
@@ -1034,9 +1019,9 @@ export const PromptManager: React.FC = () => {
                     chatParts.push(`${author}: ${cleanedText}`);
                 }
                 
-                // Adicionar ferramentas usadas (se houver)
-                if (tools.length > 0) {
-                    chatParts.push(`\n🔧 Ferramentas Utilizadas por ${author}:`);
+                // Adicionar ferramentas usadas (se houver) - apenas para mensagens do agente
+                if (tools.length > 0 && msg.author === 'agent') {
+                    chatParts.push(`\n[Ferramentas Utilizadas por ${author}]`);
                     tools.forEach(tool => {
                         chatParts.push(`  • ${tool.name}`);
                         const argsFormatted = formatToolArgs(tool.args);
@@ -1196,11 +1181,11 @@ export const PromptManager: React.FC = () => {
                     doc.setLineWidth(1);
                     doc.roundedRect(toolsX, toolsY, toolsWidth, toolsHeight, 3, 3, 'FD');
                     
-                    // Título da seção
+                    // Título da seção (sem emoji para evitar problemas de encoding)
                     doc.setFontSize(10);
                     doc.setFont('helvetica', 'bold');
                     doc.setTextColor(245, 158, 11); // amber-600 para título
-                    doc.text('🔧 Ferramentas Utilizadas:', toolsX + 8, toolsY + 8);
+                    doc.text('Ferramentas Utilizadas:', toolsX + 8, toolsY + 8);
                     
                     let toolY = toolsY + 15;
                     
