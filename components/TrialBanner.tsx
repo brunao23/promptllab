@@ -52,9 +52,6 @@ export const TrialBanner: React.FC = () => {
     );
   }
 
-  // Mostrar banner durante o trial
-  if (planInfo.isTrial && planInfo.trialDaysLeft !== null) {
-
   // Mostrar informação do plano mesmo se não for trial
   const daysLeft = planInfo.trialDaysLeft || 0;
   const isWarning = daysLeft <= 3 && daysLeft > 0;
