@@ -1046,7 +1046,7 @@ export const PromptManager: React.FC = () => {
     }
 
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-12 lg:grid-rows-6 gap-4 p-4 h-full text-white relative">
+        <div className="h-full w-full overflow-auto bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
             <ExplanationModal
                 isOpen={isExplanationModalOpen}
                 onClose={() => setIsExplanationModalOpen(false)}
@@ -1057,7 +1057,11 @@ export const PromptManager: React.FC = () => {
             />
             <PasteModal isOpen={isPasteModalOpen} onClose={() => setIsPasteModalOpen(false)} onConfirm={handlePasteConfirm} />
             <input type="file" ref={fileInputRef} onChange={handleFileSelected} className="hidden" accept=".txt,.md,.json" />
-            <div className="col-span-12 lg:col-span-4 lg:row-span-6 bg-slate-800 rounded-lg overflow-hidden">
+            
+            {/* Desktop Layout */}
+            <div className="hidden lg:grid lg:grid-cols-12 lg:grid-rows-6 gap-6 p-6 h-full">
+                {/* Left Panel - Input Form */}
+                <div className="col-span-12 xl:col-span-4 lg:row-span-6 bg-slate-900/60 backdrop-blur-sm rounded-2xl overflow-hidden border border-slate-800/50 shadow-xl shadow-black/20">
                 <PromptInputForm
                     formData={formData}
                     setFormData={(newData) => {
@@ -1069,9 +1073,11 @@ export const PromptManager: React.FC = () => {
                     onGenerateExamples={handleGenerateExamples}
                     isGeneratingExamples={isGeneratingExamples}
                     activePromptContent={activeVersion?.content ?? ''}
-                />
-            </div>
-            <div className="col-span-12 lg:col-span-5 lg:row-span-4 bg-slate-800 rounded-lg overflow-hidden flex flex-col">
+                    />
+                </div>
+
+                {/* Middle Panel - Output Display */}
+                <div className="col-span-12 xl:col-span-5 lg:row-span-4 bg-slate-900/60 backdrop-blur-sm rounded-2xl overflow-hidden flex flex-col border border-slate-800/50 shadow-xl shadow-black/20">
                 <OutputDisplay 
                     version={activeVersion} 
                     isLoading={isUIBlocked} 
@@ -1079,10 +1085,12 @@ export const PromptManager: React.FC = () => {
                     isValidated={!!validatedVersionId && activeVersion?.id === validatedVersionId}
                     onValidate={handleValidateVersion}
                     onExplain={handleExplainPrompt}
-                />
-            </div>
-            <div className="col-span-12 lg:col-span-3 lg:row-span-2 bg-slate-800 rounded-lg overflow-hidden">
-                <HistoryPanel
+                    />
+                </div>
+
+                {/* Top Right - History Panel */}
+                <div className="col-span-12 xl:col-span-3 lg:row-span-2 bg-slate-900/60 backdrop-blur-sm rounded-2xl overflow-hidden border border-slate-800/50 shadow-xl shadow-black/20">
+                    <HistoryPanel
                     history={versionHistory}
                     activeVersionId={activeVersion?.id ?? null}
                     onSelectVersion={handleSelectVersion}
@@ -1090,21 +1098,25 @@ export const PromptManager: React.FC = () => {
                     validatedVersionId={validatedVersionId}
                     onImport={handleImportClick}
                     onPaste={handlePasteClick}
-                />
-            </div>
-            <div className="col-span-12 lg:col-span-3 lg:row-span-2 bg-slate-800 rounded-lg overflow-hidden">
-                <PromptOptimizer 
+                    />
+                </div>
+
+                {/* Top Right Bottom - Optimizer */}
+                <div className="col-span-12 xl:col-span-3 lg:row-span-2 bg-slate-900/60 backdrop-blur-sm rounded-2xl overflow-hidden border border-slate-800/50 shadow-xl shadow-black/20">
+                    <PromptOptimizer 
                     onOptimize={handleOptimizePrompt}
                     isLoading={isOptimizing}
                     disabled={!activeVersion || isUIBlocked}
                     optimizationPairs={optimizationPairs}
                     onClearCorrections={() => setOptimizationPairs([])}
                     manualInstructions={manualOptInstructions}
-                    onManualInstructionsChange={setManualOptInstructions}
-                 />
-            </div>
-            <div className="col-span-12 lg:col-span-5 lg:row-span-2 bg-slate-800 rounded-lg overflow-hidden">
-                 <ChatInterface 
+                        onManualInstructionsChange={setManualOptInstructions}
+                     />
+                </div>
+
+                {/* Bottom - Chat Interface */}
+                <div className="col-span-12 xl:col-span-5 lg:row-span-2 bg-slate-900/60 backdrop-blur-sm rounded-2xl overflow-hidden border border-slate-800/50 shadow-xl shadow-black/20">
+                     <ChatInterface
                     messages={chatMessages}
                     onSendMessage={handleSendMessage}
                     onClearChat={handleClearChat}
@@ -1113,10 +1125,12 @@ export const PromptManager: React.FC = () => {
                     onUpdateMessage={handleUpdateMessage}
                     onSaveCorrection={handleSaveCorrection}
                     onDownloadChat={handleDownloadChat}
-                 />
-            </div>
-             <div className="col-span-12 lg:col-span-3 lg:row-span-2 bg-slate-800 rounded-lg overflow-hidden">
-                <AssistantPanel 
+                     />
+                </div>
+
+                {/* Bottom Right - Assistant Panel */}
+                <div className="col-span-12 xl:col-span-3 lg:row-span-2 bg-slate-900/60 backdrop-blur-sm rounded-2xl overflow-hidden border border-slate-800/50 shadow-xl shadow-black/20">
+                    <AssistantPanel 
                     messages={assistantMessages}
                     isRecording={isRecording}
                     onToggleRecording={handleToggleRecording}
