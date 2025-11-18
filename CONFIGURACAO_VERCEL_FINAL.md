@@ -2,16 +2,16 @@
 
 ## 📋 Resumo da Configuração
 
-**Projeto Vercel:** `promptllab`  
+**Projeto Vercel:** `promptlllab`  
 **Repositório GitHub:** `brunao23/promptllab`  
-**Root Directory:** `promptllab`
+**Root Directory:** `promptlllab`
 
 ## ✅ Configurações Corretas na Vercel
 
 ### 1. Settings → General
 
 **Build & Development Settings:**
-- **Root Directory:** `promptllab` ✅
+- **Root Directory:** `promptlllab` ✅
 - **Framework Preset:** Vite
 - **Build Command:** `npm run build`
 - **Output Directory:** `dist`
@@ -73,7 +73,7 @@ Após o primeiro deploy, você terá:
 
 Antes de confirmar que está tudo funcionando:
 
-- [ ] Root Directory = `promptllab`
+- [ ] Root Directory = `promptlllab`
 - [ ] Todas as variáveis de ambiente configuradas
 - [ ] Variáveis marcadas para Production, Preview e Development
 - [ ] Repositório conectado: `brunao23/promptllab`
@@ -86,7 +86,7 @@ Antes de confirmar que está tudo funcionando:
 ### No Vercel Dashboard:
 
 1. Acesse: https://vercel.com/dashboard
-2. Selecione o projeto `promptllab`
+2. Selecione o projeto `promptlllab`
 3. Vá em **Deployments**
 4. Veja o histórico de deploys
 
@@ -112,7 +112,7 @@ Antes de confirmar que está tudo funcionando:
 
 ## 📝 Notas Importantes
 
-- ✅ **Root Directory é:** `promptllab` (não `labprompt`)
+- ✅ **Root Directory é:** `promptlllab` (não `labprompt` ou `promptllab`)
 - ✅ **Repositório é:** `brunao23/promptllab`
 - ✅ **Branch principal:** `main`
 - ✅ **Deploy automático:** Configurado e funcionando

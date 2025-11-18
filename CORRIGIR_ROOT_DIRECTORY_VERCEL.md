@@ -7,7 +7,7 @@ O erro mostra:
 The specified Root Directory "labprompt" does not exist. Please update your Project Settings.
 ```
 
-**O Root Directory correto é: `promptllab`, NÃO `labprompt`**
+**O Root Directory correto é: `promptlllab`, NÃO `labprompt` ou `promptllab`**
 
 ## ✅ Solução Rápida (2 minutos)
 
@@ -15,7 +15,7 @@ The specified Root Directory "labprompt" does not exist. Please update your Proj
 
 1. Acesse: https://vercel.com/dashboard
 2. Faça login
-3. Selecione seu projeto **promptllab**
+3. Selecione seu projeto **promptlllab**
 
 ### Passo 2: Corrigir Root Directory
 
@@ -23,7 +23,7 @@ The specified Root Directory "labprompt" does not exist. Please update your Proj
 2. Clique em **General** (menu lateral)
 3. Role até **Build & Development Settings**
 4. Encontre o campo **Root Directory**
-5. **Mude de `labprompt` para `promptllab`**
+5. **Mude de `labprompt` (ou `promptllab`) para `promptlllab`**
 6. Clique em **Save**
 
 ### Passo 3: Fazer Redeploy
@@ -62,7 +62,7 @@ Enquanto isso, verifique também:
    - **Build Command:** `npm run build`
    - **Output Directory:** `dist`
    - **Install Command:** `npm install`
-   - **Root Directory:** `promptllab` ← **CORRETO AGORA**
+   - **Root Directory:** `promptlllab` ← **CORRETO AGORA**
 
 ## ✅ Resultado Esperado
 
@@ -92,5 +92,5 @@ Após corrigir:
 
 ---
 
-**IMPORTANTE:** O Root Directory na Vercel deve ser **`promptllab`**, não `labprompt`!
+**IMPORTANTE:** O Root Directory na Vercel deve ser **`promptlllab`** (com 3 'l'), não `labprompt` ou `promptllab`!
 

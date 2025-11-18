@@ -6,7 +6,7 @@
 
 1. **Acesse:** https://vercel.com/dashboard
 2. **Faça login** (se necessário)
-3. **Selecione o projeto:** `promptllab`
+3. **Selecione o projeto:** `promptlllab`
 4. **Clique em:** **Settings** (menu superior)
 5. **Clique em:** **General** (menu lateral esquerdo)
 6. **Role até:** **Build & Development Settings**
