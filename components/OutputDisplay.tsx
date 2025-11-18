@@ -67,9 +67,9 @@ export const OutputDisplay: React.FC<OutputDisplayProps> = ({ version, isLoading
   const renderContent = () => {
     if (isLoading) {
       return (
-        <div className="absolute inset-0 bg-slate-900 bg-opacity-75 flex flex-col items-center justify-center z-10">
-          <svg className="animate-spin h-10 w-10 text-cyan-400 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-          <p className="text-lg text-slate-300">Gerando prompt...</p>
+        <div className="absolute inset-0 bg-black/75 flex flex-col items-center justify-center z-10">
+          <svg className="animate-spin h-10 w-10 text-emerald-400 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+          <p className="text-lg text-white/80">Gerando prompt...</p>
         </div>
       );
     }
@@ -82,20 +82,20 @@ export const OutputDisplay: React.FC<OutputDisplayProps> = ({ version, isLoading
       );
     }
     if (!version) {
-        return <div className="flex items-center justify-center h-full text-slate-500">Aguardando a geração do prompt...</div>
+        return <div className="flex items-center justify-center h-full text-white/40">Aguardando a geração do prompt...</div>
     }
     return (
       <>
-      <div className="flex justify-between items-center border-b border-slate-700 p-3 flex-shrink-0">
+      <div className="flex justify-between items-center border-b border-white/10 p-3 flex-shrink-0">
           <div className="flex items-center space-x-4">
               <div>
-                  <h2 className="text-lg font-bold text-cyan-400">
+                  <h2 className="text-lg font-bold text-emerald-400">
                     Versão {version.version} 
-                    <span className="text-xs font-normal text-slate-400 ml-2 px-2 py-0.5 bg-slate-700 rounded-full">
+                    <span className="text-xs font-normal text-white/60 ml-2 px-2 py-0.5 bg-white/10 rounded-full">
                       Alvo: {version.format.toUpperCase()}
                     </span>
                   </h2>
-                  <p className="text-xs text-slate-500">{version.timestamp}</p>
+                  <p className="text-xs text-white/40">{version.timestamp}</p>
               </div>
               {isValidated ? (
                  <div className="flex items-center space-x-2 bg-green-500/10 text-green-400 text-sm font-semibold px-3 py-1 rounded-full">
@@ -108,16 +108,16 @@ export const OutputDisplay: React.FC<OutputDisplayProps> = ({ version, isLoading
           </div>
           <div className="flex items-center space-x-3">
               <div className="text-right">
-                  <p className="text-sm font-medium text-slate-300">{charCount.toLocaleString('pt-BR')} <span className="text-xs text-slate-500">chars</span></p>
-                  <p className="text-sm font-medium text-slate-300">~{tokenCount.toLocaleString('pt-BR')} <span className="text-xs text-slate-500">tokens</span></p>
+                  <p className="text-sm font-medium text-white/80">{charCount.toLocaleString('pt-BR')} <span className="text-xs text-white/40">chars</span></p>
+                  <p className="text-sm font-medium text-white/80">~{tokenCount.toLocaleString('pt-BR')} <span className="text-xs text-white/40">tokens</span></p>
               </div>
-              <button onClick={() => onExplain(formattedContent)} disabled={!formattedContent} className="bg-slate-700 hover:bg-slate-600 text-white font-bold py-2 px-3 rounded-lg transition text-sm">Explicar</button>
-              <button onClick={handleCopy} className="bg-slate-700 hover:bg-slate-600 text-white font-bold py-2 px-3 rounded-lg transition text-sm">{copySuccess || 'Copiar'}</button>
-              <button onClick={handleDownload} className="bg-slate-700 hover:bg-slate-600 text-white font-bold py-2 px-3 rounded-lg transition text-sm">Baixar</button>
+              <button onClick={() => onExplain(formattedContent)} disabled={!formattedContent} className="bg-white/10 hover:bg-white/20 text-white font-bold py-2 px-3 rounded-lg transition text-sm">Explicar</button>
+              <button onClick={handleCopy} className="bg-white/10 hover:bg-white/20 text-white font-bold py-2 px-3 rounded-lg transition text-sm">{copySuccess || 'Copiar'}</button>
+              <button onClick={handleDownload} className="bg-white/10 hover:bg-white/20 text-white font-bold py-2 px-3 rounded-lg transition text-sm">Baixar</button>
           </div>
       </div>
       <div className="flex-grow p-4 overflow-auto font-mono">
-          <pre className="text-sm text-slate-200 whitespace-pre-wrap break-all">
+          <pre className="text-sm text-white/80 whitespace-pre-wrap break-all">
               <code>{formattedContent}</code>
           </pre>
       </div>
@@ -126,7 +126,7 @@ export const OutputDisplay: React.FC<OutputDisplayProps> = ({ version, isLoading
   }
 
   return (
-    <div className="bg-slate-800/50 rounded-lg h-full flex flex-col relative">
+    <div className="bg-white/5 rounded-lg h-full flex flex-col relative">
       {renderContent()}
     </div>
   );
