@@ -58,13 +58,14 @@ export const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onDataExtrac
                 return;
             }
 
-            // Verificar tipos válidos
-            const validTypes = ['application/pdf', 'text/plain', 'text/markdown', 'text/x-markdown', 'text/html', 'text/csv'];
+            // Verificar tipos válidos (a validação principal já foi feita pelo validateFileType)
+            const validTypes = ['application/pdf', 'text/plain', 'text/markdown', 'text/x-markdown', 'text/html', 'text/csv', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
             const isMarkdownExt = file.name.toLowerCase().endsWith('.md');
             const isCsvExt = file.name.toLowerCase().endsWith('.csv');
+            const isExcelExt = file.name.toLowerCase().endsWith('.xlsx') || file.name.toLowerCase().endsWith('.xls');
             
-            if (!validTypes.includes(file.type) && !isMarkdownExt && !isCsvExt) {
-                errors.push(`${file.name}: Formato não suportado. Use PDF, TXT, MD, HTML ou CSV.`);
+            if (!validTypes.includes(file.type) && !isMarkdownExt && !isCsvExt && !isExcelExt) {
+                errors.push(`${file.name}: Formato não suportado. Use PDF, TXT, MD, HTML, CSV, XLSX ou XLS.`);
                 return;
             }
 
@@ -90,15 +91,45 @@ export const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onDataExtrac
         });
     };
 
+    const convertExcelToCsv = async (file: File): Promise<string> => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = new Uint8Array(e.target?.result as ArrayBuffer);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    
+                    // Pegar a primeira planilha
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    
+                    // Converter para CSV
+                    const csv = XLSX.utils.sheet_to_csv(worksheet);
+                    resolve(csv);
+                } catch (error) {
+                    reject(new Error(`Erro ao converter Excel para CSV: ${error instanceof Error ? error.message : 'Erro desconhecido'}`));
+                }
+            };
+            reader.onerror = () => reject(new Error('Erro ao ler arquivo Excel.'));
+            reader.readAsArrayBuffer(file);
+        });
+    };
+
     const getFileMimeType = (file: File): string => {
         const isMarkdownExt = file.name.toLowerCase().endsWith('.md');
         const isCsvExt = file.name.toLowerCase().endsWith('.csv');
+        const isExcelExt = file.name.toLowerCase().endsWith('.xlsx') || file.name.toLowerCase().endsWith('.xls');
         
         if (isMarkdownExt && (!file.type || file.type === '')) {
             return 'text/markdown';
         }
         
         if (isCsvExt && (!file.type || file.type === 'application/vnd.ms-excel')) {
+            return 'text/csv';
+        }
+        
+        // Excel será convertido para CSV antes do processamento
+        if (isExcelExt) {
             return 'text/csv';
         }
         
