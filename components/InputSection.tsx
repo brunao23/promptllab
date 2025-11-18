@@ -9,14 +9,14 @@ export const InputSection: React.FC<InputSectionProps> = ({ title, children }) =
   const [isOpen, setIsOpen] = useState(true);
 
   return (
-    <div className="border border-white/10 rounded-lg overflow-hidden">
+    <div className="border border-white/10 rounded-lg sm:rounded-xl overflow-hidden shadow-sm">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex justify-between items-center p-3 bg-white/10 hover:bg-white/20 transition-colors"
+        className="w-full flex justify-between items-center p-3 sm:p-3.5 md:p-4 bg-white/10 hover:bg-white/15 transition-all duration-200 active:bg-white/20"
       >
-        <h3 className="text-lg font-semibold text-white/80">{title}</h3>
+        <h3 className="text-sm sm:text-base md:text-lg font-semibold text-white/90 truncate pr-2">{title}</h3>
         <svg
-          className={`w-6 h-6 text-white/60 transform transition-transform ${isOpen ? 'rotate-180' : ''}`}
+          className={`w-5 h-5 sm:w-6 sm:h-6 text-white/60 transform transition-transform duration-200 flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -26,7 +26,7 @@ export const InputSection: React.FC<InputSectionProps> = ({ title, children }) =
         </svg>
       </button>
       {isOpen && (
-        <div className="p-4 bg-white/5">
+        <div className="p-3 sm:p-4 md:p-5 bg-white/5">
           {children}
         </div>
       )}
