@@ -389,12 +389,13 @@ const ALLOWED_FILE_TYPES = [
 export function validateFileType(file: File): { valid: boolean; error?: string } {
   const isValidType = ALLOWED_FILE_TYPES.includes(file.type) || 
                       file.name.toLowerCase().endsWith('.md') ||
-                      file.name.toLowerCase().endsWith('.txt');
+                      file.name.toLowerCase().endsWith('.txt') ||
+                      file.name.toLowerCase().endsWith('.csv');
   
   if (!isValidType) {
     return { 
       valid: false, 
-      error: 'Tipo de arquivo não permitido. Use PDF, TXT, MD, DOC ou DOCX.' 
+      error: 'Tipo de arquivo não permitido. Use PDF, TXT, MD, HTML, CSV, DOC ou DOCX.' 
     };
   }
 
