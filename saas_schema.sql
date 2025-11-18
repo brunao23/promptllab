@@ -9,23 +9,84 @@ CREATE TABLE IF NOT EXISTS public.plans (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL UNIQUE, -- 'trial', 'premium', 'enterprise'
   display_name TEXT NOT NULL, -- 'Trial Grátis', 'Premium', 'Enterprise'
-  description TEXT,
-  
-  -- Limitações do plano
-  max_prompt_versions INTEGER NOT NULL DEFAULT 4, -- Máximo de versões de prompt
-  max_tokens_per_month BIGINT NOT NULL DEFAULT 1000000, -- 1M tokens por mês
-  can_share_chat BOOLEAN NOT NULL DEFAULT false, -- Pode compartilhar chat
-  trial_days INTEGER DEFAULT NULL, -- Dias de trial (NULL = não é trial)
-  
-  -- Preços e billing
-  price_monthly DECIMAL(10, 2) DEFAULT NULL, -- Preço mensal (NULL = grátis)
-  price_yearly DECIMAL(10, 2) DEFAULT NULL, -- Preço anual
-  
-  -- Status
-  is_active BOOLEAN NOT NULL DEFAULT true,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Adicionar todas as colunas condicionalmente para compatibilidade
+DO $$ 
+BEGIN
+  -- description
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' AND table_name = 'plans' AND column_name = 'description'
+  ) THEN
+    ALTER TABLE public.plans ADD COLUMN description TEXT;
+  END IF;
+
+  -- max_prompt_versions
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' AND table_name = 'plans' AND column_name = 'max_prompt_versions'
+  ) THEN
+    ALTER TABLE public.plans ADD COLUMN max_prompt_versions INTEGER NOT NULL DEFAULT 4;
+  END IF;
+
+  -- max_tokens_per_month
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' AND table_name = 'plans' AND column_name = 'max_tokens_per_month'
+  ) THEN
+    ALTER TABLE public.plans ADD COLUMN max_tokens_per_month BIGINT NOT NULL DEFAULT 1000000;
+  END IF;
+
+  -- can_share_chat
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' AND table_name = 'plans' AND column_name = 'can_share_chat'
+  ) THEN
+    ALTER TABLE public.plans ADD COLUMN can_share_chat BOOLEAN NOT NULL DEFAULT false;
+  END IF;
+
+  -- trial_days
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' AND table_name = 'plans' AND column_name = 'trial_days'
+  ) THEN
+    ALTER TABLE public.plans ADD COLUMN trial_days INTEGER DEFAULT NULL;
+  END IF;
+
+  -- price_monthly
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' AND table_name = 'plans' AND column_name = 'price_monthly'
+  ) THEN
+    ALTER TABLE public.plans ADD COLUMN price_monthly DECIMAL(10, 2) DEFAULT NULL;
+  END IF;
+
+  -- price_yearly
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' AND table_name = 'plans' AND column_name = 'price_yearly'
+  ) THEN
+    ALTER TABLE public.plans ADD COLUMN price_yearly DECIMAL(10, 2) DEFAULT NULL;
+  END IF;
+
+  -- is_active
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' AND table_name = 'plans' AND column_name = 'is_active'
+  ) THEN
+    ALTER TABLE public.plans ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT true;
+  END IF;
+
+  -- updated_at
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' AND table_name = 'plans' AND column_name = 'updated_at'
+  ) THEN
+    ALTER TABLE public.plans ADD COLUMN updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+  END IF;
+END $$;
 
 -- =====================================================
 -- TABELA: tenants (Organizações/Clientes)
@@ -34,14 +95,44 @@ CREATE TABLE IF NOT EXISTS public.tenants (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL, -- Nome da organização
   slug TEXT NOT NULL UNIQUE, -- URL amigável (ex: "empresa-abc")
-  email TEXT, -- Email de contato
-  phone TEXT, -- Telefone de contato (WhatsApp)
-  
-  -- Status
-  is_active BOOLEAN NOT NULL DEFAULT true,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Adicionar todas as colunas condicionalmente para compatibilidade
+DO $$ 
+BEGIN
+  -- email
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' AND table_name = 'tenants' AND column_name = 'email'
+  ) THEN
+    ALTER TABLE public.tenants ADD COLUMN email TEXT;
+  END IF;
+
+  -- phone
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' AND table_name = 'tenants' AND column_name = 'phone'
+  ) THEN
+    ALTER TABLE public.tenants ADD COLUMN phone TEXT;
+  END IF;
+
+  -- is_active
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' AND table_name = 'tenants' AND column_name = 'is_active'
+  ) THEN
+    ALTER TABLE public.tenants ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT true;
+  END IF;
+
+  -- updated_at
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' AND table_name = 'tenants' AND column_name = 'updated_at'
+  ) THEN
+    ALTER TABLE public.tenants ADD COLUMN updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+  END IF;
+END $$;
 
 -- =====================================================
 -- TABELA: subscriptions (Assinaturas dos usuários)
@@ -50,99 +141,98 @@ CREATE TABLE IF NOT EXISTS public.subscriptions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   plan_id UUID NOT NULL REFERENCES public.plans(id),
-  
-  -- Datas
-  trial_started_at TIMESTAMPTZ, -- Quando começou o trial
-  trial_ends_at TIMESTAMPTZ, -- Quando termina o trial
-  subscription_started_at TIMESTAMPTZ, -- Quando começou a assinatura paga
-  subscription_ends_at TIMESTAMPTZ, -- Quando termina a assinatura
-  
-  -- Status
-  status TEXT NOT NULL DEFAULT 'trial', -- 'trial', 'active', 'cancelled', 'expired'
-  is_active BOOLEAN NOT NULL DEFAULT true,
-  
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  
-  CONSTRAINT subscriptions_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE,
-  CONSTRAINT subscriptions_status_check CHECK (status IN ('trial', 'active', 'cancelled', 'expired'))
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Adicionar colunas se não existirem (para compatibilidade com tabelas já criadas)
+-- Adicionar constraint se não existir
 DO $$ 
 BEGIN
-  -- Adicionar tenant_id se não existir
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint 
+    WHERE conname = 'subscriptions_user_id_fkey'
+  ) THEN
+    ALTER TABLE public.subscriptions 
+    ADD CONSTRAINT subscriptions_user_id_fkey 
+    FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+  END IF;
+END $$;
+
+-- Adicionar todas as colunas condicionalmente para compatibilidade
+DO $$ 
+BEGIN
+  -- tenant_id
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.columns 
-    WHERE table_schema = 'public' 
-    AND table_name = 'subscriptions' 
-    AND column_name = 'tenant_id'
+    WHERE table_schema = 'public' AND table_name = 'subscriptions' AND column_name = 'tenant_id'
   ) THEN
     ALTER TABLE public.subscriptions 
     ADD COLUMN tenant_id UUID REFERENCES public.tenants(id) ON DELETE SET NULL;
   END IF;
 
-  -- Adicionar is_active se não existir
+  -- trial_started_at
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.columns 
-    WHERE table_schema = 'public' 
-    AND table_name = 'subscriptions' 
-    AND column_name = 'is_active'
+    WHERE table_schema = 'public' AND table_name = 'subscriptions' AND column_name = 'trial_started_at'
   ) THEN
-    ALTER TABLE public.subscriptions 
-    ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT true;
+    ALTER TABLE public.subscriptions ADD COLUMN trial_started_at TIMESTAMPTZ;
   END IF;
 
-  -- Adicionar outras colunas se não existirem
+  -- trial_ends_at
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.columns 
-    WHERE table_schema = 'public' 
-    AND table_name = 'subscriptions' 
-    AND column_name = 'trial_started_at'
+    WHERE table_schema = 'public' AND table_name = 'subscriptions' AND column_name = 'trial_ends_at'
   ) THEN
-    ALTER TABLE public.subscriptions 
-    ADD COLUMN trial_started_at TIMESTAMPTZ;
+    ALTER TABLE public.subscriptions ADD COLUMN trial_ends_at TIMESTAMPTZ;
   END IF;
 
+  -- subscription_started_at
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.columns 
-    WHERE table_schema = 'public' 
-    AND table_name = 'subscriptions' 
-    AND column_name = 'trial_ends_at'
+    WHERE table_schema = 'public' AND table_name = 'subscriptions' AND column_name = 'subscription_started_at'
   ) THEN
-    ALTER TABLE public.subscriptions 
-    ADD COLUMN trial_ends_at TIMESTAMPTZ;
+    ALTER TABLE public.subscriptions ADD COLUMN subscription_started_at TIMESTAMPTZ;
   END IF;
 
+  -- subscription_ends_at
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.columns 
-    WHERE table_schema = 'public' 
-    AND table_name = 'subscriptions' 
-    AND column_name = 'subscription_started_at'
+    WHERE table_schema = 'public' AND table_name = 'subscriptions' AND column_name = 'subscription_ends_at'
   ) THEN
-    ALTER TABLE public.subscriptions 
-    ADD COLUMN subscription_started_at TIMESTAMPTZ;
+    ALTER TABLE public.subscriptions ADD COLUMN subscription_ends_at TIMESTAMPTZ;
   END IF;
 
+  -- status
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.columns 
-    WHERE table_schema = 'public' 
-    AND table_name = 'subscriptions' 
-    AND column_name = 'subscription_ends_at'
+    WHERE table_schema = 'public' AND table_name = 'subscriptions' AND column_name = 'status'
   ) THEN
-    ALTER TABLE public.subscriptions 
-    ADD COLUMN subscription_ends_at TIMESTAMPTZ;
+    ALTER TABLE public.subscriptions ADD COLUMN status TEXT NOT NULL DEFAULT 'trial';
   END IF;
 
-  -- Garantir que status existe com valor padrão
+  -- is_active (IMPORTANTE: deve ser adicionada antes de qualquer função que a use)
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.columns 
-    WHERE table_schema = 'public' 
-    AND table_name = 'subscriptions' 
-    AND column_name = 'status'
+    WHERE table_schema = 'public' AND table_name = 'subscriptions' AND column_name = 'is_active'
+  ) THEN
+    ALTER TABLE public.subscriptions ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT true;
+  END IF;
+
+  -- updated_at
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' AND table_name = 'subscriptions' AND column_name = 'updated_at'
+  ) THEN
+    ALTER TABLE public.subscriptions ADD COLUMN updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+  END IF;
+
+  -- Adicionar constraint de status se não existir
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint 
+    WHERE conname = 'subscriptions_status_check'
   ) THEN
     ALTER TABLE public.subscriptions 
-    ADD COLUMN status TEXT NOT NULL DEFAULT 'trial';
+    ADD CONSTRAINT subscriptions_status_check 
+    CHECK (status IN ('trial', 'active', 'cancelled', 'expired'));
   END IF;
 END $$;
 
@@ -284,18 +374,79 @@ CREATE TABLE IF NOT EXISTS public.admin_users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   email TEXT NOT NULL UNIQUE,
-  role TEXT NOT NULL DEFAULT 'admin', -- 'admin', 'super_admin'
-  can_manage_tenants BOOLEAN NOT NULL DEFAULT true,
-  can_manage_subscriptions BOOLEAN NOT NULL DEFAULT true,
-  can_view_analytics BOOLEAN NOT NULL DEFAULT true,
-  
-  is_active BOOLEAN NOT NULL DEFAULT true,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  
-  CONSTRAINT admin_users_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE,
-  CONSTRAINT admin_users_role_check CHECK (role IN ('admin', 'super_admin'))
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Adicionar todas as colunas condicionalmente para compatibilidade
+DO $$ 
+BEGIN
+  -- role
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' AND table_name = 'admin_users' AND column_name = 'role'
+  ) THEN
+    ALTER TABLE public.admin_users ADD COLUMN role TEXT NOT NULL DEFAULT 'admin';
+  END IF;
+
+  -- can_manage_tenants
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' AND table_name = 'admin_users' AND column_name = 'can_manage_tenants'
+  ) THEN
+    ALTER TABLE public.admin_users ADD COLUMN can_manage_tenants BOOLEAN NOT NULL DEFAULT true;
+  END IF;
+
+  -- can_manage_subscriptions
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' AND table_name = 'admin_users' AND column_name = 'can_manage_subscriptions'
+  ) THEN
+    ALTER TABLE public.admin_users ADD COLUMN can_manage_subscriptions BOOLEAN NOT NULL DEFAULT true;
+  END IF;
+
+  -- can_view_analytics
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' AND table_name = 'admin_users' AND column_name = 'can_view_analytics'
+  ) THEN
+    ALTER TABLE public.admin_users ADD COLUMN can_view_analytics BOOLEAN NOT NULL DEFAULT true;
+  END IF;
+
+  -- is_active
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' AND table_name = 'admin_users' AND column_name = 'is_active'
+  ) THEN
+    ALTER TABLE public.admin_users ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT true;
+  END IF;
+
+  -- updated_at
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' AND table_name = 'admin_users' AND column_name = 'updated_at'
+  ) THEN
+    ALTER TABLE public.admin_users ADD COLUMN updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+  END IF;
+
+  -- Adicionar constraints se não existirem
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint 
+    WHERE conname = 'admin_users_user_id_fkey'
+  ) THEN
+    ALTER TABLE public.admin_users 
+    ADD CONSTRAINT admin_users_user_id_fkey 
+    FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint 
+    WHERE conname = 'admin_users_role_check'
+  ) THEN
+    ALTER TABLE public.admin_users 
+    ADD CONSTRAINT admin_users_role_check 
+    CHECK (role IN ('admin', 'super_admin'));
+  END IF;
+END $$;
 
 -- =====================================================
 -- ÍNDICES
@@ -373,11 +524,50 @@ BEGIN
 END $$;
 
 CREATE INDEX IF NOT EXISTS idx_tenants_slug ON public.tenants(slug);
-CREATE INDEX IF NOT EXISTS idx_tenants_is_active ON public.tenants(is_active);
 
-CREATE INDEX IF NOT EXISTS idx_admin_users_user_id ON public.admin_users(user_id);
-CREATE INDEX IF NOT EXISTS idx_admin_users_email ON public.admin_users(email);
-CREATE INDEX IF NOT EXISTS idx_admin_users_is_active ON public.admin_users(is_active);
+-- Criar índices condicionalmente apenas se as colunas existirem
+DO $$ 
+BEGIN
+  -- tenants.is_active
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' AND table_name = 'tenants' AND column_name = 'is_active'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS idx_tenants_is_active ON public.tenants(is_active);
+  END IF;
+
+  -- admin_users.user_id
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' AND table_name = 'admin_users' AND column_name = 'user_id'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS idx_admin_users_user_id ON public.admin_users(user_id);
+  END IF;
+
+  -- admin_users.email
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' AND table_name = 'admin_users' AND column_name = 'email'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS idx_admin_users_email ON public.admin_users(email);
+  END IF;
+
+  -- admin_users.is_active
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' AND table_name = 'admin_users' AND column_name = 'is_active'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS idx_admin_users_is_active ON public.admin_users(is_active);
+  END IF;
+
+  -- plans.is_active
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' AND table_name = 'plans' AND column_name = 'is_active'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS idx_plans_is_active ON public.plans(is_active);
+  END IF;
+END $$;
 
 -- =====================================================
 -- FUNÇÕES AUXILIARES
