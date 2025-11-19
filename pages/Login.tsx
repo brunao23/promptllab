@@ -116,7 +116,7 @@ export const Login: React.FC = () => {
         } else if (errorMessage.includes('Password')) {
           setError('Erro na senha. Verifique se digitou corretamente.');
         } else if (errorMessage.includes('Failed to fetch') || errorMessage.includes('NetworkError') || errorMessage.includes('network')) {
-          setError('❌ Erro de conexão com o banco de dados.\n\n🔧 Isso geralmente acontece quando as variáveis de ambiente do Supabase não estão configuradas na Vercel.\n\n📋 Verifique:\n1. Settings → Environment Variables na Vercel\n2. Se VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY estão configuradas\n3. Se estão marcadas para Production\n4. Se foi feito redeploy após adicionar\n\n📖 Consulte: CORRIGIR_CONEXAO_SUPABASE.md');
+          setError('❌ Erro de conexão com o banco de dados.\n\n⚠️ IMPORTANTE: Este projeto usa VITE (não Next.js)!\n\n🔧 Variáveis de ambiente devem ter prefixo VITE_:\n   ✅ VITE_SUPABASE_URL (correto)\n   ✅ VITE_SUPABASE_ANON_KEY (correto)\n   ❌ NEXT_PUBLIC_SUPABASE_URL (ERRADO - isso é do Next.js!)\n   ❌ SUPABASE_URL (ERRADO - não funciona no frontend Vite)\n\n📋 Corrija na Vercel:\n1. Settings → Environment Variables\n2. REMOVA variáveis com prefixo errado (NEXT_PUBLIC_ ou SUPABASE_)\n3. ADICIONE com prefixo VITE_:\n   - VITE_SUPABASE_URL = https://zmagqrcymbletqymclig.supabase.co\n   - VITE_SUPABASE_ANON_KEY = sua-chave-aqui\n4. Marque ☑️ Production, Preview e Development\n5. Faça REDEPLOY após adicionar\n\n📖 Consulte: URGENTE_CORRIGIR_VARIAVEIS_VERCEL.md');
         } else {
           setError(`Erro ao fazer login: ${authError.message || 'Por favor, verifique suas credenciais e tente novamente.'}`);
         }
