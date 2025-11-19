@@ -379,6 +379,162 @@ export async function listUsers(): Promise<UserWithSubscription[]> {
 }
 
 /**
+ * Cria um novo usuário com subscription premium (ADMIN ONLY)
+ */
+export async function createUserWithPremium(userData: {
+  email: string;
+  password: string;
+  fullName: string;
+}): Promise<{ userId: string; message: string }> {
+  try {
+    console.log('🔐 [Admin] Criando usuário com premium:', userData.email);
+
+    // 1. Criar usuário no Supabase Auth
+    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+      email: userData.email,
+      password: userData.password,
+      email_confirm: true, // Auto-confirmar email (admin criou)
+      user_metadata: {
+        full_name: userData.fullName,
+      },
+    });
+
+    if (authError) {
+      console.error('❌ Erro ao criar usuário:', authError);
+      throw new Error(`Erro ao criar usuário: ${authError.message}`);
+    }
+
+    if (!authData.user) {
+      throw new Error('Usuário não foi criado corretamente');
+    }
+
+    const userId = authData.user.id;
+    console.log('✅ Usuário criado no Auth:', userId);
+
+    // 2. Criar perfil (caso não seja criado automaticamente)
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .upsert({
+        id: userId,
+        email: userData.email,
+        full_name: userData.fullName,
+      });
+
+    if (profileError) {
+      console.warn('⚠️ Erro ao criar perfil (pode já existir):', profileError);
+    }
+
+    // 3. Buscar plano Premium
+    const { data: premiumPlan, error: planError } = await supabase
+      .from('plans')
+      .select('id')
+      .eq('name', 'premium')
+      .single();
+
+    if (planError || !premiumPlan) {
+      console.error('❌ Plano premium não encontrado:', planError);
+      throw new Error('Plano premium não encontrado no banco de dados');
+    }
+
+    console.log('✅ Plano premium encontrado:', premiumPlan.id);
+
+    // 4. Criar subscription premium
+    const { error: subscriptionError } = await supabase
+      .from('subscriptions')
+      .insert({
+        user_id: userId,
+        plan_id: premiumPlan.id,
+        status: 'active',
+        is_active: true,
+        subscription_started_at: new Date().toISOString(),
+      });
+
+    if (subscriptionError) {
+      console.error('❌ Erro ao criar subscription:', subscriptionError);
+      throw new Error(`Erro ao criar subscription premium: ${subscriptionError.message}`);
+    }
+
+    console.log('✅ Subscription premium criada para:', userId);
+
+    return {
+      userId,
+      message: `Usuário ${userData.email} criado com sucesso e subscription premium ativada!`,
+    };
+  } catch (error: any) {
+    console.error('❌ Erro ao criar usuário com premium:', error);
+    throw error;
+  }
+}
+
+/**
+ * Altera o plano de um usuário (trial → premium ou premium → trial)
+ */
+export async function changeUserPlan(
+  userId: string,
+  newPlanType: 'trial' | 'premium'
+): Promise<{ message: string }> {
+  try {
+    console.log(`🔄 [Admin] Alterando plano do usuário ${userId} para ${newPlanType}`);
+
+    // 1. Buscar o plano desejado
+    const { data: plan, error: planError } = await supabase
+      .from('plans')
+      .select('id, trial_days')
+      .eq('name', newPlanType)
+      .single();
+
+    if (planError || !plan) {
+      throw new Error(`Plano ${newPlanType} não encontrado`);
+    }
+
+    // 2. Desativar subscriptions antigas
+    await supabase
+      .from('subscriptions')
+      .update({ is_active: false })
+      .eq('user_id', userId);
+
+    // 3. Criar nova subscription
+    const subscriptionData: any = {
+      user_id: userId,
+      plan_id: plan.id,
+      is_active: true,
+    };
+
+    if (newPlanType === 'trial' && plan.trial_days) {
+      // Criar trial
+      const now = new Date();
+      const trialEndsAt = new Date(now);
+      trialEndsAt.setDate(trialEndsAt.getDate() + plan.trial_days);
+      
+      subscriptionData.status = 'trial';
+      subscriptionData.trial_started_at = now.toISOString();
+      subscriptionData.trial_ends_at = trialEndsAt.toISOString();
+    } else {
+      // Criar premium
+      subscriptionData.status = 'active';
+      subscriptionData.subscription_started_at = new Date().toISOString();
+    }
+
+    const { error: createError } = await supabase
+      .from('subscriptions')
+      .insert(subscriptionData);
+
+    if (createError) {
+      throw new Error(`Erro ao criar nova subscription: ${createError.message}`);
+    }
+
+    console.log(`✅ Plano alterado para ${newPlanType}`);
+
+    return {
+      message: `Plano alterado para ${newPlanType === 'premium' ? 'Premium' : 'Trial'} com sucesso!`,
+    };
+  } catch (error: any) {
+    console.error('❌ Erro ao alterar plano:', error);
+    throw error;
+  }
+}
+
+/**
  * Obtém estatísticas gerais
  */
 export async function getAdminStats(): Promise<{
