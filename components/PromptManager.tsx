@@ -169,7 +169,7 @@ export const PromptManager: React.FC = () => {
                 console.log('✅ Usuário autenticado:', session.user.email);
 
                 // Verificar se há um promptId nos query params (vindo do repositório)
-                const promptIdFromParams = searchParams.get('promptId');
+                const promptIdFromParams = searchParams ? searchParams.get('promptId') : null;
                 
                 if (promptIdFromParams) {
                     // Limpar o query param após usar para evitar recarregamentos infinitos
