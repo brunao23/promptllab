@@ -1,6 +1,9 @@
+'use client';
+
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { signOut, supabase, getCurrentProfile } from '../services/supabaseService';
+import { useRouter, usePathname } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
+import { signOut, getCurrentProfile } from '../services/supabaseService';
 import { isSuperAdmin } from '../services/adminService';
 import { SubscriptionInfo } from './SubscriptionInfo';
 
@@ -10,8 +13,9 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onMobileClose }) => {
-  const navigate = useNavigate();
-  const location = useLocation();
+  const router = useRouter();
+  const pathname = usePathname();
+  const supabase = createClient();
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [userName, setUserName] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -87,7 +91,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onMobileClose })
   const handleLogout = async () => {
     try {
       await signOut();
-      navigate('/login');
+      router.push('/login');
     } catch (error) {
       console.error('Erro ao fazer logout:', error);
     }
@@ -102,7 +106,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onMobileClose })
         </svg>
       ),
       path: '/dashboard',
-      active: location.pathname === '/dashboard',
+      active: pathname === '/dashboard',
     },
     {
       label: 'Repositório',
@@ -112,7 +116,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onMobileClose })
         </svg>
       ),
       path: '/dashboard/repository',
-      active: location.pathname === '/dashboard/repository',
+      active: pathname === '/dashboard/repository',
     },
     {
       label: 'Configurações',
@@ -123,7 +127,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onMobileClose })
         </svg>
       ),
       path: '/dashboard/settings',
-      active: location.pathname === '/dashboard/settings',
+      active: pathname === '/dashboard/settings',
     },
     ...(isAdminUser ? [{
       label: 'Admin Master',
@@ -133,7 +137,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onMobileClose })
         </svg>
       ),
       path: '/admin',
-      active: location.pathname === '/admin',
+      active: pathname === '/admin',
     }] : []),
   ];
 
@@ -177,7 +181,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onMobileClose })
             <button
               key={item.path}
               onClick={() => {
-                navigate(item.path);
+                router.push(item.path);
                 onMobileClose();
               }}
               className={`

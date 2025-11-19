@@ -37,8 +37,15 @@ export async function ensureAvatarsBucket(): Promise<{ success: boolean; message
 
     // Tentar criar o bucket usando a API REST diretamente
     // Isso pode não funcionar com ANON_KEY, mas vamos tentar
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    // Suporta Next.js e Vite
+    const supabaseUrl = 
+      (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_SUPABASE_URL) ||
+      (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_SUPABASE_URL) ||
+      '';
+    const supabaseKey = 
+      (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_SUPABASE_ANON_KEY) ||
+      (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_SUPABASE_ANON_KEY) ||
+      '';
 
     if (!supabaseUrl || !supabaseKey) {
       return {

@@ -1,7 +1,7 @@
-
+'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useSearchParams } from 'next/navigation';
 import { PromptInputForm } from './PromptInputForm';
 import { OutputDisplay } from './OutputDisplay';
 import { HistoryPanel } from './HistoryPanel';
@@ -43,7 +43,7 @@ import {
 } from '../services/subscriptionService';
 
 export const PromptManager: React.FC = () => {
-    const location = useLocation();
+    const searchParams = useSearchParams();
     const [versionHistory, setVersionHistory] = useState<PromptVersion[]>([]);
     const [activeVersion, setActiveVersion] = useState<PromptVersion | null>(null);
     const [validatedVersionId, setValidatedVersionId] = useState<string | null>(null);
@@ -168,27 +168,27 @@ export const PromptManager: React.FC = () => {
 
                 console.log('✅ Usuário autenticado:', session.user.email);
 
-                // Verificar se há um promptId no state (vindo do repositório)
-                // IMPORTANTE: Limpar o location.state após usar para evitar recarregamentos infinitos
-                const promptIdFromState = (location.state as any)?.promptId;
-                if (promptIdFromState && location.state) {
-                    // Limpar o state IMEDIATAMENTE após ler para evitar recarregamentos infinitos
-                    window.history.replaceState({}, document.title, location.pathname);
-                    // Também limpar do objeto location para garantir
-                    (location.state as any) = null;
+                // Verificar se há um promptId nos query params (vindo do repositório)
+                const promptIdFromParams = searchParams.get('promptId');
+                
+                if (promptIdFromParams) {
+                    // Limpar o query param após usar para evitar recarregamentos infinitos
+                    const url = new URL(window.location.href);
+                    url.searchParams.delete('promptId');
+                    window.history.replaceState({}, document.title, url.pathname + url.search);
                 }
                 
-                if (promptIdFromState) {
-                    console.log('📋 Carregando prompt específico do repositório:', promptIdFromState);
+                if (promptIdFromParams) {
+                    console.log('📋 Carregando prompt específico do repositório:', promptIdFromParams);
                     try {
                         // Carregar dados completos do prompt
-                        const { promptData } = await getPrompt(promptIdFromState);
+                        const { promptData } = await getPrompt(promptIdFromParams);
                         console.log('✅ Dados do prompt carregados do repositório');
-                        setCurrentPromptId(promptIdFromState);
+                        setCurrentPromptId(promptIdFromParams);
                         setFormData(promptData);
                         
                         // Carregar versões do prompt
-                        let versions = await getPromptVersions(promptIdFromState);
+                        let versions = await getPromptVersions(promptIdFromParams);
                         console.log('📜 Versões encontradas:', versions?.length || 0);
                         
                         // Se não houver versões, gerar uma versão inicial automaticamente

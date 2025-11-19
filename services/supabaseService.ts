@@ -13,28 +13,36 @@ import {
 } from '../utils/security';
 
 // Configuração do Supabase
-// No Vite, use VITE_ prefixo para variáveis de ambiente
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+// No Next.js, use NEXT_PUBLIC_ prefixo para variáveis de ambiente públicas
+// Suporta tanto process.env (Next.js) quanto import.meta.env (Vite) para compatibilidade
+const supabaseUrl = 
+  (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_SUPABASE_URL) ||
+  (typeof window !== 'undefined' && (window as any).__NEXT_DATA__?.env?.NEXT_PUBLIC_SUPABASE_URL) ||
+  (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_SUPABASE_URL) ||
+  '';
+
+const supabaseAnonKey = 
+  (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_SUPABASE_ANON_KEY) ||
+  (typeof window !== 'undefined' && (window as any).__NEXT_DATA__?.env?.NEXT_PUBLIC_SUPABASE_ANON_KEY) ||
+  (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_SUPABASE_ANON_KEY) ||
+  '';
 
 // Validação mais rigorosa das variáveis de ambiente
 if (!supabaseUrl || !supabaseAnonKey) {
   const errorMsg = '❌ ERRO: Variáveis de ambiente do Supabase não configuradas!\n' +
-    '⚠️ IMPORTANTE: Este projeto usa VITE (não Next.js), então você DEVE usar:\n' +
-    '   - VITE_SUPABASE_URL (NÃO NEXT_PUBLIC_SUPABASE_URL!)\n' +
-    '   - VITE_SUPABASE_ANON_KEY (NÃO NEXT_PUBLIC_SUPABASE_ANON_KEY!)\n' +
+    '⚠️ IMPORTANTE: Este projeto usa Next.js, então você DEVE usar:\n' +
+    '   - NEXT_PUBLIC_SUPABASE_URL\n' +
+    '   - NEXT_PUBLIC_SUPABASE_ANON_KEY\n' +
     'Configure na Vercel: Settings → Environment Variables\n' +
     `URL atual: ${supabaseUrl || 'VAZIO'}\n` +
-    `Key atual: ${supabaseAnonKey ? supabaseAnonKey.substring(0, 20) + '...' : 'VAZIO'}\n` +
-    '📖 Consulte: URGENTE_CORRIGIR_VARIAVEIS_VERCEL.md';
+    `Key atual: ${supabaseAnonKey ? supabaseAnonKey.substring(0, 20) + '...' : 'VAZIO'}\n`;
   
   console.error(errorMsg);
   
   // Em produção, não queremos quebrar a aplicação completamente
-  // Mas vamos criar um cliente com valores vazios para que os erros apareçam claramente
-  if (import.meta.env.PROD) {
+  if (typeof process !== 'undefined' && process.env.NODE_ENV === 'production') {
     console.error('⚠️ Aplicação em produção sem configuração do Supabase!');
-    console.error('⚠️ Verifique se as variáveis estão com prefixo VITE_ na Vercel!');
+    console.error('⚠️ Verifique se as variáveis estão com prefixo NEXT_PUBLIC_ na Vercel!');
   }
 }
 

@@ -13,7 +13,7 @@ interface Prompt {
 }
 
 export const RepositoryPage: React.FC = () => {
-  const navigate = useNavigate();
+  const router = useRouter();
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedPrompt, setSelectedPrompt] = useState<Prompt | null>(null);
@@ -94,10 +94,7 @@ export const RepositoryPage: React.FC = () => {
 
   const handleUsePrompt = () => {
     if (selectedPrompt) {
-      navigate('/dashboard', { 
-        state: { promptId: selectedPrompt.id },
-        replace: false 
-      });
+      router.push(`/dashboard?promptId=${selectedPrompt.id}`);
     }
   };
 
@@ -114,7 +111,7 @@ export const RepositoryPage: React.FC = () => {
         <div className="mb-8">
           <div className="flex items-center space-x-4 mb-4">
             <button
-              onClick={() => navigate('/dashboard')}
+              onClick={() => router.push('/dashboard')}
               className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors border border-white/10"
               title="Voltar para o Workspace"
             >
