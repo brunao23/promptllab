@@ -32,10 +32,7 @@ jobs:
           ls -la
           echo ""
           echo "📦 Verificando package.json:"
-          if [ -f "labprompt/package.json" ]; then
-            echo "✅ package.json encontrado em ./labprompt"
-            cat labprompt/package.json | head -10
-          elif [ -f "package.json" ]; then
+          if [ -f "package.json" ]; then
             echo "✅ package.json encontrado na raiz"
             cat package.json | head -10
           else
@@ -44,7 +41,6 @@ jobs:
           fi
 
       - name: 📥 Instalar dependências
-        working-directory: ./labprompt
         run: |
           echo "📥 Instalando dependências..."
           if [ -f package-lock.json ]; then
@@ -57,7 +53,6 @@ jobs:
           echo "✅ Dependências instaladas"
 
       - name: 🔍 Verificar build
-        working-directory: ./labprompt
         run: |
           echo "🔍 Iniciando build..."
           npm run build
@@ -69,7 +64,6 @@ jobs:
           API_KEY: ${{ secrets.GEMINI_API_KEY || '' }}
 
       - name: ✅ Verificar artefatos do build
-        working-directory: ./labprompt
         run: |
           echo "📦 Verificando artefatos do build..."
           if [ -d "dist" ]; then
@@ -86,7 +80,7 @@ jobs:
       - name: ✅ Build concluído
         run: |
           echo "✅ Build concluído com sucesso!"
-          echo "📦 Os arquivos estão prontos em ./labprompt/dist"
+          echo "📦 Os arquivos estão prontos em ./dist"
           echo ""
           echo "💡 IMPORTANTE: Se você configurou a integração direta GitHub+Vercel,"
           echo "   o deploy será feito automaticamente pela Vercel após este workflow."
@@ -96,6 +90,6 @@ jobs:
           echo ""
           echo "⚠️  Se o deploy automático da Vercel não funcionar, verifique:"
           echo "   1. Se o repositório está conectado na Vercel"
-          echo "   2. Se o Root Directory está configurado como 'labprompt' (não vazio!)"
+          echo "   2. Se o Root Directory está configurado como VAZIO (projeto na raiz!)"
           echo "   3. Se as variáveis de ambiente estão configuradas"
 

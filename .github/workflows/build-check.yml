@@ -25,7 +25,6 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        working-directory: ./labprompt
         run: |
           if [ -f package-lock.json ]; then
             npm ci
@@ -34,12 +33,10 @@ jobs:
           fi
 
       - name: Run linter (if configured)
-        working-directory: ./labprompt
         continue-on-error: true
         run: npm run lint || true
 
       - name: Build project
-        working-directory: ./labprompt
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://placeholder.supabase.co' }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'placeholder-key' }}
@@ -48,7 +45,6 @@ jobs:
         run: npm run build
 
       - name: Check build artifacts
-        working-directory: ./labprompt
         run: |
           if [ ! -d "dist" ]; then
             echo "❌ Build failed: dist directory not found"

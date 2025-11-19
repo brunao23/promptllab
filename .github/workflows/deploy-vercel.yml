@@ -27,7 +27,6 @@ jobs:
           cache: 'npm'
 
       - name: 📥 Instalar dependências
-        working-directory: ./labprompt
         run: |
           if [ -f package-lock.json ]; then
             npm ci
@@ -36,7 +35,6 @@ jobs:
           fi
 
       - name: 🔍 Verificar build
-        working-directory: ./labprompt
         run: npm run build
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://placeholder.supabase.co' }}
@@ -45,7 +43,6 @@ jobs:
           API_KEY: ${{ secrets.GEMINI_API_KEY || '' }}
 
       - name: ✅ Verificar artefatos
-        working-directory: ./labprompt
         run: |
           if [ ! -d "dist" ]; then
             echo "❌ Build failed: dist directory not found"
@@ -72,7 +69,6 @@ jobs:
           cache: 'npm'
 
       - name: 📥 Instalar dependências
-        working-directory: ./labprompt
         run: |
           if [ -f package-lock.json ]; then
             npm ci
@@ -81,7 +77,6 @@ jobs:
           fi
 
       - name: 🔍 Build
-        working-directory: ./labprompt
         run: npm run build
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
@@ -97,7 +92,6 @@ jobs:
 
       - name: 📤 Deploy para Vercel (Preview)
         if: github.event_name == 'pull_request'
-        working-directory: ./labprompt
         run: |
           vercel deploy \
             --token ${{ secrets.VERCEL_TOKEN }} \
@@ -105,7 +99,6 @@ jobs:
 
       - name: 🚀 Deploy para Vercel (Production)
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
-        working-directory: ./labprompt
         run: |
           vercel deploy \
             --token ${{ secrets.VERCEL_TOKEN }} \
