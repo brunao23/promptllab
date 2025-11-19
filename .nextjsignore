@@ -1,0 +1,9 @@
+# Arquivos antigos do Vite que não devem ser compilados pelo Next.js
+App.tsx.old
+index.tsx.old
+index.html.old
+vite.config.ts.old
+pages/HomePage.tsx.old
+pages/Dashboard.tsx.old
+pages/AuthCallback.tsx.old
+
