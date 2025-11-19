@@ -1,12 +1,14 @@
 'use client';
 
 import { ShareChatPage } from '@/pages/ShareChatPage';
+import { use } from 'react';
 
 export default function ShareChatPageRoute({
   params,
 }: {
-  params: { versionId: string };
+  params: Promise<{ versionId: string }>;
 }) {
-  return <ShareChatPage versionId={params.versionId} />;
+  const { versionId } = use(params);
+  return <ShareChatPage versionId={versionId} />;
 }
 
