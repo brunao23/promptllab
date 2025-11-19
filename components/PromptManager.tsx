@@ -497,12 +497,26 @@ export const PromptManager: React.FC = () => {
             }
         };
 
-        // Verificar se já está carregando para evitar múltiplos carregamentos simultâneos
-        if (!isLoadingData) {
+        // Sempre carregar na montagem inicial, mas verificar se já está carregando para evitar múltiplos carregamentos simultâneos
+        // Se dataLoadedRef.current é false, significa que é o primeiro carregamento
+        if (!dataLoadedRef.current) {
+            console.log('🔄 Primeiro carregamento, iniciando...');
+            loadUserData();
+        } else if (!isLoadingData) {
+            console.log('🔄 Recarregando dados (não está em carregamento)...');
             loadUserData();
         } else {
             console.log('⏸️ Carregamento já em andamento, aguardando...');
         }
+
+        // Timeout de segurança: se isLoadingData ficar true por mais de 30 segundos, resetar
+        const safetyTimeout = setTimeout(() => {
+            if (isLoadingData) {
+                console.warn('⚠️ Timeout de segurança: isLoadingData ficou true por muito tempo, resetando...');
+                setIsLoadingData(false);
+                dataLoadedRef.current = true;
+            }
+        }, 30000);
 
         // Listener para mudanças de autenticação (logout/login)
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -536,6 +550,7 @@ export const PromptManager: React.FC = () => {
 
         return () => {
             subscription.unsubscribe();
+            clearTimeout(safetyTimeout);
         };
     }, [location.pathname]); // Adicionar location.pathname como dependência para recarregar quando mudar de rota
 
