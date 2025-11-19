@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
 import { PromptInputForm } from './PromptInputForm';
 import { OutputDisplay } from './OutputDisplay';
 import { HistoryPanel } from './HistoryPanel';
@@ -14,7 +15,6 @@ import { WorkspaceManager } from './WorkspaceManager';
 import type { PromptData, PromptVersion, ChatMessage, FewShotExample, OptimizationPair } from '../types';
 import { INITIAL_PROMPT_DATA } from '../constants';
 import { createFinalPrompt, startChat, continueChat, optimizePrompt, generateExamples, processAudioCommand, explainPrompt } from '../services/geminiService';
-import { incrementVersionCount } from '../services/subscriptionService';
 import type { GenerateContentResponse } from '@google/genai';
 import { jsPDF } from 'jspdf';
 import { 
@@ -25,7 +25,6 @@ import {
   getPromptVersions, 
   saveChatMessage, 
   getChatMessages, 
-  supabase, 
   getCurrentUser, 
   getCurrentProfile,
   getDefaultWorkspace
@@ -44,6 +43,7 @@ import {
 
 export const PromptManager: React.FC = () => {
     const searchParams = useSearchParams();
+    const supabase = createClient();
     const [versionHistory, setVersionHistory] = useState<PromptVersion[]>([]);
     const [activeVersion, setActiveVersion] = useState<PromptVersion | null>(null);
     const [validatedVersionId, setValidatedVersionId] = useState<string | null>(null);

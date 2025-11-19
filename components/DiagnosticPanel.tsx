@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { supabase } from '../services/supabaseService';
+import { createClient } from '@/lib/supabase/client';
 import { getCurrentSubscription } from '../services/subscriptionService';
 
 export const DiagnosticPanel: React.FC = () => {
+  const supabase = createClient();
   const [diagnostics, setDiagnostics] = useState<{
     hasSession: boolean;
     userId: string | null;

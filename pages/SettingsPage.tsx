@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { getCurrentProfile, supabase, updateProfile, changePassword, uploadAvatar } from '../services/supabaseService';
+import { createClient } from '@/lib/supabase/client';
+import { getCurrentProfile, updateProfile, changePassword, uploadAvatar } from '../services/supabaseService';
 import { ensureAvatarsBucket } from '../services/bucketService';
 import { validateName, validatePassword, sanitizeText } from '../utils/security';
 import { 
@@ -17,6 +18,7 @@ import {
 
 export const SettingsPage: React.FC = () => {
   const router = useRouter();
+  const supabase = createClient();
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);

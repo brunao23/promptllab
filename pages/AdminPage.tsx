@@ -7,7 +7,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '../services/supabaseService';
+import { createClient } from '@/lib/supabase/client';
 import { 
   isAdmin, 
   isSuperAdmin, 
@@ -24,6 +24,7 @@ import type { Tenant, UserWithSubscription } from '../services/adminService';
 
 export const AdminPage: React.FC = () => {
   const router = useRouter();
+  const supabase = createClient();
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'tenants' | 'subscriptions'>('dashboard');
