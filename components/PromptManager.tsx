@@ -209,10 +209,12 @@ export const PromptManager: React.FC = () => {
                                         const initialPromptContent = await createFinalPrompt(promptData);
                                         const newVersion = await createPromptVersion(
                                             promptIdFromParams,
-                                            initialPromptContent,
-                                            promptData.formatoSaida || 'text',
-                                            promptData.masterPromptFormat || 'markdown',
-                                            promptData
+                                            {
+                                                content: initialPromptContent,
+                                                format: promptData.formatoSaida || 'text',
+                                                masterFormat: promptData.masterPromptFormat || 'markdown',
+                                                sourceData: promptData
+                                            }
                                         );
                                         console.log('✅ Versão inicial gerada:', newVersion.id);
                                         // Incrementar contador de versões
