@@ -133,7 +133,7 @@ export const SubscriptionInfo: React.FC = () => {
     planInfo.maxVersions === -1 ? 'Ilimitado' : `Máx. ${planInfo.maxVersions} versões/mês`;
 
   return (
-    <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 sm:p-5 border border-white/10 shadow-xl w-full">
+    <div className="bg-white/5 backdrop-blur-sm rounded-xl p-3 sm:p-4 border border-white/10 shadow-xl w-full">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 pb-4 border-b border-white/10 gap-2">
         <div className="flex-1 min-w-0">
           <div className="flex items-center space-x-2 mb-1 flex-wrap">

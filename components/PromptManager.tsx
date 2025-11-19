@@ -14,6 +14,7 @@ import { WorkspaceManager } from './WorkspaceManager';
 import type { PromptData, PromptVersion, ChatMessage, FewShotExample, OptimizationPair } from '../types';
 import { INITIAL_PROMPT_DATA } from '../constants';
 import { createFinalPrompt, startChat, continueChat, optimizePrompt, generateExamples, processAudioCommand, explainPrompt } from '../services/geminiService';
+import { incrementVersionCount } from '../services/subscriptionService';
 import type { GenerateContentResponse } from '@google/genai';
 import { jsPDF } from 'jspdf';
 import { 
@@ -165,30 +166,87 @@ export const PromptManager: React.FC = () => {
                 if (promptIdFromState) {
                     console.log('📋 Carregando prompt específico do repositório:', promptIdFromState);
                     try {
+                        // Carregar dados completos do prompt
                         const { promptData } = await getPrompt(promptIdFromState);
+                        console.log('✅ Dados do prompt carregados do repositório');
                         setCurrentPromptId(promptIdFromState);
                         setFormData(promptData);
                         
-                        const versions = await getPromptVersions(promptIdFromState);
+                        // Carregar versões do prompt
+                        let versions = await getPromptVersions(promptIdFromState);
+                        console.log('📜 Versões encontradas:', versions?.length || 0);
+                        
+                        // Se não houver versões, gerar uma versão inicial automaticamente
+                        if (!versions || versions.length === 0) {
+                            console.log('⚠️ Nenhuma versão encontrada. Gerando versão inicial...');
+                            try {
+                                // Verificar se pode criar versão
+                                const canCreate = await canCreateVersion();
+                                if (!canCreate.allowed) {
+                                    console.warn('⚠️ Não é possível criar versão:', canCreate.reason);
+                                    setError(canCreate.reason || 'Limite de versões atingido');
+                                } else {
+                                    // Validar campos obrigatórios antes de gerar
+                                    if (!promptData.persona || !promptData.objetivo || !promptData.contextoNegocio || !promptData.contexto) {
+                                        console.warn('⚠️ Campos obrigatórios faltando, pulando geração automática');
+                                        setError('Campos obrigatórios (Persona, Objetivo, Contexto do Negócio, Contexto) devem estar preenchidos para gerar versão inicial');
+                                    } else {
+                                        const initialPromptContent = await createFinalPrompt(promptData);
+                                        const newVersion = await createPromptVersion(
+                                            promptIdFromState,
+                                            initialPromptContent,
+                                            promptData.formatoSaida || 'text',
+                                            promptData.masterPromptFormat || 'markdown',
+                                            promptData
+                                        );
+                                        console.log('✅ Versão inicial gerada:', newVersion.id);
+                                        // Incrementar contador de versões
+                                        await incrementVersionCount();
+                                        versions = [newVersion];
+                                    }
+                                }
+                            } catch (genError: any) {
+                                console.error('❌ Erro ao gerar versão inicial:', genError);
+                                setError(genError.message || 'Erro ao gerar versão inicial');
+                                // Continuar mesmo se falhar a geração
+                            }
+                        }
+                        
                         if (versions && versions.length > 0) {
+                            console.log('✅ Configurando versões no estado:', versions.length);
                             setVersionHistory(versions);
                             const latestVersion = versions[0];
                             setActiveVersion(latestVersion);
                             
-                            const messages = await getChatMessages(latestVersion.id);
-                            if (messages && messages.length > 0) {
-                                setChatMessages(messages);
+                            // Carregar mensagens do chat se houver
+                            try {
+                                const messages = await getChatMessages(latestVersion.id);
+                                if (messages && messages.length > 0) {
+                                    setChatMessages(messages);
+                                }
+                            } catch (msgError) {
+                                console.warn('⚠️ Erro ao carregar mensagens (pode não haver mensagens ainda):', msgError);
                             }
                             
+                            // Inicializar chat se houver conteúdo
                             if (latestVersion.content) {
-                                startChat(latestVersion.content);
+                                try {
+                                    await startChat(latestVersion.content);
+                                    console.log('✅ Chat inicializado com sucesso');
+                                } catch (chatError) {
+                                    console.warn('⚠️ Erro ao inicializar chat:', chatError);
+                                }
                             }
+                        } else {
+                            console.warn('⚠️ Ainda não há versões disponíveis após tentativa de geração');
                         }
                         setIsLoadingData(false);
                         return;
-                    } catch (err) {
+                    } catch (err: any) {
                         console.error('❌ Erro ao carregar prompt do repositório:', err);
-                        // Continuar com o fluxo normal se houver erro
+                        setError(err.message || 'Erro ao carregar prompt do repositório');
+                        // Não setar setIsLoadingData(false) aqui - deixar o fluxo normal continuar
+                        // para tentar carregar os prompts do usuário normalmente
                     }
                 }
 
@@ -207,8 +265,15 @@ export const PromptManager: React.FC = () => {
                 // Dar tempo ao React para atualizar a UI
                 await new Promise(resolve => setTimeout(resolve, 10));
                 const workspaceIdToUse = currentWorkspaceId || (await getDefaultWorkspace())?.id;
-                const prompts = await getUserPrompts(workspaceIdToUse || undefined);
-                console.log('✅ Prompts carregados:', prompts?.length || 0);
+                let prompts;
+                try {
+                    prompts = await getUserPrompts(workspaceIdToUse || undefined);
+                    console.log('✅ Prompts carregados:', prompts?.length || 0);
+                } catch (promptsError: any) {
+                    console.error('❌ Erro ao carregar prompts do usuário:', promptsError);
+                    setError(`Erro ao carregar prompts: ${promptsError?.message || 'Erro desconhecido'}`);
+                    prompts = [];
+                }
                 
                 if (prompts && prompts.length > 0) {
                     // Carregar o prompt mais recente
@@ -337,7 +402,7 @@ export const PromptManager: React.FC = () => {
                                 // Reiniciar chat com o prompt da versão ativa DEPOIS de carregar as mensagens
                                 if (latestVersion.content && latestVersion.content.trim().length > 0) {
                                     console.log('🔄 Inicializando chat com conteúdo da versão...');
-                                    startChat(latestVersion.content);
+                                    await startChat(latestVersion.content);
                                     console.log('✅ Chat inicializado com prompt da versão ativa');
                                     console.log('📋 Conteúdo do prompt carregado:', latestVersion.content.substring(0, 100) + '...');
                                 } else {
@@ -356,7 +421,7 @@ export const PromptManager: React.FC = () => {
                                 // Mesmo com erro, tentar inicializar o chat se houver conteúdo
                                 if (latestVersion.content && latestVersion.content.trim().length > 0) {
                                     console.log('🔄 Tentando inicializar chat mesmo com erro nas mensagens...');
-                                    startChat(latestVersion.content);
+                                    await startChat(latestVersion.content);
                                 }
                             }
                         } else {
@@ -396,6 +461,8 @@ export const PromptManager: React.FC = () => {
                     setVersionHistory([]);
                     setActiveVersion(null);
                     setChatMessages([]);
+                    // Resetar formData para valores iniciais quando não há prompts
+                    setFormData(INITIAL_PROMPT_DATA);
                 }
             } catch (err: any) {
                 console.error('❌ Erro ao carregar dados do usuário:', err);
@@ -406,8 +473,14 @@ export const PromptManager: React.FC = () => {
                     hint: err.hint,
                     code: err.code,
                 });
-                setError(`Erro ao carregar dados: ${err.message || 'Erro desconhecido'}`);
-                // Continuar com dados vazios
+                const errorMessage = err?.message || err?.toString() || 'Erro desconhecido ao carregar dados';
+                setError(`Erro ao carregar dados: ${errorMessage}`);
+                // Garantir que estados sejam limpos mesmo em caso de erro
+                setCurrentPromptId(null);
+                setVersionHistory([]);
+                setActiveVersion(null);
+                setChatMessages([]);
+                setFormData(INITIAL_PROMPT_DATA);
             } finally {
                 console.log('✅ Carregamento de dados finalizado. isLoadingData = false');
                 setIsLoadingData(false);
@@ -579,14 +652,14 @@ export const PromptManager: React.FC = () => {
                         // Inicializar chat DEPOIS de carregar as mensagens
                         if (activeVersion.content && activeVersion.content.trim().length > 0) {
                             console.log('🔄 [USE_EFFECT] Inicializando chat com nova versão...');
-                            startChat(activeVersion.content);
+                            await startChat(activeVersion.content);
                             console.log('✅ [USE_EFFECT] Chat inicializado com nova versão');
                         }
                     } catch (err: any) {
                         console.warn('⚠️ [USE_EFFECT] Erro ao carregar mensagens de chat:', err);
                         // Mesmo com erro, tentar inicializar o chat se houver conteúdo
                         if (activeVersion.content && activeVersion.content.trim().length > 0) {
-                            startChat(activeVersion.content);
+                            await startChat(activeVersion.content);
                         }
                     }
                 };
@@ -597,7 +670,9 @@ export const PromptManager: React.FC = () => {
                 // Apenas inicializar chat se houver conteúdo e ainda não foi inicializado
                 if (activeVersion.content && activeVersion.content.trim().length > 0) {
                     console.log('🔄 [USE_EFFECT] Apenas reinicializando chat com conteúdo da versão');
-                    startChat(activeVersion.content);
+                    startChat(activeVersion.content).catch(err => {
+                        console.error('Erro ao reinicializar chat:', err);
+                    });
                 }
             }
             
@@ -804,7 +879,7 @@ export const PromptManager: React.FC = () => {
             setHasUnsavedChanges(false);
             
             // Reiniciar chat
-            startChat(promptContent);
+            await startChat(promptContent);
         } catch (e: any) {
             console.error('❌ Erro ao gerar prompt:', e);
             setError(e.message || "Ocorreu um erro desconhecido. Verifique o console para mais detalhes.");
@@ -856,8 +931,11 @@ export const PromptManager: React.FC = () => {
             setActiveVersion(newVersion);
             setOptimizationPairs([]);
             setManualOptInstructions('');
-        } catch (e: any) {
-            setError(e.message || "Ocorreu um erro desconhecido ao otimizar.");
+        } catch (error: any) {
+            console.error('❌ Erro ao otimizar prompt:', error);
+            // Garantir que sempre temos uma mensagem de erro válida
+            const errorMessage = error?.message || error?.toString() || "Ocorreu um erro desconhecido ao otimizar.";
+            setError(errorMessage);
         } finally {
             setIsOptimizing(false);
         }
@@ -930,9 +1008,9 @@ export const PromptManager: React.FC = () => {
         }
     };
 
-    const handleClearChat = () => {
+    const handleClearChat = async () => {
         if (activeVersion) {
-            startChat(activeVersion.content);
+            await startChat(activeVersion.content);
             setChatMessages([]);
         }
     };
@@ -1478,7 +1556,7 @@ export const PromptManager: React.FC = () => {
             setHasUnsavedChanges(false);
             
             // Reiniciar chat com o novo prompt
-            startChat(content);
+            await startChat(content);
         } catch (err: any) {
             console.error('Erro ao carregar prompt externo:', err);
             setError(err.message || 'Erro ao importar prompt. Verifique o console para mais detalhes.');
@@ -1579,7 +1657,7 @@ export const PromptManager: React.FC = () => {
                     }
                     
                     if (latestVersion.content) {
-                        startChat(latestVersion.content);
+                        await startChat(latestVersion.content);
                     }
                 }
             }
@@ -1696,100 +1774,105 @@ export const PromptManager: React.FC = () => {
             <PasteModal isOpen={isPasteModalOpen} onClose={() => setIsPasteModalOpen(false)} onConfirm={handlePasteConfirm} />
             <input type="file" ref={fileInputRef} onChange={handleFileSelected} className="hidden" accept=".txt,.md,.json" />
             
-            {/* Desktop Layout */}
-            {/* Desktop Layout - Grid Responsivo Otimizado */}
-            <div className="hidden lg:grid lg:grid-cols-12 lg:grid-rows-6 gap-4 xl:gap-5 2xl:gap-6 p-4 lg:p-5 xl:p-6 h-full max-w-[1920px] mx-auto">
-                {/* Left Panel - Input Form */}
-                <div className="col-span-12 xl:col-span-4 lg:row-span-6 bg-white/5 backdrop-blur-sm rounded-xl xl:rounded-2xl overflow-hidden border border-white/10 shadow-xl min-h-0 flex flex-col">
-                <PromptInputForm
-                    formData={formData}
-                    setFormData={(newData) => {
-                        setFormData(newData);
-                        setHasUnsavedChanges(true);
-                    }}
-                    onGenerate={handleGeneratePrompt}
-                    isLoading={isLoading}
-                    onGenerateExamples={handleGenerateExamples}
-                    isGeneratingExamples={isGeneratingExamples}
-                    activePromptContent={activeVersion?.content ?? ''}
-                    onSaveToRepository={handleSaveToRepository}
-                    isSavingToRepository={isSavingToRepository}
+            {/* Desktop Layout - Grid 3 Colunas Fixas */}
+            <div className="hidden lg:grid lg:grid-cols-12 gap-4 xl:gap-5 2xl:gap-6">
+                {/* Coluna Esquerda - Input Form (4 colunas) */}
+                <div className="col-span-12 xl:col-span-4 bg-white/5 backdrop-blur-sm rounded-xl xl:rounded-2xl overflow-hidden border border-white/10 shadow-xl flex flex-col" style={{ height: 'calc(100vh - 180px)' }}>
+                    <PromptInputForm
+                        formData={formData}
+                        setFormData={(newData) => {
+                            setFormData(newData);
+                            setHasUnsavedChanges(true);
+                        }}
+                        onGenerate={handleGeneratePrompt}
+                        isLoading={isLoading}
+                        onGenerateExamples={handleGenerateExamples}
+                        isGeneratingExamples={isGeneratingExamples}
+                        activePromptContent={activeVersion?.content ?? ''}
+                        onSaveToRepository={handleSaveToRepository}
+                        isSavingToRepository={isSavingToRepository}
                     />
                 </div>
 
-                {/* Middle Panel - Output Display */}
-                <div className="col-span-12 xl:col-span-5 lg:row-span-4 bg-white/5 backdrop-blur-sm rounded-xl xl:rounded-2xl overflow-hidden flex flex-col border border-white/10 shadow-xl min-h-0">
-                <OutputDisplay 
-                    version={activeVersion} 
-                    isLoading={isUIBlocked} 
-                    error={error} 
-                    isValidated={!!validatedVersionId && activeVersion?.id === validatedVersionId}
-                    onValidate={handleValidateVersion}
-                    onExplain={handleExplainPrompt}
-                    />
+                {/* Coluna Central - Output e Chat (5 colunas) */}
+                <div className="col-span-12 xl:col-span-5 space-y-4 xl:space-y-5 2xl:space-y-6">
+                    {/* Output Display */}
+                    <div className="bg-white/5 backdrop-blur-sm rounded-xl xl:rounded-2xl overflow-hidden flex flex-col border border-white/10 shadow-xl" style={{ height: 'calc(50vh - 100px)' }}>
+                        <OutputDisplay 
+                            version={activeVersion} 
+                            isLoading={isUIBlocked} 
+                            error={error} 
+                            isValidated={!!validatedVersionId && activeVersion?.id === validatedVersionId}
+                            onValidate={handleValidateVersion}
+                            onExplain={handleExplainPrompt}
+                        />
+                    </div>
+
+                    {/* Chat Interface */}
+                    <div className="bg-white/5 backdrop-blur-sm rounded-xl xl:rounded-2xl overflow-hidden border border-white/10 shadow-xl flex flex-col" style={{ height: 'calc(50vh - 100px)' }}>
+                        <ChatInterface
+                            messages={chatMessages}
+                            onSendMessage={handleSendMessage}
+                            onClearChat={handleClearChat}
+                            isLoading={isChatLoading}
+                            disabled={!activeVersion || isUIBlocked}
+                            onUpdateMessage={handleUpdateMessage}
+                            onSaveCorrection={handleSaveCorrection}
+                            onDownloadChat={handleDownloadChat}
+                        />
+                    </div>
                 </div>
 
-                {/* Top Right - Workspace Manager */}
-                <div className="col-span-12 xl:col-span-3 lg:row-span-2 bg-white/5 backdrop-blur-sm rounded-xl xl:rounded-2xl overflow-hidden border border-white/10 shadow-xl min-h-0 flex flex-col">
-                    <WorkspaceManager
-                        currentWorkspaceId={currentWorkspaceId}
-                        onWorkspaceChange={handleWorkspaceChange}
-                        onWorkspaceCreated={handleWorkspaceCreated}
-                    />
-                </div>
-                
-                {/* History Panel - Top Right Middle */}
-                <div className="col-span-12 xl:col-span-3 lg:row-span-2 bg-white/5 backdrop-blur-sm rounded-xl xl:rounded-2xl overflow-hidden border border-white/10 shadow-xl min-h-0 flex flex-col">
-                    <HistoryPanel
-                    history={versionHistory}
-                    activeVersionId={activeVersion?.id ?? null}
-                    onSelectVersion={handleSelectVersion}
-                    onDeleteVersion={handleDeleteVersion}
-                    validatedVersionId={validatedVersionId}
-                    onImport={handleImportClick}
-                    onPaste={handlePasteClick}
-                    onShare={handleShareVersion}
-                    />
-                </div>
+                {/* Coluna Direita - Workspace, History, Optimizer, Assistant (3 colunas) */}
+                <div className="col-span-12 xl:col-span-3 space-y-4 xl:space-y-5 2xl:space-y-6">
+                    {/* Workspace Manager */}
+                    <div className="bg-white/5 backdrop-blur-sm rounded-xl xl:rounded-2xl overflow-hidden border border-white/10 shadow-xl flex flex-col" style={{ minHeight: '150px' }}>
+                        <WorkspaceManager
+                            currentWorkspaceId={currentWorkspaceId}
+                            onWorkspaceChange={handleWorkspaceChange}
+                            onWorkspaceCreated={handleWorkspaceCreated}
+                        />
+                    </div>
+                    
+                    {/* History Panel */}
+                    <div className="bg-white/5 backdrop-blur-sm rounded-xl xl:rounded-2xl overflow-hidden border border-white/10 shadow-xl flex flex-col" style={{ height: 'calc(35vh - 80px)' }}>
+                        <HistoryPanel
+                            history={versionHistory}
+                            activeVersionId={activeVersion?.id ?? null}
+                            onSelectVersion={handleSelectVersion}
+                            onDeleteVersion={handleDeleteVersion}
+                            validatedVersionId={validatedVersionId}
+                            onImport={handleImportClick}
+                            onPaste={handlePasteClick}
+                            onShare={handleShareVersion}
+                        />
+                    </div>
 
-                {/* Optimizer - Top Right Bottom */}
-                <div className="col-span-12 xl:col-span-3 lg:row-span-2 bg-white/5 backdrop-blur-sm rounded-xl xl:rounded-2xl overflow-hidden border border-white/10 shadow-xl min-h-0 flex flex-col">
-                    <PromptOptimizer 
-                    onOptimize={handleOptimizePrompt}
-                    isLoading={isOptimizing}
-                    disabled={!activeVersion || isUIBlocked}
-                    optimizationPairs={optimizationPairs}
-                    onClearCorrections={() => setOptimizationPairs([])}
-                    manualInstructions={manualOptInstructions}
-                        onManualInstructionsChange={setManualOptInstructions}
-                     />
-                </div>
+                    {/* Optimizer */}
+                    <div className="bg-white/5 backdrop-blur-sm rounded-xl xl:rounded-2xl overflow-hidden border border-white/10 shadow-xl flex flex-col" style={{ minHeight: '150px' }}>
+                        <PromptOptimizer 
+                            onOptimize={handleOptimizePrompt}
+                            isLoading={isOptimizing}
+                            disabled={!activeVersion || isUIBlocked}
+                            optimizationPairs={optimizationPairs}
+                            onClearCorrections={() => setOptimizationPairs([])}
+                            manualInstructions={manualOptInstructions}
+                            onManualInstructionsChange={setManualOptInstructions}
+                        />
+                    </div>
 
-                {/* Bottom - Chat Interface */}
-                <div className="col-span-12 xl:col-span-5 lg:row-span-2 bg-white/5 backdrop-blur-sm rounded-xl xl:rounded-2xl overflow-hidden border border-white/10 shadow-xl min-h-0 flex flex-col">
-                     <ChatInterface
-                    messages={chatMessages}
-                    onSendMessage={handleSendMessage}
-                    onClearChat={handleClearChat}
-                    isLoading={isChatLoading}
-                    disabled={!activeVersion || isUIBlocked}
-                    onUpdateMessage={handleUpdateMessage}
-                    onSaveCorrection={handleSaveCorrection}
-                    onDownloadChat={handleDownloadChat}
-                     />
-                </div>
-
-                {/* Bottom Right - Assistant Panel */}
-                <div className="col-span-12 xl:col-span-3 lg:row-span-2 bg-white/5 backdrop-blur-sm rounded-xl xl:rounded-2xl overflow-hidden border border-white/10 shadow-xl min-h-0 flex flex-col">
-                    <AssistantPanel 
-                    messages={assistantMessages}
-                    isRecording={isRecording}
-                    onToggleRecording={handleToggleRecording}
-                    isAssistantLoading={isAssistantLoading}
-                    error={assistantError}
-                    isApiKeySelected={isApiKeySelected}
-                    onSelectKey={handleSelectApiKey}
-                 />
+                    {/* Assistant Panel */}
+                    <div className="bg-white/5 backdrop-blur-sm rounded-xl xl:rounded-2xl overflow-hidden border border-white/10 shadow-xl flex flex-col" style={{ height: 'calc(35vh - 80px)' }}>
+                        <AssistantPanel 
+                            messages={assistantMessages}
+                            isRecording={isRecording}
+                            onToggleRecording={handleToggleRecording}
+                            isAssistantLoading={isAssistantLoading}
+                            error={assistantError}
+                            isApiKeySelected={isApiKeySelected}
+                            onSelectKey={handleSelectApiKey}
+                        />
+                    </div>
                 </div>
             </div>
 

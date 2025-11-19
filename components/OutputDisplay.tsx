@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 // FIX: Corrected import path for types.
 import type { PromptVersion, OutputFormat } from '../types';
-import { checkAccess, getCurrentPlanInfo } from '../services/subscriptionService';
+import { getCurrentPlanInfo, canShareChat } from '../services/subscriptionService';
 
 interface OutputDisplayProps {
   version: PromptVersion | null;
@@ -25,18 +25,19 @@ export const OutputDisplay: React.FC<OutputDisplayProps> = ({ version, isLoading
   const [copySuccess, setCopySuccess] = useState('');
   const [shareLink, setShareLink] = useState<string>('');
   const [showShareModal, setShowShareModal] = useState(false);
-  const [canShareChat, setCanShareChat] = useState(false);
+  const [canShareChatEnabled, setCanShareChatEnabled] = useState(false);
   const [planInfo, setPlanInfo] = useState<any>(null);
 
   useEffect(() => {
     const checkPermissions = async () => {
       try {
-        const canShare = await checkAccess('share_chat');
-        setCanShareChat(canShare);
+        const shareCheck = await canShareChat();
+        setCanShareChatEnabled(shareCheck.allowed);
         const info = await getCurrentPlanInfo();
         setPlanInfo(info);
       } catch (error) {
         console.error('Erro ao verificar permissões:', error);
+        setCanShareChatEnabled(false);
       }
     };
     checkPermissions();
@@ -128,7 +129,7 @@ export const OutputDisplay: React.FC<OutputDisplayProps> = ({ version, isLoading
         </div>
       );
     }
-    if (!version) {
+    if (!version || !version.content || version.content.trim().length === 0) {
         return <div className="flex items-center justify-center h-full text-white/40">Aguardando a geração do prompt...</div>
     }
     return (
@@ -162,10 +163,10 @@ export const OutputDisplay: React.FC<OutputDisplayProps> = ({ version, isLoading
               <button onClick={handleCopy} className="bg-white/10 hover:bg-white/20 text-white font-bold py-2 px-3 rounded-lg transition text-sm">{copySuccess || 'Copiar'}</button>
               <button onClick={handleDownload} className="bg-white/10 hover:bg-white/20 text-white font-bold py-2 px-3 rounded-lg transition text-sm">Baixar</button>
               <button 
-                onClick={canShareChat ? handleShare : () => alert('Compartilhar chat não está disponível no plano Trial. Upgrade para Premium para acessar este recurso.')} 
-                disabled={!version || !canShareChat} 
-                className={`${canShareChat ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-white/10 text-white/40 cursor-not-allowed'} text-white font-bold py-2 px-3 rounded-lg transition text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1`}
-                title={!canShareChat ? 'Compartilhar chat não disponível no Trial. Upgrade para Premium.' : 'Compartilhar chat'}
+                onClick={canShareChatEnabled ? handleShare : () => alert('Compartilhar chat não está disponível no plano Trial. Upgrade para Premium para acessar este recurso.')} 
+                disabled={!version || !canShareChatEnabled} 
+                className={`${canShareChatEnabled ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-white/10 text-white/40 cursor-not-allowed'} text-white font-bold py-2 px-3 rounded-lg transition text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1`}
+                title={!canShareChatEnabled ? 'Compartilhar chat não disponível no Trial. Upgrade para Premium.' : 'Compartilhar chat'}
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />

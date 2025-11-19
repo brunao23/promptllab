@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { signOut, supabase, getCurrentProfile } from '../services/supabaseService';
 import { isSuperAdmin } from '../services/adminService';
+import { SubscriptionInfo } from './SubscriptionInfo';
 
 interface SidebarProps {
   isMobileOpen: boolean;
@@ -194,6 +195,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onMobileClose })
             </button>
           ))}
         </nav>
+
+        {/* Premium/Subscription Info */}
+        <div className="px-4 pb-4 border-t border-white/5 pt-4">
+          <SubscriptionInfo />
+        </div>
 
         {/* User Profile */}
         <div className="p-4 border-t border-white/5">

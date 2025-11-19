@@ -377,6 +377,39 @@ BEGIN
     ALTER TABLE public.usage_tracking 
     ADD COLUMN version_id UUID REFERENCES public.prompt_versions(id) ON DELETE SET NULL;
   END IF;
+
+  -- Adicionar period_start se não existir
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+    AND table_name = 'usage_tracking' 
+    AND column_name = 'period_start'
+  ) THEN
+    ALTER TABLE public.usage_tracking 
+    ADD COLUMN period_start TIMESTAMPTZ;
+    
+    -- Atualizar valores NULL existentes com o início do mês baseado em usage_month e usage_year
+    UPDATE public.usage_tracking 
+    SET period_start = date_trunc('month', make_date(usage_year, usage_month, 1))
+    WHERE period_start IS NULL;
+    
+    -- Agora tornar a coluna NOT NULL
+    ALTER TABLE public.usage_tracking 
+    ALTER COLUMN period_start SET NOT NULL;
+    
+    -- Definir valor padrão para novos registros
+    ALTER TABLE public.usage_tracking 
+    ALTER COLUMN period_start SET DEFAULT date_trunc('month', NOW());
+  ELSE
+    -- Se a coluna já existe, apenas atualizar valores NULL existentes
+    UPDATE public.usage_tracking 
+    SET period_start = date_trunc('month', make_date(usage_year, usage_month, 1))
+    WHERE period_start IS NULL;
+    
+    -- Garantir que a coluna não permita NULL
+    ALTER TABLE public.usage_tracking 
+    ALTER COLUMN period_start SET NOT NULL;
+  END IF;
 END $$;
 
 -- =====================================================
@@ -755,7 +788,8 @@ BEGIN
     usage_month,
     usage_year,
     prompt_id,
-    version_id
+    version_id,
+    period_start
   ) VALUES (
     p_user_id,
     v_subscription_id,
@@ -766,7 +800,8 @@ BEGIN
     EXTRACT(MONTH FROM NOW()),
     EXTRACT(YEAR FROM NOW()),
     p_prompt_id,
-    p_version_id
+    p_version_id,
+    date_trunc('month', NOW())
   )
   RETURNING id INTO v_usage_id;
 

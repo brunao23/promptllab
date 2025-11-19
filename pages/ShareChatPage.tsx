@@ -40,6 +40,9 @@ export const ShareChatPage: React.FC = () => {
 
         setPromptContent(version.content);
         
+        // Inicializar chat com o prompt
+        await startChat(version.content);
+        
         // Extrair nome do agente da persona (se possível)
         if (version.sourceData?.persona) {
           const personaText = version.sourceData.persona;
@@ -61,8 +64,6 @@ export const ShareChatPage: React.FC = () => {
           }
         }
 
-        // Inicializar chat
-        await startChat(version.content);
         setIsLoading(false);
       } catch (err: any) {
         console.error('Erro ao carregar versão:', err);

@@ -6,7 +6,6 @@ import { RepositoryPage } from './RepositoryPage';
 import { SettingsPage } from './SettingsPage';
 import { AdminPage } from './AdminPage';
 import { TrialBanner } from '../components/TrialBanner';
-import { SubscriptionInfo } from '../components/SubscriptionInfo';
 import { DiagnosticPanel } from '../components/DiagnosticPanel';
 
 export const Dashboard: React.FC = () => {
@@ -34,7 +33,7 @@ export const Dashboard: React.FC = () => {
       />
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col overflow-hidden lg:ml-0">
+      <div className="flex-1 flex flex-col overflow-hidden">
         {/* Mobile Header - Topo em telas pequenas */}
         <header className="lg:hidden sticky top-0 z-40 bg-black/95 backdrop-blur-md border-b border-white/10 px-4 py-3 flex items-center justify-between shadow-lg">
           <button
@@ -60,37 +59,28 @@ export const Dashboard: React.FC = () => {
         {/* Content Area - Scrollável */}
         <main className="flex-1 overflow-y-auto overflow-x-hidden bg-black">
           {/* Container responsivo com padding adequado */}
-          <div className="max-w-[1920px] mx-auto px-3 sm:px-4 md:px-6 lg:px-8 xl:px-10 py-4 sm:py-5 md:py-6 lg:py-8">
+          <div className="w-full max-w-[1920px] mx-auto px-4 md:px-6 lg:px-8 xl:px-10 py-4 md:py-6 lg:py-8">
             {/* Diagnostic Panel - Apenas aparece se houver erro */}
-            <div className="mb-3 sm:mb-4">
+            <div className="mb-4">
               <DiagnosticPanel />
             </div>
 
             {/* Trial Banner - Topo do conteúdo */}
-            <div className="mb-4 sm:mb-5 md:mb-6">
+            <div className="mb-4 md:mb-5 lg:mb-6">
               <TrialBanner />
             </div>
 
-            {/* Grid Layout Principal - Totalmente Responsivo */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4 md:gap-5 lg:gap-6">
-              {/* Conteúdo Principal - Esquerda */}
-              <div className="lg:col-span-8 xl:col-span-9 order-2 lg:order-1">
-                <div className="min-w-0 w-full">
-                  <Routes>
-                    <Route path="/" element={<PromptManager />} />
-                    <Route path="/repository" element={<RepositoryPage />} />
-                    <Route path="/settings" element={<SettingsPage />} />
-                    <Route path="/admin" element={<AdminPage />} />
-                  </Routes>
-                </div>
+            {/* Grid Layout Principal - Desktop com 2 colunas */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-5 lg:gap-6">
+              {/* Conteúdo Principal - Ocupa toda a largura */}
+              <div className="lg:col-span-12">
+                <Routes>
+                  <Route path="/" element={<PromptManager />} />
+                  <Route path="/repository" element={<RepositoryPage />} />
+                  <Route path="/settings" element={<SettingsPage />} />
+                  <Route path="/admin" element={<AdminPage />} />
+                </Routes>
               </div>
-
-              {/* Sidebar Direita - Subscription Info */}
-              <aside className="lg:col-span-4 xl:col-span-3 order-1 lg:order-2">
-                <div className="sticky top-4 lg:top-6 space-y-3 sm:space-y-4">
-                  <SubscriptionInfo />
-                </div>
-              </aside>
             </div>
           </div>
         </main>

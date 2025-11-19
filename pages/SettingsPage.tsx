@@ -3,6 +3,15 @@ import { useNavigate } from 'react-router-dom';
 import { getCurrentProfile, supabase, updateProfile, changePassword, uploadAvatar } from '../services/supabaseService';
 import { ensureAvatarsBucket } from '../services/bucketService';
 import { validateName, validatePassword, sanitizeText } from '../utils/security';
+import { 
+  getUserApiKeys, 
+  saveUserApiKey, 
+  deleteUserApiKey, 
+  validateGeminiApiKey, 
+  validateOpenAIApiKey,
+  type ApiProvider,
+  type UserApiKey 
+} from '../services/apiKeyService';
 
 export const SettingsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -27,6 +36,17 @@ export const SettingsPage: React.FC = () => {
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const loadedOnceRef = React.useRef(false);
+  
+  // API Keys state
+  const [apiKeys, setApiKeys] = useState<UserApiKey[]>([]);
+  const [isLoadingApiKeys, setIsLoadingApiKeys] = useState(false);
+  const [isSavingApiKey, setIsSavingApiKey] = useState(false);
+  const [isValidatingApiKey, setIsValidatingApiKey] = useState(false);
+  const [apiKeyForm, setApiKeyForm] = useState({
+    provider: 'gemini' as ApiProvider,
+    apiKey: '',
+    isGlobal: false,
+  });
 
   useEffect(() => {
     // Evitar recarregamento desnecessário se já foi carregado
@@ -37,7 +57,92 @@ export const SettingsPage: React.FC = () => {
     loadProfile().then(() => {
       loadedOnceRef.current = true;
     });
+    loadApiKeys();
   }, []);
+  
+  const loadApiKeys = async () => {
+    try {
+      setIsLoadingApiKeys(true);
+      const keys = await getUserApiKeys();
+      setApiKeys(keys);
+    } catch (error: any) {
+      console.error('Erro ao carregar API Keys:', error);
+      setError('Erro ao carregar API Keys');
+    } finally {
+      setIsLoadingApiKeys(false);
+    }
+  };
+  
+  const handleSaveApiKey = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!apiKeyForm.apiKey.trim()) {
+      setError('Por favor, insira uma API Key');
+      return;
+    }
+    
+    try {
+      setIsSavingApiKey(true);
+      setIsValidatingApiKey(true);
+      setError(null);
+      setSuccess(null);
+      
+      // Validar API Key antes de salvar
+      let isValid = false;
+      if (apiKeyForm.provider === 'gemini') {
+        isValid = await validateGeminiApiKey(apiKeyForm.apiKey.trim());
+      } else if (apiKeyForm.provider === 'openai') {
+        isValid = await validateOpenAIApiKey(apiKeyForm.apiKey.trim());
+      }
+      
+      if (!isValid) {
+        setError(`API Key inválida para ${apiKeyForm.provider === 'gemini' ? 'Gemini' : 'OpenAI'}. Verifique se a chave está correta.`);
+        setIsValidatingApiKey(false);
+        setIsSavingApiKey(false);
+        return;
+      }
+      
+      setIsValidatingApiKey(false);
+      
+      // Salvar API Key
+      await saveUserApiKey(apiKeyForm.provider, apiKeyForm.apiKey.trim(), apiKeyForm.isGlobal);
+      
+      setSuccess(`API Key do ${apiKeyForm.provider === 'gemini' ? 'Gemini' : 'OpenAI'} salva com sucesso!`);
+      setTimeout(() => setSuccess(null), 3000);
+      
+      // Limpar formulário
+      setApiKeyForm({
+        provider: 'gemini',
+        apiKey: '',
+        isGlobal: false,
+      });
+      
+      // Recarregar lista
+      await loadApiKeys();
+    } catch (error: any) {
+      console.error('Erro ao salvar API Key:', error);
+      setError(error.message || 'Erro ao salvar API Key');
+    } finally {
+      setIsSavingApiKey(false);
+      setIsValidatingApiKey(false);
+    }
+  };
+  
+  const handleDeleteApiKey = async (id: string) => {
+    if (!confirm('Tem certeza que deseja remover esta API Key?')) {
+      return;
+    }
+    
+    try {
+      await deleteUserApiKey(id);
+      setSuccess('API Key removida com sucesso!');
+      setTimeout(() => setSuccess(null), 3000);
+      await loadApiKeys();
+    } catch (error: any) {
+      console.error('Erro ao deletar API Key:', error);
+      setError(error.message || 'Erro ao remover API Key');
+    }
+  };
 
   const loadProfile = async () => {
     // Evitar recarregamento se já está carregando ou já carregou recentemente
@@ -471,6 +576,124 @@ export const SettingsPage: React.FC = () => {
                 {isChangingPassword ? 'Alterando...' : 'Alterar Senha'}
               </button>
             </form>
+          </div>
+
+          {/* API Keys Section */}
+          <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-6 border border-white/10 shadow-xl">
+            <h2 className="text-xl font-bold text-white mb-4">API Keys</h2>
+            <p className="text-sm text-white/60 mb-6">
+              Configure suas próprias API Keys para usar quando a API do sistema estiver indisponível ou quando você quiser usar sua própria chave.
+            </p>
+            
+            {/* Formulário para adicionar API Key */}
+            <form onSubmit={handleSaveApiKey} className="mb-6 space-y-4 p-4 bg-white/5 rounded-lg border border-white/10">
+              <div>
+                <label className="block text-sm font-medium text-white/80 mb-2">
+                  Provedor
+                </label>
+                <select
+                  value={apiKeyForm.provider}
+                  onChange={(e) => setApiKeyForm({ ...apiKeyForm, provider: e.target.value as ApiProvider })}
+                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50"
+                >
+                  <option value="gemini">Google Gemini</option>
+                  <option value="openai">OpenAI</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-white/80 mb-2">
+                  API Key
+                </label>
+                <input
+                  type="password"
+                  value={apiKeyForm.apiKey}
+                  onChange={(e) => setApiKeyForm({ ...apiKeyForm, apiKey: e.target.value })}
+                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 font-mono text-sm"
+                  placeholder={apiKeyForm.provider === 'gemini' ? 'AIzaSy...' : 'sk-...'}
+                />
+                <p className="text-xs text-white/40 mt-1">
+                  {apiKeyForm.provider === 'gemini' 
+                    ? 'Obtenha sua chave em: https://aistudio.google.com/app/apikey'
+                    : 'Obtenha sua chave em: https://platform.openai.com/api-keys'
+                  }
+                </p>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="isGlobal"
+                  checked={apiKeyForm.isGlobal}
+                  onChange={(e) => setApiKeyForm({ ...apiKeyForm, isGlobal: e.target.checked })}
+                  className="w-4 h-4 rounded border-white/20 bg-white/5 text-emerald-500 focus:ring-emerald-500/50"
+                />
+                <label htmlFor="isGlobal" className="text-sm text-white/80">
+                  Usar globalmente quando a API do sistema falhar
+                </label>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isSavingApiKey || isValidatingApiKey || !apiKeyForm.apiKey.trim()}
+                className="w-full px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-black font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isValidatingApiKey ? 'Validando...' : isSavingApiKey ? 'Salvando...' : 'Salvar API Key'}
+              </button>
+            </form>
+
+            {/* Lista de API Keys */}
+            {isLoadingApiKeys ? (
+              <div className="text-center py-8">
+                <div className="inline-block w-8 h-8 border-4 border-white/10 rounded-full border-t-emerald-400 animate-spin"></div>
+                <p className="text-white/60 mt-4">Carregando API Keys...</p>
+              </div>
+            ) : apiKeys.length === 0 ? (
+              <div className="text-center py-8 text-white/60">
+                <p>Nenhuma API Key configurada</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {apiKeys.map((key) => (
+                  <div
+                    key={key.id}
+                    className="p-4 bg-white/5 rounded-lg border border-white/10 flex items-center justify-between"
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-3 mb-2">
+                        <span className="px-3 py-1 bg-emerald-500/20 text-emerald-400 rounded text-sm font-semibold">
+                          {key.provider === 'gemini' ? 'Gemini' : 'OpenAI'}
+                        </span>
+                        {key.is_active && (
+                          <span className="px-2 py-1 bg-green-500/20 text-green-400 rounded text-xs">
+                            Ativa
+                          </span>
+                        )}
+                        {key.is_global && (
+                          <span className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-xs">
+                            Global
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-white/40 font-mono">
+                        {key.api_key.substring(0, 10)}...{key.api_key.substring(key.api_key.length - 4)}
+                      </p>
+                      {key.usage_count > 0 && (
+                        <p className="text-xs text-white/60 mt-1">
+                          Usada {key.usage_count} vez(es) • {key.total_tokens_used.toLocaleString()} tokens
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => handleDeleteApiKey(key.id)}
+                      className="px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg transition-colors text-sm"
+                    >
+                      Remover
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -3,34 +3,66 @@ import { GoogleGenAI, Chat, GenerateContentResponse, Type, FunctionDeclaration }
 import type { PromptData, FewShotExample, OptimizationPair } from '../types';
 import { canUseTokens, incrementTokenUsage } from './subscriptionService';
 import { estimateFullTokens } from '../utils/tokenEstimator';
+import { getUserApiKey, updateApiKeyUsage } from './apiKeyService';
 
 // Helper function to get the API key and initialize the AI client
-const getAI = () => {
-    const apiKey = process.env.API_KEY;
-    if (!apiKey) {
-        throw new Error("API_KEY environment variable not set.");
+// Tenta usar a API Key do usuário primeiro, depois a do sistema
+const getAI = async (): Promise<{ ai: GoogleGenAI; usingUserKey: boolean; apiKey: string }> => {
+    // Primeiro, tenta buscar a API Key do usuário
+    let apiKey = await getUserApiKey('gemini');
+    let usingUserKey = false;
+    
+    if (apiKey) {
+        usingUserKey = true;
+        console.log('🔑 Usando API Key do usuário (Gemini)');
+    } else {
+        // Se não houver API Key do usuário, usa a do sistema
+        apiKey = process.env.API_KEY || '';
+        if (!apiKey) {
+            throw new Error("API_KEY não configurada. Configure sua própria API Key nas Configurações ou configure a API_KEY do sistema.");
+        }
+        console.log('🔑 Usando API Key do sistema (Gemini)');
     }
-    return new GoogleGenAI({ apiKey });
+    
+    return {
+        ai: new GoogleGenAI({ apiKey }),
+        usingUserKey,
+        apiKey
+    };
 };
 
 const model = 'gemini-2.5-flash';
 
 export const createFinalPrompt = async (data: PromptData): Promise<string> => {
-    const ai = getAI();
+    // Validar campos obrigatórios
+    if (!data.persona || !data.persona.trim()) {
+        throw new Error('Campo "Persona" é obrigatório');
+    }
+    if (!data.objetivo || !data.objetivo.trim()) {
+        throw new Error('Campo "Objetivo" é obrigatório');
+    }
+    if (!data.contextoNegocio || !data.contextoNegocio.trim()) {
+        throw new Error('Campo "Contexto do Negócio" é obrigatório');
+    }
+    if (!data.contexto || !data.contexto.trim()) {
+        throw new Error('Campo "Contexto da Interação" é obrigatório');
+    }
+
+    const { ai, usingUserKey } = await getAI();
     let basePromptInfo = `
 # INFORMAÇÕES BASE PARA GERAÇÃO DO PROMPT MESTRE
 
 ## IDENTIDADE CENTRAL & EXPERTISE (PERSONA)
-${data.persona}
+${data.persona.trim()}
 
 ## OBJETIVO PRINCIPAL
-${data.objetivo}
+${data.objetivo.trim()}
 
 ## CONTEXTO DO NEGÓCIO
-${data.contextoNegocio}
+${data.contextoNegocio.trim()}
 
 ## CONTEXTO DA INTERAÇÃO
-${data.contexto}
+${data.contexto.trim()}
 `;
     if (data.ferramentas.length > 0) {
         basePromptInfo += `\n## FERRAMENTAS DISPONÍVEIS (TOOLS)\n`;
@@ -236,6 +268,11 @@ Sua resposta deve ser APENAS o objeto JSON válido, SEM blocos de código markdo
     const actualTokens = estimateFullTokens(expansionPrompt, response.text);
     await incrementTokenUsage(actualTokens);
     
+    // Se estiver usando API Key do usuário, atualizar estatísticas
+    if (usingUserKey) {
+        await updateApiKeyUsage('gemini', actualTokens);
+    }
+    
     let finalText = response.text.trim();
     
     // Se for JSON, garantir que está bem formatado
@@ -268,9 +305,11 @@ Sua resposta deve ser APENAS o objeto JSON válido, SEM blocos de código markdo
 };
 
 let chatInstance: Chat | null = null;
+let currentApiKeyInfo: { usingUserKey: boolean; apiKey: string } | null = null;
 
-export const startChat = (systemInstruction: string): void => {
-    const ai = getAI();
+export const startChat = async (systemInstruction: string): Promise<void> => {
+    const { ai, usingUserKey, apiKey } = await getAI();
+    currentApiKeyInfo = { usingUserKey, apiKey };
     // Se o prompt mestre for JSON, tentamos extrair algo usável como instrução de sistema se possível,
     // ou usamos o JSON inteiro como string.
     let finalInstruction = systemInstruction;
@@ -310,6 +349,11 @@ export const continueChat = async (message: string, promptContent?: string): Pro
         const actualTokens = estimateFullTokens(message, response.text);
         await incrementTokenUsage(actualTokens);
         
+        // Se estiver usando API Key do usuário, atualizar estatísticas
+        if (currentApiKeyInfo?.usingUserKey) {
+            await updateApiKeyUsage('gemini', actualTokens);
+        }
+        
         return response.text;
     } catch (error: any) {
         console.error("Error in chat:", error);
@@ -322,7 +366,7 @@ export const continueChat = async (message: string, promptContent?: string): Pro
 };
 
 export const generateExamples = async (data: PromptData): Promise<Omit<FewShotExample, 'id'>[]> => {
-    const ai = getAI();
+    const { ai, usingUserKey, apiKey } = await getAI();
     try {
         const generationContext = `
         **Persona do Agente:** ${data.persona}
@@ -376,7 +420,7 @@ export const generateExamples = async (data: PromptData): Promise<Omit<FewShotEx
 };
 
 export const optimizePrompt = async (currentPrompt: string, corrections: OptimizationPair[], instructions: string = ''): Promise<string> => {
-    const ai = getAI();
+    const { ai, usingUserKey, apiKey } = await getAI();
     try {
         const correctionsSection = corrections.length > 0 ? corrections.map((c, i) => `
 ### Correção ${i + 1}
@@ -414,21 +458,62 @@ Reescreva o prompt para corrigir os problemas identificados. Retorne APENAS o no
             isJson = true;
         } catch (e) {}
 
+        const optimizationPromptWithFormatting = isJson ? `${optimizationPrompt}
+
+**IMPORTANTE - FORMATO JSON:**
+- O prompt otimizado DEVE ser um JSON válido e bem formatado
+- Use indentação de 2 espaços por nível
+- Use quebras de linha após cada chave/valor
+- NÃO retorne JSON em bloco de código markdown (sem três backticks json)
+- Retorne APENAS o objeto JSON puro, bem formatado e estruturado
+- Garanta que o JSON seja válido e passível de parse com JSON.parse()
+` : optimizationPrompt;
+
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-pro',
-            contents: optimizationPrompt,
+            contents: optimizationPromptWithFormatting,
             config: isJson ? { responseMimeType: "application/json" } : undefined
         });
 
-        return response.text;
-    } catch (error) {
+        let optimizedText = response.text.trim();
+
+        // Se for JSON, formatar e limpar
+        if (isJson) {
+            try {
+                // Remover blocos de código markdown se houver
+                optimizedText = optimizedText.replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();
+                optimizedText = optimizedText.replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
+                
+                // Parsear e reformatar com indentação de 2 espaços
+                const parsed = JSON.parse(optimizedText);
+                optimizedText = JSON.stringify(parsed, null, 2);
+            } catch (parseError) {
+                console.warn('⚠️ Erro ao formatar JSON otimizado, tentando extrair JSON:', parseError);
+                // Tentar extrair JSON do texto se houver
+                const jsonMatch = optimizedText.match(/\{[\s\S]*\}/);
+                if (jsonMatch) {
+                    try {
+                        const parsed = JSON.parse(jsonMatch[0]);
+                        optimizedText = JSON.stringify(parsed, null, 2);
+                    } catch (e2) {
+                        console.error('❌ Erro ao extrair e formatar JSON:', e2);
+                        // Se falhar, retornar o texto original
+                    }
+                }
+            }
+        }
+
+        return optimizedText;
+    } catch (error: any) {
         console.error("Error optimizing prompt:", error);
-        throw new Error("Falha na otimização.");
+        // Garantir que o erro seja uma string ou objeto com mensagem
+        const errorMessage = error?.message || error?.toString() || "Falha na otimização.";
+        throw new Error(errorMessage);
     }
 };
 
 export const explainPrompt = async (promptContent: string): Promise<string> => {
-    const ai = getAI();
+    const { ai, usingUserKey, apiKey } = await getAI();
     const explanationRequest = `
 Você é um especialista em engenharia de prompts e comunicação técnica. Sua tarefa é analisar o prompt de IA fornecido e gerar uma documentação clara, detalhada e pedagógica sobre ele. O público-alvo desta documentação são clientes e membros não-técnicos da equipe do projeto.
 
@@ -513,7 +598,7 @@ const retryWithBackoff = async <T>(
 };
 
 export const analyzeDocument = async (fileBase64: string, mimeType: string, fileName?: string): Promise<Partial<PromptData>> => {
-    const ai = getAI();
+    const { ai, usingUserKey, apiKey } = await getAI();
 
     // Para arquivos CSV, melhorar o prompt de análise
     const isCsv = mimeType === 'text/csv' || fileName?.toLowerCase().endsWith('.csv');
@@ -594,6 +679,11 @@ Retorne sempre um JSON válido, mesmo que alguns campos estejam vazios.
             // Incrementar uso de tokens após a chamada
             const actualTokens = estimateFullTokens(extractionPrompt, response.text);
             await incrementTokenUsage(actualTokens);
+            
+            // Se estiver usando API Key do usuário, atualizar estatísticas
+            if (usingUserKey) {
+                await updateApiKeyUsage('gemini', actualTokens);
+            }
             
             return response;
         }, 3, 500); // 3 tentativas, começando com 500ms (reduzido de 2s para acelerar)
@@ -688,7 +778,7 @@ const formUpdateTools: FunctionDeclaration[] = [
 const assistantSystemInstruction = `Você é um assistente de preenchimento de formulário por voz. Transcreva o áudio do usuário e use as ferramentas para atualizar os campos. Responda com [TRANSCRIÇÃO: ...] seguido de uma confirmação curta.`;
 
 export const processAudioCommand = async (audioBase64: string, audioMimeType: string): Promise<GenerateContentResponse> => {
-    const ai = getAI();
+    const { ai, usingUserKey, apiKey } = await getAI();
     try {
         return await ai.models.generateContent({
             model: 'gemini-2.5-pro',
