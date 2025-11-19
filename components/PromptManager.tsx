@@ -208,7 +208,7 @@ export const PromptManager: React.FC = () => {
                                     } else {
                                         const initialPromptContent = await createFinalPrompt(promptData);
                                         const newVersion = await createPromptVersion(
-                                            promptIdFromState,
+                                            promptIdFromParams,
                                             initialPromptContent,
                                             promptData.formatoSaida || 'text',
                                             promptData.masterPromptFormat || 'markdown',
