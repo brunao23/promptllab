@@ -161,7 +161,12 @@ export const PromptManager: React.FC = () => {
                 console.log('✅ Usuário autenticado:', session.user.email);
 
                 // Verificar se há um promptId no state (vindo do repositório)
+                // IMPORTANTE: Limpar o location.state após usar para evitar recarregamentos infinitos
                 const promptIdFromState = (location.state as any)?.promptId;
+                if (promptIdFromState && location.state) {
+                    // Limpar o state após ler para evitar recarregamentos infinitos
+                    window.history.replaceState({}, document.title, location.pathname);
+                }
                 
                 if (promptIdFromState) {
                     console.log('📋 Carregando prompt específico do repositório:', promptIdFromState);
@@ -241,12 +246,15 @@ export const PromptManager: React.FC = () => {
                             console.warn('⚠️ Ainda não há versões disponíveis após tentativa de geração');
                         }
                         setIsLoadingData(false);
+                        dataLoadedRef.current = true;
                         return;
                     } catch (err: any) {
                         console.error('❌ Erro ao carregar prompt do repositório:', err);
                         setError(err.message || 'Erro ao carregar prompt do repositório');
-                        // Não setar setIsLoadingData(false) aqui - deixar o fluxo normal continuar
-                        // para tentar carregar os prompts do usuário normalmente
+                        // Garantir que isLoadingData seja false mesmo em caso de erro
+                        setIsLoadingData(false);
+                        dataLoadedRef.current = true;
+                        // Continuar o fluxo normal para tentar carregar os prompts do usuário
                     }
                 }
 
@@ -482,13 +490,19 @@ export const PromptManager: React.FC = () => {
                 setChatMessages([]);
                 setFormData(INITIAL_PROMPT_DATA);
             } finally {
+                // CRÍTICO: Sempre garantir que isLoadingData seja false
                 console.log('✅ Carregamento de dados finalizado. isLoadingData = false');
                 setIsLoadingData(false);
                 dataLoadedRef.current = true;
             }
         };
 
-        loadUserData();
+        // Verificar se já está carregando para evitar múltiplos carregamentos simultâneos
+        if (!isLoadingData) {
+            loadUserData();
+        } else {
+            console.log('⏸️ Carregamento já em andamento, aguardando...');
+        }
 
         // Listener para mudanças de autenticação (logout/login)
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -523,7 +537,7 @@ export const PromptManager: React.FC = () => {
         return () => {
             subscription.unsubscribe();
         };
-    }, []);
+    }, [location.pathname]); // Adicionar location.pathname como dependência para recarregar quando mudar de rota
 
     // Debug: Log quando versionHistory muda
     useEffect(() => {
