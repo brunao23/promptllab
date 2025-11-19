@@ -335,7 +335,14 @@ export function validateCSRFToken(token: string, storedToken: string): boolean {
 // =====================================================
 
 interface SecurityEvent {
-  type: 'login_attempt' | 'login_failed' | 'login_success' | 'signup_attempt' | 'rate_limit_exceeded' | 'suspicious_activity';
+  type:
+    | 'login_attempt'
+    | 'login_failed'
+    | 'login_success'
+    | 'signup_attempt'
+    | 'signup_success'
+    | 'rate_limit_exceeded'
+    | 'suspicious_activity';
   identifier: string;
   timestamp: number;
   details?: Record<string, any>;
