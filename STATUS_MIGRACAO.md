@@ -19,13 +19,14 @@
 ## 🔄 EM ANDAMENTO
 
 ### Páginas a Migrar
-- [ ] `app/register/page.tsx` - Página de Registro
-- [ ] `app/auth/callback/page.tsx` - Callback de autenticação
-- [ ] `app/dashboard/page.tsx` - Dashboard principal
-- [ ] `app/dashboard/repository/page.tsx` - Repositório
-- [ ] `app/dashboard/settings/page.tsx` - Configurações
-- [ ] `app/admin/page.tsx` - Painel Admin
-- [ ] `app/chat/[versionId]/page.tsx` - Chat compartilhado
+- ✅ `app/register/page.tsx` - Página de Registro
+- ✅ `app/auth/callback/page.tsx` - Callback de autenticação
+- ✅ `app/dashboard/page.tsx` - Dashboard principal
+- ✅ `app/dashboard/layout.tsx` - Layout do Dashboard
+- ✅ `app/dashboard/repository/page.tsx` - Repositório
+- ✅ `app/dashboard/settings/page.tsx` - Configurações
+- ✅ `app/admin/page.tsx` - Painel Admin
+- ✅ `app/chat/[versionId]/page.tsx` - Chat compartilhado
 
 ### Serviços a Atualizar
 - [ ] Criar `lib/supabaseService.ts` adaptado para Next.js
@@ -37,6 +38,9 @@
 - [ ] Marcar componentes que usam hooks como `'use client'`
 - [ ] Verificar quais podem ser Server Components
 - [ ] Atualizar imports de `react-router-dom` para `next/link` e `next/navigation`
+- [ ] `components/Sidebar.tsx` - Atualizar navegação
+- [ ] `components/PromptManager.tsx` - Atualizar navegação
+- [ ] `components/Header.tsx` - Atualizar navegação
 
 ## ⚠️ IMPORTANTE - Variáveis de Ambiente
 
