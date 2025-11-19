@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useEffect, useState } from 'react';
 import { getCurrentPlanInfo, getCurrentMonthUsage, getCurrentMonthVersions } from '../services/subscriptionService';
 

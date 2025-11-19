@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useCallback, useState } from 'react';
 import { analyzeDocument } from '../services/geminiService';
 import { validateFileSize, validateFileType } from '../utils/security';

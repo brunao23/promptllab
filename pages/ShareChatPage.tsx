@@ -1,12 +1,16 @@
+'use client';
+
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams } from 'react-router-dom';
 import { getPromptVersion } from '../services/supabaseService';
 import { startChat, continueChat } from '../services/geminiService';
 import type { ChatMessage } from '../types';
 import { jsPDF } from 'jspdf';
 
-export const ShareChatPage: React.FC = () => {
-  const { versionId } = useParams<{ versionId: string }>();
+interface ShareChatPageProps {
+  versionId: string;
+}
+
+export const ShareChatPage: React.FC<ShareChatPageProps> = ({ versionId }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(true);

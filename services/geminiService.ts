@@ -17,9 +17,15 @@ const getAI = async (): Promise<{ ai: GoogleGenAI; usingUserKey: boolean; apiKey
         console.log('🔑 Usando API Key do usuário (Gemini)');
     } else {
         // Se não houver API Key do usuário, usa a do sistema
-        apiKey = process.env.API_KEY || '';
+        // Suporta tanto Next.js quanto Vite
+        apiKey = 
+          (typeof process !== 'undefined' && process.env?.GEMINI_API_KEY) ||
+          (typeof process !== 'undefined' && process.env?.API_KEY) ||
+          (typeof import.meta !== 'undefined' && (import.meta as any).env?.GEMINI_API_KEY) ||
+          (typeof import.meta !== 'undefined' && (import.meta as any).env?.API_KEY) ||
+          '';
         if (!apiKey) {
-            throw new Error("API_KEY não configurada. Configure sua própria API Key nas Configurações ou configure a API_KEY do sistema.");
+            throw new Error("API_KEY não configurada. Configure sua própria API Key nas Configurações ou configure a GEMINI_API_KEY do sistema.");
         }
         console.log('🔑 Usando API Key do sistema (Gemini)');
     }

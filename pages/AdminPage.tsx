@@ -3,8 +3,10 @@
  * Apenas brunocostaads23@gmail.com tem acesso
  */
 
+'use client';
+
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/navigation';
 import { supabase } from '../services/supabaseService';
 import { 
   isAdmin, 
@@ -21,7 +23,7 @@ import {
 import type { Tenant, UserWithSubscription } from '../services/adminService';
 
 export const AdminPage: React.FC = () => {
-  const navigate = useNavigate();
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'tenants' | 'subscriptions'>('dashboard');
@@ -47,7 +49,7 @@ export const AdminPage: React.FC = () => {
         const isSuper = await isSuperAdmin();
         if (!isSuper) {
           alert('Acesso negado. Apenas administradores master podem acessar este painel.');
-          navigate('/dashboard');
+          router.push('/dashboard');
           return;
         }
         setIsAuthorized(true);
@@ -149,7 +151,7 @@ export const AdminPage: React.FC = () => {
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <button
-              onClick={() => navigate('/dashboard')}
+              onClick={() => router.push('/dashboard')}
               className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -1,9 +1,13 @@
+'use client';
+
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { signOut, supabase, getCurrentProfile } from '../services/supabaseService';
+import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
+import { signOut, getCurrentProfile } from '../services/supabaseService';
 
 export const Header: React.FC = () => {
-  const navigate = useNavigate();
+  const router = useRouter();
+  const supabase = createClient();
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [userName, setUserName] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -58,7 +62,7 @@ export const Header: React.FC = () => {
   const handleLogout = async () => {
     try {
       await signOut();
-      navigate('/login');
+      router.push('/login');
     } catch (error) {
       console.error('Erro ao fazer logout:', error);
     }

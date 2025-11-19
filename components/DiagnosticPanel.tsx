@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../services/supabaseService';
 import { getCurrentSubscription } from '../services/subscriptionService';
