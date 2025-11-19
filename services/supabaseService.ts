@@ -20,9 +20,13 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 // Validação mais rigorosa das variáveis de ambiente
 if (!supabaseUrl || !supabaseAnonKey) {
   const errorMsg = '❌ ERRO: Variáveis de ambiente do Supabase não configuradas!\n' +
-    'Configure VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY no arquivo .env ou nas variáveis de ambiente da Vercel.\n' +
+    '⚠️ IMPORTANTE: Este projeto usa VITE (não Next.js), então você DEVE usar:\n' +
+    '   - VITE_SUPABASE_URL (NÃO NEXT_PUBLIC_SUPABASE_URL!)\n' +
+    '   - VITE_SUPABASE_ANON_KEY (NÃO NEXT_PUBLIC_SUPABASE_ANON_KEY!)\n' +
+    'Configure na Vercel: Settings → Environment Variables\n' +
     `URL atual: ${supabaseUrl || 'VAZIO'}\n` +
-    `Key atual: ${supabaseAnonKey ? supabaseAnonKey.substring(0, 20) + '...' : 'VAZIO'}`;
+    `Key atual: ${supabaseAnonKey ? supabaseAnonKey.substring(0, 20) + '...' : 'VAZIO'}\n` +
+    '📖 Consulte: URGENTE_CORRIGIR_VARIAVEIS_VERCEL.md';
   
   console.error(errorMsg);
   
@@ -30,6 +34,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
   // Mas vamos criar um cliente com valores vazios para que os erros apareçam claramente
   if (import.meta.env.PROD) {
     console.error('⚠️ Aplicação em produção sem configuração do Supabase!');
+    console.error('⚠️ Verifique se as variáveis estão com prefixo VITE_ na Vercel!');
   }
 }
 
