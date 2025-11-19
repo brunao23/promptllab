@@ -57,14 +57,14 @@ export const AdminPage: React.FC = () => {
         await loadData();
       } catch (error) {
         console.error('Erro ao verificar permissões:', error);
-        navigate('/dashboard');
+        router.push('/dashboard');
       } finally {
         setIsLoading(false);
       }
     };
 
     checkAuth();
-  }, [navigate]);
+  }, [router]);
 
   const loadData = async () => {
     try {
@@ -428,4 +428,6 @@ export const AdminPage: React.FC = () => {
     </div>
   );
 };
+
+export default AdminPage;
 

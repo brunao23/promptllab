@@ -372,7 +372,7 @@ export const SettingsPage: React.FC = () => {
 
       const passwordValidation = validatePassword(passwordData.newPassword);
       if (!passwordValidation.valid) {
-        setError(passwordValidation.error || 'Senha inválida');
+        setError(passwordValidation.errors.join(', ') || 'Senha inválida');
         setIsChangingPassword(false);
         return;
       }
@@ -704,4 +704,6 @@ export const SettingsPage: React.FC = () => {
     </div>
   );
 };
+
+export default SettingsPage;
 

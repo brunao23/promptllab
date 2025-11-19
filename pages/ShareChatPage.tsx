@@ -608,3 +608,5 @@ export const ShareChatPage: React.FC<ShareChatPageProps> = ({ versionId }) => {
   );
 };
 
+export default ShareChatPage;
+

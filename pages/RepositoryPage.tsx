@@ -1,6 +1,8 @@
+'use client';
+
 import React, { useState, useEffect } from 'react';
 import { getUserPrompts, getPrompt, deletePrompt } from '../services/supabaseService';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/navigation';
 
 
 interface Prompt {
@@ -291,4 +293,6 @@ export const RepositoryPage: React.FC = () => {
     </div>
   );
 };
+
+export default RepositoryPage;
 
