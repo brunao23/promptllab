@@ -24,14 +24,26 @@ export const RepositoryPage: React.FC = () => {
   const loadedOnceRef = React.useRef(false);
 
   useEffect(() => {
-    // Evitar recarregamento desnecessário se já foi carregado
-    if (loadedOnceRef.current) {
-      return;
-    }
-    
+    // Sempre carregar ao montar o componente
     loadPrompts().then(() => {
       loadedOnceRef.current = true;
     });
+  }, []);
+
+  // Recarregar quando a página receber foco (se o usuário voltar de outra página)
+  useEffect(() => {
+    const handleFocus = () => {
+      // Recarregar apenas se já foi carregado antes (evitar duplo carregamento inicial)
+      if (loadedOnceRef.current) {
+        console.log('🔄 Página recebeu foco, recarregando prompts...');
+        loadPrompts();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+    };
   }, []);
 
   const loadPrompts = async () => {
@@ -64,7 +76,10 @@ export const RepositoryPage: React.FC = () => {
     
     try {
       await deletePrompt(promptId);
-      setPrompts(prompts.filter(p => p.id !== promptId));
+      // Recarregar lista do banco para garantir consistência
+      // Isso evita problemas se outros prompts foram modificados
+      await loadPrompts();
+      // Limpar seleção se o prompt excluído estava selecionado
       if (selectedPrompt?.id === promptId) {
         setSelectedPrompt(null);
         setPromptDetails(null);
@@ -72,6 +87,8 @@ export const RepositoryPage: React.FC = () => {
     } catch (error) {
       console.error('Erro ao excluir prompt:', error);
       alert('Erro ao excluir prompt');
+      // Mesmo em caso de erro, tentar recarregar para manter consistência
+      await loadPrompts();
     }
   };
 
