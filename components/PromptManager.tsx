@@ -132,11 +132,19 @@ export const PromptManager: React.FC = () => {
     // Carregar dados do Supabase ao montar o componente E quando a sessão mudar
     useEffect(() => {
         const loadUserData = async (forceReload = false) => {
-            // Proteção: evitar recarregamento se já foi carregado recentemente (menos de 5 segundos)
+            // Proteção: evitar recarregamento se já foi carregado recentemente (menos de 3 segundos)
+            // E só se NÃO for um forceReload
             const now = Date.now();
             const timeSinceLastLoad = now - lastLoadTimeRef.current;
-            if (!forceReload && dataLoadedRef.current && timeSinceLastLoad < 5000) {
+            if (!forceReload && dataLoadedRef.current && timeSinceLastLoad < 3000) {
                 console.log('⏭️ Dados já foram carregados recentemente, pulando recarregamento desnecessário');
+                setIsLoadingData(false); // Garantir que não fique preso em loading
+                return;
+            }
+            
+            // Se já está carregando e não é forceReload, não iniciar outro carregamento
+            if (!forceReload && isLoadingData) {
+                console.log('⏸️ Já está carregando, aguardando...');
                 return;
             }
 
@@ -164,8 +172,10 @@ export const PromptManager: React.FC = () => {
                 // IMPORTANTE: Limpar o location.state após usar para evitar recarregamentos infinitos
                 const promptIdFromState = (location.state as any)?.promptId;
                 if (promptIdFromState && location.state) {
-                    // Limpar o state após ler para evitar recarregamentos infinitos
+                    // Limpar o state IMEDIATAMENTE após ler para evitar recarregamentos infinitos
                     window.history.replaceState({}, document.title, location.pathname);
+                    // Também limpar do objeto location para garantir
+                    (location.state as any) = null;
                 }
                 
                 if (promptIdFromState) {
@@ -497,26 +507,20 @@ export const PromptManager: React.FC = () => {
             }
         };
 
-        // Sempre carregar na montagem inicial, mas verificar se já está carregando para evitar múltiplos carregamentos simultâneos
-        // Se dataLoadedRef.current é false, significa que é o primeiro carregamento
+        // SEMPRE carregar na primeira montagem - sem verificações que podem bloquear
         if (!dataLoadedRef.current) {
             console.log('🔄 Primeiro carregamento, iniciando...');
             loadUserData();
-        } else if (!isLoadingData) {
-            console.log('🔄 Recarregando dados (não está em carregamento)...');
-            loadUserData();
-        } else {
-            console.log('⏸️ Carregamento já em andamento, aguardando...');
         }
 
-        // Timeout de segurança: se isLoadingData ficar true por mais de 30 segundos, resetar
+        // Timeout de segurança: se isLoadingData ficar true por mais de 15 segundos, resetar
         const safetyTimeout = setTimeout(() => {
             if (isLoadingData) {
-                console.warn('⚠️ Timeout de segurança: isLoadingData ficou true por muito tempo, resetando...');
+                console.warn('⚠️ Timeout de segurança (15s): isLoadingData ficou true por muito tempo, resetando...');
                 setIsLoadingData(false);
                 dataLoadedRef.current = true;
             }
-        }, 30000);
+        }, 15000);
 
         // Listener para mudanças de autenticação (logout/login)
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -552,7 +556,7 @@ export const PromptManager: React.FC = () => {
             subscription.unsubscribe();
             clearTimeout(safetyTimeout);
         };
-    }, [location.pathname]); // Adicionar location.pathname como dependência para recarregar quando mudar de rota
+    }, []); // SEM dependências - só carrega uma vez na montagem
 
     // Debug: Log quando versionHistory muda
     useEffect(() => {
