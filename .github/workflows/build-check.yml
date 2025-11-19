@@ -21,10 +21,11 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '18'
           cache: 'npm'
 
       - name: Install dependencies
+        working-directory: ./labprompt
         run: |
           if [ -f package-lock.json ]; then
             npm ci
@@ -33,22 +34,27 @@ jobs:
           fi
 
       - name: Run linter (if configured)
+        working-directory: ./labprompt
         continue-on-error: true
         run: npm run lint || true
 
       - name: Build project
+        working-directory: ./labprompt
         env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'placeholder-key' }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || '' }}
+          API_KEY: ${{ secrets.GEMINI_API_KEY || '' }}
         run: npm run build
 
       - name: Check build artifacts
+        working-directory: ./labprompt
         run: |
           if [ ! -d "dist" ]; then
-            echo "Build failed: dist directory not found"
+            echo "❌ Build failed: dist directory not found"
             exit 1
           fi
-          echo "Build successful!"
+          echo "✅ Build successful!"
+          echo "📦 Build artifacts:"
+          ls -la dist/ | head -5
 

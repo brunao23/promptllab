@@ -10,13 +10,9 @@ on:
       - main
       - master
 
-env:
-  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-
 jobs:
-  deploy:
-    name: Deploy para Vercel
+  build-check:
+    name: Verificar Build
     runs-on: ubuntu-latest
     timeout-minutes: 10
     
@@ -31,6 +27,7 @@ jobs:
           cache: 'npm'
 
       - name: 📥 Instalar dependências
+        working-directory: ./labprompt
         run: |
           if [ -f package-lock.json ]; then
             npm ci
@@ -39,6 +36,52 @@ jobs:
           fi
 
       - name: 🔍 Verificar build
+        working-directory: ./labprompt
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'placeholder-key' }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || '' }}
+          API_KEY: ${{ secrets.GEMINI_API_KEY || '' }}
+
+      - name: ✅ Verificar artefatos
+        working-directory: ./labprompt
+        run: |
+          if [ ! -d "dist" ]; then
+            echo "❌ Build failed: dist directory not found"
+            exit 1
+          fi
+          echo "✅ Build successful! dist directory found"
+          ls -la dist/ | head -5
+
+  deploy:
+    name: Deploy para Vercel (Opcional)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: ${{ secrets.VERCEL_TOKEN != '' }}
+    needs: build-check
+    
+    steps:
+      - name: ⬇️ Checkout do código
+        uses: actions/checkout@v4
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: 📥 Instalar dependências
+        working-directory: ./labprompt
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: 🔍 Build
+        working-directory: ./labprompt
         run: npm run build
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
@@ -51,18 +94,10 @@ jobs:
 
       - name: 🔐 Fazer login na Vercel
         run: vercel login --token ${{ secrets.VERCEL_TOKEN }}
-        continue-on-error: false
-
-      - name: 🔗 Vincular projeto
-        run: |
-          vercel link --yes \
-            --token ${{ secrets.VERCEL_TOKEN }} \
-            --project ${{ secrets.VERCEL_PROJECT_ID }} \
-            --scope ${{ secrets.VERCEL_ORG_ID }}
-        continue-on-error: true
 
       - name: 📤 Deploy para Vercel (Preview)
         if: github.event_name == 'pull_request'
+        working-directory: ./labprompt
         run: |
           vercel deploy \
             --token ${{ secrets.VERCEL_TOKEN }} \
@@ -70,6 +105,7 @@ jobs:
 
       - name: 🚀 Deploy para Vercel (Production)
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        working-directory: ./labprompt
         run: |
           vercel deploy \
             --token ${{ secrets.VERCEL_TOKEN }} \
@@ -79,5 +115,5 @@ jobs:
       - name: ✅ Deploy concluído
         run: |
           echo "✅ Deploy concluído com sucesso!"
-          echo "🔗 Verifique o status no dashboard da Vercel"
+          echo "💡 Nota: Se você usa integração direta GitHub+Vercel, o deploy automático já foi feito pela Vercel"
 

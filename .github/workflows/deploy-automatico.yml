@@ -11,8 +11,8 @@ on:
       - master
 
 jobs:
-  deploy:
-    name: Build e Deploy
+  build:
+    name: Build e Verificação
     runs-on: ubuntu-latest
     timeout-minutes: 10
     
@@ -32,8 +32,11 @@ jobs:
           ls -la
           echo ""
           echo "📦 Verificando package.json:"
-          if [ -f package.json ]; then
-            echo "✅ package.json encontrado"
+          if [ -f "labprompt/package.json" ]; then
+            echo "✅ package.json encontrado em ./labprompt"
+            cat labprompt/package.json | head -10
+          elif [ -f "package.json" ]; then
+            echo "✅ package.json encontrado na raiz"
             cat package.json | head -10
           else
             echo "❌ package.json NÃO encontrado!"
@@ -41,6 +44,7 @@ jobs:
           fi
 
       - name: 📥 Instalar dependências
+        working-directory: ./labprompt
         run: |
           echo "📥 Instalando dependências..."
           if [ -f package-lock.json ]; then
@@ -53,17 +57,19 @@ jobs:
           echo "✅ Dependências instaladas"
 
       - name: 🔍 Verificar build
+        working-directory: ./labprompt
         run: |
           echo "🔍 Iniciando build..."
           npm run build
           echo "✅ Build concluído"
         env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || '' }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || '' }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'placeholder-key' }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || '' }}
           API_KEY: ${{ secrets.GEMINI_API_KEY || '' }}
 
       - name: ✅ Verificar artefatos do build
+        working-directory: ./labprompt
         run: |
           echo "📦 Verificando artefatos do build..."
           if [ -d "dist" ]; then
@@ -80,11 +86,16 @@ jobs:
       - name: ✅ Build concluído
         run: |
           echo "✅ Build concluído com sucesso!"
-          echo "📦 Os arquivos estão prontos em ./dist"
+          echo "📦 Os arquivos estão prontos em ./labprompt/dist"
           echo ""
-          echo "💡 Nota: Se você configurou a integração direta GitHub+Vercel,"
+          echo "💡 IMPORTANTE: Se você configurou a integração direta GitHub+Vercel,"
           echo "   o deploy será feito automaticamente pela Vercel após este workflow."
           echo ""
           echo "🔗 Configure a integração em: https://vercel.com/dashboard"
           echo "   Settings > Git > Connect Repository"
+          echo ""
+          echo "⚠️  Se o deploy automático da Vercel não funcionar, verifique:"
+          echo "   1. Se o repositório está conectado na Vercel"
+          echo "   2. Se o Root Directory está configurado como 'labprompt' (não vazio!)"
+          echo "   3. Se as variáveis de ambiente estão configuradas"
 
