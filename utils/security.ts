@@ -353,7 +353,7 @@ interface SecurityEvent {
  */
 export function logSecurityEvent(event: SecurityEvent): void {
   // Em produção, enviar para serviço de logging/monitoramento
-  if (import.meta.env.PROD) {
+  if (process.env.NODE_ENV === 'production') {
     // TODO: Enviar para serviço de monitoramento (ex: Sentry, CloudWatch)
     console.warn('🔒 Security Event:', event);
   } else {
@@ -420,7 +420,7 @@ export function validateFileType(file: File): { valid: boolean; error?: string }
 export function getRateLimitIdentifier(email?: string, ip?: string): string {
   // Em produção, usar IP + email
   // Em desenvolvimento, usar apenas email
-  if (import.meta.env.PROD && ip) {
+  if (process.env.NODE_ENV === 'production' && ip) {
     return `${email || 'anonymous'}_${ip}`;
   }
   return email || 'anonymous';
