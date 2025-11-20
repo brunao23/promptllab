@@ -884,6 +884,13 @@ export const PromptManager: React.FC = () => {
                 return;
             }
 
+            // Verificar se promptId existe (TypeScript check)
+            if (!promptId) {
+                setError('Erro: ID do prompt não encontrado. Tente novamente.');
+                setIsLoading(false);
+                return;
+            }
+
             // Criar versão no banco
             console.log('💾 Salvando versão no banco...');
             let newVersion: PromptVersion;
