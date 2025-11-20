@@ -1586,8 +1586,15 @@ export const PromptManager: React.FC = () => {
                 await createPrompt(importedSourceData, `Prompt Importado - ${new Date().toLocaleDateString('pt-BR')}`);
             }
 
-            // Criar versão no banco
-            const newVersion = await createPromptVersion(promptId, {
+            // Verificar se promptId existe (TypeScript check)
+            if (!promptId) {
+                setError('Erro: ID do prompt não encontrado. Tente novamente.');
+                return;
+            }
+
+            // Criar versão no banco (promptId é garantidamente string aqui)
+            const finalPromptId: string = promptId;
+            const newVersion = await createPromptVersion(finalPromptId, {
                 content: content,
                 format: 'markdown',
                 masterFormat: detectedMasterFormat,
