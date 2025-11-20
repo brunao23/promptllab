@@ -933,8 +933,8 @@ export const PromptManager: React.FC = () => {
     
     const handleOptimizePrompt = async () => {
         // Verificar limite de versões antes de otimizar
-        const canCreateVersion = await checkAccess('create_version');
-        if (!canCreateVersion) {
+        const hasAccess = await checkAccess('create_version');
+        if (!hasAccess) {
             const versionsInfo = await getCurrentMonthVersions();
             alert(`Limite de versões atingido! Você já criou ${versionsInfo.versionsCount} de ${versionsInfo.versionsLimit} versões permitidas no seu plano este mês. Upgrade para Premium para criar versões ilimitadas.`);
             return;
