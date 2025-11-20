@@ -1,6 +1,6 @@
 'use client';
 
-import { ShareChatPage } from '@/pages/ShareChatPage';
+import { ShareChatPage } from '@/page-components/ShareChatPage';
 import { use } from 'react';
 
 export default function ShareChatPageRoute({

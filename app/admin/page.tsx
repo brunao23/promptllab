@@ -1,6 +1,6 @@
 'use client';
 
-import { AdminPage } from '@/pages/AdminPage';
+import { AdminPage } from '@/page-components/AdminPage';
 
 export default function AdminPageRoute() {
   return <AdminPage />;
