@@ -282,8 +282,6 @@ export const PromptManager: React.FC = () => {
                 
                 // Carregar prompts do usuário (filtrados por workspace se houver)
                 console.log('📥 Carregando prompts do usuário...', currentWorkspaceId ? `(workspace: ${currentWorkspaceId})` : '');
-                // Dar tempo ao React para atualizar a UI
-                await new Promise(resolve => setTimeout(resolve, 10));
                 const workspaceIdToUse = currentWorkspaceId || (await getDefaultWorkspace())?.id;
                 let prompts;
                 try {
@@ -318,10 +316,8 @@ export const PromptManager: React.FC = () => {
                     setFormData(promptData);
                     console.log('✅ FormData definido no estado com sucesso');
                     
-                    // Carregar TODAS as versões do prompt - CRÍTICO: SEMPRE tentar carregar
-                    console.log('📜 Carregando TODAS as versões do prompt do ID:', latestPrompt.id);
-                    // Dar tempo ao React para atualizar a UI
-                    await new Promise(resolve => setTimeout(resolve, 10));
+                    // Carregar versões do prompt (otimizado)
+                    console.log('📜 Carregando versões do prompt do ID:', latestPrompt.id);
                     let versions: PromptVersion[] = [];
                     try {
                         versions = await getPromptVersions(latestPrompt.id);
@@ -387,13 +383,6 @@ export const PromptManager: React.FC = () => {
                             }, null, 2));
                             setActiveVersion({ ...latestVersion }); // Usar spread para garantir nova referência
                             console.log('✅ Versão ativa definida no estado com sucesso');
-                            
-                            // CRÍTICO: Aguardar um pouco para garantir que o estado foi atualizado
-                            // E forçar re-renderização dos componentes
-                            await new Promise(resolve => setTimeout(resolve, 200));
-                            
-                            // Verificar se o estado foi atualizado (será verificado no próximo render)
-                            console.log('🔍 Aguardando atualização do estado...');
                             
                             // Carregar mensagens de chat da versão ativa ANTES de inicializar o chat
                             try {
@@ -469,11 +458,6 @@ export const PromptManager: React.FC = () => {
                         setActiveVersion(null);
                         setChatMessages([]);
                     }
-                    
-                    // CRÍTICO: Aguardar um pouco mais para garantir que TODOS os estados foram atualizados
-                    console.log('⏳ Aguardando sincronização de estados...');
-                    await new Promise(resolve => setTimeout(resolve, 200));
-                    console.log('✅ Sincronização de estados concluída');
                 } else {
                     console.log('ℹ️ Nenhum prompt encontrado. Usuário pode começar criando um novo.');
                     // Limpar estados se não há prompts

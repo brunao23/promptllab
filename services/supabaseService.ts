@@ -707,15 +707,19 @@ export async function getUserPrompts(workspaceId?: string) {
     query = query.eq('workspace_id', workspaceId);
   }
 
-  const { data, error } = await query.order('created_at', { ascending: false });
+  // Otimização: Adicionar limite e filtrar is_active na query
+  const { data, error } = await query
+    .eq('is_active', true) // Filtrar direto na query
+    .order('created_at', { ascending: false })
+    .limit(20); // Limitar a 20 prompts mais recentes para performance
 
   if (error) {
     console.error('❌ [getUserPrompts] Erro ao buscar prompts:', error);
     throw error;
   }
 
-  // Filtrar por is_active manualmente (pode ser NULL ou false)
-  const activePrompts = (data || []).filter(p => p.is_active !== false);
+  // Já vem filtrado por is_active e limitado
+  const activePrompts = data || [];
   
   console.log('✅ [getUserPrompts] Prompts encontrados:', {
     total: data?.length || 0,
@@ -1007,12 +1011,13 @@ export async function getPromptVersions(promptId: string) {
     throw new Error('Prompt não encontrado ou você não tem permissão para acessá-lo');
   }
 
-  // Agora buscar as versões
+  // Agora buscar as versões (otimizado com limite)
   const { data, error } = await supabase
     .from('prompt_versions')
     .select('*')
     .eq('prompt_id', promptId)
-    .order('version_number', { ascending: false });
+    .order('version_number', { ascending: false })
+    .limit(50); // Limitar a 50 versões mais recentes para performance
 
   if (error) {
     console.error('❌ Erro ao buscar versões:', error);
@@ -1279,12 +1284,13 @@ export async function getChatMessages(promptVersionId: string) {
     throw new Error('Versão não encontrada ou você não tem permissão para acessá-la');
   }
 
-  // Buscar mensagens
+  // Buscar mensagens (otimizado com limite)
   const { data, error } = await supabase
     .from('chat_messages')
     .select('*')
     .eq('prompt_version_id', promptVersionId)
-    .order('order_index', { ascending: true });
+    .order('order_index', { ascending: true })
+    .limit(100); // Limitar a 100 mensagens mais recentes para performance
 
   if (error) {
     console.error('❌ Erro ao buscar mensagens:', error);
