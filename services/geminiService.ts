@@ -270,6 +270,11 @@ Sua resposta deve ser APENAS o objeto JSON válido, SEM blocos de código markdo
         config: data.masterPromptFormat === 'json' ? { responseMimeType: "application/json" } : undefined
     });
     
+    // Verificar se response.text existe
+    if (!response.text) {
+        throw new Error('Resposta vazia do modelo Gemini');
+    }
+    
     // Incrementar uso de tokens após a chamada
     const actualTokens = estimateFullTokens(expansionPrompt, response.text);
     await incrementTokenUsage(actualTokens);
