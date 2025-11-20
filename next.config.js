@@ -1,9 +1,24 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  
+  // Otimizações para produção
+  compress: true,
+  poweredByHeader: false,
+  
+  // Configurações de imagens
   images: {
     domains: [],
+    formats: ['image/avif', 'image/webp'],
   },
+  
+  // Compilador otimizado (remove console em produção)
+  compiler: {
+    removeConsole: process.env.NODE_ENV === 'production' ? {
+      exclude: ['error', 'warn'],
+    } : false,
+  },
+  
   // Headers de segurança
   async headers() {
     return [
