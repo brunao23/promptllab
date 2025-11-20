@@ -758,7 +758,7 @@ export const PromptManager: React.FC = () => {
         if (response.functionCalls && response.functionCalls.length > 0) {
             response.functionCalls.forEach(handleAssistantToolCall);
         }
-        const responseText = response.text.trim();
+        const responseText = response.text?.trim();
         if (responseText) {
             const transcriptionMatch = responseText.match(/\[TRANSCRIÇÃO:\s*(.*?)\]/i);
             const userTranscription = transcriptionMatch ? transcriptionMatch[1] : "Comando de áudio não transcrito.";
