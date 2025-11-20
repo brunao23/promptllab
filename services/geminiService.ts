@@ -356,6 +356,11 @@ export const continueChat = async (message: string, promptContent?: string): Pro
 
         const response: GenerateContentResponse = await chatInstance.sendMessage({ message });
         
+        // Verificar se response.text existe
+        if (!response.text) {
+            throw new Error('Resposta vazia do modelo Gemini');
+        }
+        
         // Incrementar uso de tokens após a chamada
         const actualTokens = estimateFullTokens(message, response.text);
         await incrementTokenUsage(actualTokens);
@@ -423,6 +428,10 @@ export const generateExamples = async (data: PromptData): Promise<Omit<FewShotEx
             }
         });
 
+        if (!response.text) {
+            throw new Error('Resposta vazia do modelo Gemini ao gerar exemplos');
+        }
+
         return JSON.parse(response.text.trim()) as Omit<FewShotExample, 'id'>[];
     } catch (error) {
         console.error("Error generating examples:", error);
@@ -485,6 +494,10 @@ Reescreva o prompt para corrigir os problemas identificados. Retorne APENAS o no
             contents: optimizationPromptWithFormatting,
             config: isJson ? { responseMimeType: "application/json" } : undefined
         });
+
+        if (!response.text) {
+            throw new Error('Resposta vazia do modelo Gemini ao otimizar prompt');
+        }
 
         let optimizedText = response.text.trim();
 
@@ -550,6 +563,11 @@ Retorne APENAS a documentação em Markdown.`;
             model: 'gemini-2.5-pro',
             contents: explanationRequest
         });
+        
+        if (!response.text) {
+            throw new Error('Resposta vazia do modelo Gemini ao explicar prompt');
+        }
+        
         return response.text;
     } catch (error) {
         console.error("Error explaining prompt:", error);
@@ -686,6 +704,11 @@ Retorne sempre um JSON válido, mesmo que alguns campos estejam vazios.
                     responseSchema: schema
                 }
             });
+            
+            // Verificar se response.text existe
+            if (!response.text) {
+                throw new Error('Resposta vazia do modelo Gemini ao extrair dados');
+            }
             
             // Incrementar uso de tokens após a chamada
             const actualTokens = estimateFullTokens(extractionPrompt, response.text);
