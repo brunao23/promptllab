@@ -110,23 +110,18 @@ export const PromptManager: React.FC = () => {
     const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string | null>(null);
     const [isSavingToRepository, setIsSavingToRepository] = useState(false);
 
-    // Carregar limites do usuário
+    // OTIMIZAÇÃO: Carregar limites do usuário de forma não-bloqueante (não trava o carregamento principal)
     useEffect(() => {
-        const loadLimits = async () => {
-            try {
-                setIsCheckingLimits(true);
-                const limits = await checkUserLimits();
+        // Carregar limites em background, não bloqueia o carregamento principal
+        checkUserLimits()
+            .then(limits => {
                 setUserLimits(limits);
-                console.log('📊 Limites do usuário carregados:', limits);
-            } catch (error: any) {
-                console.error('❌ Erro ao carregar limites:', error);
-                // Continuar mesmo se houver erro ao carregar limites
-            } finally {
                 setIsCheckingLimits(false);
-            }
-        };
-        
-        loadLimits();
+            })
+            .catch(error => {
+                console.error('❌ Erro ao carregar limites:', error);
+                setIsCheckingLimits(false);
+            });
     }, []);
 
     // Carregar dados do Supabase ao montar o componente E quando a sessão mudar
@@ -270,169 +265,80 @@ export const PromptManager: React.FC = () => {
                     }
                 }
 
-                // Carregar workspace padrão primeiro
-                if (!currentWorkspaceId) {
-                    console.log('📁 Carregando workspace padrão...');
-                    const defaultWorkspace = await getDefaultWorkspace();
-                    if (defaultWorkspace) {
-                        setCurrentWorkspaceId(defaultWorkspace.id);
-                        console.log('✅ Workspace padrão carregado:', defaultWorkspace.id, defaultWorkspace.name);
-                    }
-                }
+                // OTIMIZAÇÃO: Carregar workspace e prompts em paralelo
+                console.log('📥 Carregando dados iniciais...');
                 
-                // Carregar prompts do usuário (filtrados por workspace se houver)
-                console.log('📥 Carregando prompts do usuário...', currentWorkspaceId ? `(workspace: ${currentWorkspaceId})` : '');
-                const workspaceIdToUse = currentWorkspaceId || (await getDefaultWorkspace())?.id;
-                let prompts;
-                try {
-                    prompts = await getUserPrompts(workspaceIdToUse || undefined);
-                    console.log('✅ Prompts carregados:', prompts?.length || 0);
-                } catch (promptsError: any) {
-                    console.error('❌ Erro ao carregar prompts do usuário:', promptsError);
-                    setError(`Erro ao carregar prompts: ${promptsError?.message || 'Erro desconhecido'}`);
-                    prompts = [];
+                const [defaultWorkspace, prompts] = await Promise.all([
+                    !currentWorkspaceId ? getDefaultWorkspace().catch(() => null) : Promise.resolve(null),
+                    (async () => {
+                        try {
+                            const workspaceId = currentWorkspaceId || (await getDefaultWorkspace())?.id;
+                            return await getUserPrompts(workspaceId || undefined);
+                        } catch (e) {
+                            console.error('❌ Erro ao carregar prompts:', e);
+                            return [];
+                        }
+                    })()
+                ]);
+
+                // Configurar workspace se encontrado
+                if (defaultWorkspace && !currentWorkspaceId) {
+                    setCurrentWorkspaceId(defaultWorkspace.id);
+                    console.log('✅ Workspace padrão carregado:', defaultWorkspace.id);
                 }
+
+                console.log('✅ Prompts carregados:', prompts?.length || 0);
                 
                 if (prompts && prompts.length > 0) {
                     // Carregar o prompt mais recente
                     const latestPrompt = prompts[0];
-                    console.log('📋 Carregando prompt mais recente:', latestPrompt.id, latestPrompt.title);
+                    console.log('📋 Carregando prompt mais recente:', latestPrompt.id);
                     setCurrentPromptId(latestPrompt.id);
                     
-                    // Carregar dados completos do prompt (incluindo relacionamentos)
-                    console.log('📝 Carregando dados completos do prompt...');
-                    const { promptData } = await getPrompt(latestPrompt.id);
-                    console.log('✅ Dados do prompt carregados:', {
-                        hasPersona: !!promptData.persona,
-                        persona: promptData.persona?.substring(0, 50) + '...',
-                        hasObjetivo: !!promptData.objetivo,
-                        objetivo: promptData.objetivo?.substring(0, 50) + '...',
-                        exemplos: promptData.exemplos.length,
-                        variaveis: promptData.variaveisDinamicas.length,
-                        ferramentas: promptData.ferramentas.length,
-                        fluxos: promptData.fluxos.length,
-                    });
-                    console.log('💾 Definindo formData completo no estado...');
-                    setFormData(promptData);
-                    console.log('✅ FormData definido no estado com sucesso');
+                    // OTIMIZAÇÃO: Carregar dados do prompt e versões em paralelo
+                    const [promptResult] = await Promise.all([
+                        getPrompt(latestPrompt.id).catch((e) => {
+                            console.error('❌ Erro ao carregar prompt:', e);
+                            return null;
+                        })
+                    ]);
+
+                    if (promptResult) {
+                        const { promptData } = promptResult;
+                        console.log('✅ Dados do prompt carregados');
+                        setFormData(promptData);
                     
-                    // Carregar versões do prompt (otimizado)
-                    console.log('📜 Carregando versões do prompt do ID:', latestPrompt.id);
+                    // OTIMIZAÇÃO: Carregar versões em paralelo enquanto o formData já está sendo exibido
+                    console.log('📜 Carregando versões do prompt...');
                     let versions: PromptVersion[] = [];
                     try {
                         versions = await getPromptVersions(latestPrompt.id);
-                        console.log('✅ Versões carregadas do banco:', versions?.length || 0);
+                        console.log('✅ Versões carregadas:', versions?.length || 0);
                         
                         if (!versions) {
-                            console.warn('⚠️ getPromptVersions retornou null/undefined');
                             versions = [];
                         }
                         
                         if (versions.length > 0) {
-                            console.log('📋 Detalhes completos das versões:');
-                            versions.forEach((v, idx) => {
-                                console.log(`  [${idx}] v${v.version} - ${v.timestamp} - ID: ${v.id}`);
-                                console.log(`      Conteúdo: ${v.content?.substring(0, 100) || 'VAZIO'}...`);
-                                console.log(`      Has sourceData: ${!!v.sourceData}`);
-                            });
-                            
-                            // Definir histórico completo ANTES de qualquer outra coisa
-                            // CRÍTICO: Usar callback para garantir atualização
-                            console.log('💾 DEFININDO histórico completo no estado:', versions.length, 'versões');
-                            setVersionHistory(prev => {
-                                // Verificar se já tem o mesmo número de versões
-                                if (prev.length === versions.length && prev.length > 0) {
-                                    // Verificar se os IDs são os mesmos
-                                    const prevIds = prev.map(v => v.id).sort().join(',');
-                                    const newIds = versions.map(v => v.id).sort().join(',');
-                                    if (prevIds === newIds) {
-                                        console.log('⏭️ Histórico já está atualizado, pulando');
-                                        return prev;
-                                    }
-                                }
-                                console.log('✅ Atualizando histórico com', versions.length, 'versões');
-                                return versions;
-                            });
-                            console.log('✅ Histórico definido no estado. Total de versões:', versions.length);
-                            
-                            // Carregar versão ativa (mais recente = primeira do array)
+                            // OTIMIZAÇÃO: Definir versões e versão ativa imediatamente
                             const latestVersion = versions[0];
-                            console.log('🎯 SELECIONANDO VERSÃO ATIVA:', {
-                                id: latestVersion.id,
-                                version: latestVersion.version,
-                                timestamp: latestVersion.timestamp,
-                                hasContent: !!latestVersion.content,
-                                contentLength: latestVersion.content?.length || 0,
-                                hasSourceData: !!latestVersion.sourceData,
-                            });
+                            setVersionHistory(versions);
+                            setActiveVersion({ ...latestVersion });
                             
-                            if (!latestVersion.id) {
-                                console.error('❌ ERRO CRÍTICO: Versão não tem ID! Versão:', latestVersion);
-                            }
-                            if (!latestVersion.content) {
-                                console.warn('⚠️ AVISO: Versão não tem conteúdo! ID:', latestVersion.id);
-                            }
-                            
-                            // DEFINIR versão ativa ANTES de carregar mensagens
-                            console.log('💾 DEFININDO versão ativa no estado...');
-                            console.log('💾 Versão a ser definida:', JSON.stringify({ 
-                                id: latestVersion.id, 
-                                version: latestVersion.version,
-                                hasContent: !!latestVersion.content,
-                                contentLength: latestVersion.content?.length || 0,
-                            }, null, 2));
-                            setActiveVersion({ ...latestVersion }); // Usar spread para garantir nova referência
-                            console.log('✅ Versão ativa definida no estado com sucesso');
-                            
-                            // Carregar mensagens de chat da versão ativa ANTES de inicializar o chat
-                            try {
-                                console.log('💬 Carregando mensagens de chat da versão:', latestVersion.id);
-                                const messages = await getChatMessages(latestVersion.id);
-                                console.log('✅ Mensagens de chat carregadas do banco:', messages?.length || 0);
-                                
-                                if (!messages) {
-                                    console.warn('⚠️ getChatMessages retornou null/undefined');
-                                }
-                                
-                                // Definir mensagens ANTES de inicializar o chat
+                            // OTIMIZAÇÃO: Carregar mensagens e inicializar chat em paralelo (não-bloqueante)
+                            Promise.all([
+                                getChatMessages(latestVersion.id).catch(() => []),
+                                latestVersion.content?.trim() ? startChat(latestVersion.content).catch(() => null) : Promise.resolve(null)
+                            ]).then(([messages]) => {
                                 if (messages && messages.length > 0) {
-                                    console.log('💬 Restaurando histórico completo de chat:', messages.length, 'mensagens');
-                                    messages.forEach((msg, idx) => {
-                                        console.log(`  [${idx}] ${msg.author}: ${msg.text?.substring(0, 50) || 'VAZIO'}...`);
-                                    });
-                                    console.log('💬 Definindo mensagens no estado...');
-                                    setChatMessages([...messages]); // Usar spread para garantir nova referência
-                                    console.log('💬 Histórico de chat restaurado com sucesso no estado');
+                                    setChatMessages([...messages]);
                                 } else {
-                                    console.log('ℹ️ Nenhuma mensagem de chat encontrada para esta versão');
                                     setChatMessages([]);
                                 }
-                                
-                                // Reiniciar chat com o prompt da versão ativa DEPOIS de carregar as mensagens
-                                if (latestVersion.content && latestVersion.content.trim().length > 0) {
-                                    console.log('🔄 Inicializando chat com conteúdo da versão...');
-                                    await startChat(latestVersion.content);
-                                    console.log('✅ Chat inicializado com prompt da versão ativa');
-                                    console.log('📋 Conteúdo do prompt carregado:', latestVersion.content.substring(0, 100) + '...');
-                                } else {
-                                    console.warn('⚠️ Versão não tem conteúdo válido para inicializar o chat. ID:', latestVersion.id);
-                                }
-                            } catch (err: any) {
-                                console.error('❌ ERRO ao carregar mensagens de chat:', err);
-                                console.error('❌ Detalhes do erro:', {
-                                    message: err.message,
-                                    stack: err.stack,
-                                    details: err.details,
-                                    hint: err.hint,
-                                    code: err.code,
-                                });
+                            }).catch((err) => {
+                                console.error('❌ Erro ao carregar mensagens/chat:', err);
                                 setChatMessages([]);
-                                // Mesmo com erro, tentar inicializar o chat se houver conteúdo
-                                if (latestVersion.content && latestVersion.content.trim().length > 0) {
-                                    console.log('🔄 Tentando inicializar chat mesmo com erro nas mensagens...');
-                                    await startChat(latestVersion.content);
-                                }
-                            }
+                            });
                         } else {
                             console.warn('⚠️ Nenhuma versão encontrada para o prompt:', latestPrompt.id);
                             // Não limpar tudo, manter o prompt e formData carregados

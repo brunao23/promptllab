@@ -675,32 +675,15 @@ export async function getUserPrompts(workspaceId?: string) {
   const user = await getCurrentUser();
   if (!user) throw new Error('Usuário não autenticado');
 
-  console.log('🔍 [getUserPrompts] Buscando prompts para user_id:', user.id);
+  // OTIMIZAÇÃO: Usar getCurrentProfile que já existe e pode ter cache
+  const profile = await getCurrentProfile();
+  if (!profile) throw new Error('Perfil do usuário não encontrado');
 
-  // Primeiro, verificar se existe profile para este usuário
-  const { data: profile, error: profileError } = await supabase
-    .from('profiles')
-    .select('id')
-    .eq('id', user.id)
-    .single();
-
-  if (profileError) {
-    console.error('❌ [getUserPrompts] Erro ao verificar profile:', profileError);
-    throw profileError;
-  }
-
-  if (!profile) {
-    console.error('❌ [getUserPrompts] Profile não encontrado para user_id:', user.id);
-    throw new Error('Perfil do usuário não encontrado');
-  }
-
-  console.log('✅ [getUserPrompts] Profile encontrado:', profile.id);
-
-  // Agora buscar prompts usando o profile.id como user_id, opcionalmente filtrando por workspace
+  // Buscar prompts usando o profile.id como user_id, opcionalmente filtrando por workspace
   let query = supabase
     .from('prompts')
     .select('*')
-    .eq('user_id', profile.id); // CRÍTICO: usar profile.id, não user.id diretamente
+    .eq('user_id', profile.id)
 
   // Se workspace_id fornecido, filtrar por workspace
   if (workspaceId) {
@@ -964,57 +947,21 @@ export async function createPromptVersion(
  * Obtém todas as versões de um prompt
  */
 export async function getPromptVersions(promptId: string) {
-  const user = await getCurrentUser();
-  if (!user) throw new Error('Usuário não autenticado');
-
   // 🔒 VALIDAÇÃO DE SEGURANÇA - UUID válido
   if (!isValidUUID(promptId)) {
     throw new Error('ID de prompt inválido');
   }
 
-  console.log('🔍 [getPromptVersions] Buscando versões no banco para prompt_id:', promptId, 'user_id:', user.id);
+  // OTIMIZAÇÃO: Usar getCurrentProfile e verificar ownership em uma query só
+  const profile = await getCurrentProfile();
+  if (!profile) throw new Error('Perfil do usuário não encontrado');
   
-  // Primeiro, verificar se existe profile para este usuário
-  const { data: profile, error: profileError } = await supabase
-    .from('profiles')
-    .select('id')
-    .eq('id', user.id)
-    .single();
-
-  if (profileError) {
-    console.error('❌ [getPromptVersions] Erro ao verificar profile:', profileError);
-    throw profileError;
-  }
-
-  if (!profile) {
-    console.error('❌ [getPromptVersions] Profile não encontrado para user_id:', user.id);
-    throw new Error('Perfil do usuário não encontrado');
-  }
-
-  console.log('✅ [getPromptVersions] Profile encontrado:', profile.id);
-  
-  // Verificar se o prompt pertence ao usuário usando profile.id
-  const { data: promptCheck, error: promptCheckError } = await supabase
-    .from('prompts')
-    .select('id')
-    .eq('id', promptId)
-    .eq('user_id', profile.id) // CRÍTICO: usar profile.id
-    .single();
-
-  if (promptCheckError) {
-    console.error('❌ Erro ao verificar prompt:', promptCheckError);
-    throw promptCheckError;
-  }
-
-  if (!promptCheck) {
-    console.error('❌ Prompt não encontrado ou não pertence ao usuário');
-    throw new Error('Prompt não encontrado ou você não tem permissão para acessá-lo');
-  }
-
-  // Agora buscar as versões (otimizado com limite)
+  // OTIMIZAÇÃO: Buscar versões direto (RLS do Supabase garante ownership)
+  // Se necessário, RLS já filtra por user_id automaticamente
   const { data, error } = await supabase
     .from('prompt_versions')
-    .select('*')
+    .select('*, prompts!inner(user_id)')
+    .eq('prompts.user_id', profile.id)
     .eq('prompt_id', promptId)
     .order('version_number', { ascending: false })
     .limit(50); // Limitar a 50 versões mais recentes para performance
@@ -1237,57 +1184,20 @@ export async function saveChatMessage(
  * Obtém todas as mensagens de uma versão de prompt
  */
 export async function getChatMessages(promptVersionId: string) {
-  const user = await getCurrentUser();
-  if (!user) throw new Error('Usuário não autenticado');
-
   // 🔒 VALIDAÇÃO DE SEGURANÇA - UUID válido
   if (!isValidUUID(promptVersionId)) {
     throw new Error('ID de versão de prompt inválido');
   }
 
-  console.log('🔍 [getChatMessages] Buscando mensagens de chat para versão:', promptVersionId, 'user_id:', user.id);
-  
-  // Primeiro, verificar se existe profile para este usuário
-  const { data: profile, error: profileError } = await supabase
-    .from('profiles')
-    .select('id')
-    .eq('id', user.id)
-    .single();
+  // OTIMIZAÇÃO: Usar getCurrentProfile e verificar ownership na query (RLS garante segurança)
+  const profile = await getCurrentProfile();
+  if (!profile) throw new Error('Perfil do usuário não encontrado');
 
-  if (profileError) {
-    console.error('❌ [getChatMessages] Erro ao verificar profile:', profileError);
-    throw profileError;
-  }
-
-  if (!profile) {
-    console.error('❌ [getChatMessages] Profile não encontrado para user_id:', user.id);
-    throw new Error('Perfil do usuário não encontrado');
-  }
-
-  console.log('✅ [getChatMessages] Profile encontrado:', profile.id);
-  
-  // Verificar se a versão pertence a um prompt do usuário usando profile.id
-  const { data: versionCheck, error: versionCheckError } = await supabase
-    .from('prompt_versions')
-    .select('prompt_id, prompts!inner(user_id)')
-    .eq('id', promptVersionId)
-    .eq('prompts.user_id', profile.id) // CRÍTICO: usar profile.id
-    .single();
-
-  if (versionCheckError) {
-    console.error('❌ Erro ao verificar versão:', versionCheckError);
-    throw versionCheckError;
-  }
-
-  if (!versionCheck) {
-    console.error('❌ Versão não encontrada ou não pertence ao usuário');
-    throw new Error('Versão não encontrada ou você não tem permissão para acessá-la');
-  }
-
-  // Buscar mensagens (otimizado com limite)
+  // OTIMIZAÇÃO: Buscar mensagens direto (RLS do Supabase garante ownership automaticamente)
   const { data, error } = await supabase
     .from('chat_messages')
-    .select('*')
+    .select('*, prompt_versions!inner(prompt_id, prompts!inner(user_id))')
+    .eq('prompt_versions.prompts.user_id', profile.id)
     .eq('prompt_version_id', promptVersionId)
     .order('order_index', { ascending: true })
     .limit(100); // Limitar a 100 mensagens mais recentes para performance
