@@ -891,11 +891,12 @@ export const PromptManager: React.FC = () => {
                 return;
             }
 
-            // Criar versão no banco
+            // Criar versão no banco (promptId é garantidamente string aqui)
             console.log('💾 Salvando versão no banco...');
             let newVersion: PromptVersion;
+            const finalPromptId: string = promptId; // Type assertion para garantir que é string
             try {
-                newVersion = await createPromptVersion(promptId, {
+                newVersion = await createPromptVersion(finalPromptId, {
                     content: promptContent,
                     format: formData.formatoSaida,
                     masterFormat: formData.masterPromptFormat,
