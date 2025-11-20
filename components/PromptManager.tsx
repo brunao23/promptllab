@@ -307,6 +307,7 @@ export const PromptManager: React.FC = () => {
                         const { promptData } = promptResult;
                         console.log('✅ Dados do prompt carregados');
                         setFormData(promptData);
+                    }
                     
                     // OTIMIZAÇÃO: Carregar versões em paralelo enquanto o formData já está sendo exibido
                     console.log('📜 Carregando versões do prompt...');
