@@ -7,9 +7,9 @@ import {
   updateWorkspace, 
   setDefaultWorkspace, 
   deleteWorkspace,
-  getDefaultWorkspace,
-  type Workspace 
+  getDefaultWorkspace
 } from '../services/supabaseService';
+import type { Workspace } from '../types';
 
 interface WorkspaceManagerProps {
   currentWorkspaceId: string | null;
