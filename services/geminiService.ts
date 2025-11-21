@@ -18,32 +18,11 @@ const getAI = async (): Promise<{ ai: GoogleGenAI; usingUserKey: boolean; apiKey
         usingUserKey = true;
         console.log('✅ [getAI] Usando API Key do usuário (Gemini)');
     } else {
-        console.log('🔍 [getAI] Nenhuma API Key do usuário, buscando chave do sistema...');
-        
-        // Se não houver API Key do usuário, usa a do sistema
-        // Suporta tanto Next.js quanto Vite
-        apiKey = 
-          (typeof process !== 'undefined' && process.env?.GEMINI_API_KEY) ||
-          (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_GEMINI_API_KEY) ||
-          (typeof process !== 'undefined' && process.env?.API_KEY) ||
-          (typeof import.meta !== 'undefined' && (import.meta as any).env?.GEMINI_API_KEY) ||
-          (typeof import.meta !== 'undefined' && (import.meta as any).env?.API_KEY) ||
-          '';
-        
-        console.log('🔍 [getAI] Verificando variáveis de ambiente:', {
-            hasGeminiApiKey: !!(typeof process !== 'undefined' && process.env?.GEMINI_API_KEY),
-            hasNextPublicGeminiKey: !!(typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_GEMINI_API_KEY),
-            hasApiKey: !!(typeof process !== 'undefined' && process.env?.API_KEY),
-            foundKey: !!apiKey,
-            keyLength: apiKey?.length || 0,
-        });
-        
-        if (!apiKey) {
-            console.error('❌ [getAI] GEMINI_API_KEY não configurada!');
-            console.error('❌ [getAI] Configure na Vercel: Settings → Environment Variables → GEMINI_API_KEY');
-            throw new Error("API_KEY não configurada. Configure sua própria API Key nas Configurações ou configure a GEMINI_API_KEY do sistema na Vercel.");
-        }
-        console.log('✅ [getAI] Usando API Key do sistema (Gemini) - comprimento:', apiKey.length);
+        // NO CLIENTE, NÃO TENTA BUSCAR VARIÁVEIS DE AMBIENTE DO SERVIDOR
+        // Isso deve ser feito via API routes
+        console.error('❌ [getAI] GEMINI_API_KEY não configurada no cliente!');
+        console.error('❌ [getAI] As funções devem usar API routes quando não há chave do usuário.');
+        throw new Error("API_KEY não configurada. Configure sua própria API Key nas Configurações ou configure a GEMINI_API_KEY do sistema na Vercel.");
     }
     
     return {
@@ -675,6 +654,37 @@ const retryWithBackoff = async <T>(
 };
 
 export const analyzeDocument = async (fileBase64: string, mimeType: string, fileName?: string): Promise<Partial<PromptData>> => {
+    // Primeiro, tenta usar API Key do usuário
+    const userApiKey = await getUserApiKey('gemini');
+    
+    // Se o usuário NÃO tem API Key própria, usa a API route do servidor (chave global)
+    if (!userApiKey) {
+        console.log('🌐 [analyzeDocument] Usando API route do servidor (chave global)');
+        
+        try {
+            const response = await fetch('/api/gemini/analyze-document', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ fileBase64, mimeType, fileName }),
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Erro ao analisar documento via API');
+            }
+            
+            const result = await response.json();
+            return result.data;
+        } catch (error: any) {
+            console.error('❌ [analyzeDocument] Erro ao usar API route:', error);
+            throw error;
+        }
+    }
+    
+    // Se o usuário tem API Key própria, usa localmente
+    console.log('✅ [analyzeDocument] Usando API Key do usuário');
     const { ai, usingUserKey, apiKey } = await getAI();
 
     // Para arquivos CSV, melhorar o prompt de análise
