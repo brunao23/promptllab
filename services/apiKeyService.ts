@@ -66,28 +66,49 @@ export async function saveUserApiKey(
   isGlobal: boolean = false
 ): Promise<UserApiKey> {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
+    console.log('💾 [saveUserApiKey] Iniciando salvamento...', { provider, isGlobal, keyLength: apiKey.trim().length });
+    
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError) {
+      console.error('❌ [saveUserApiKey] Erro ao obter usuário:', userError);
+      throw userError;
+    }
+    
     if (!user) {
       throw new Error('Usuário não autenticado');
     }
 
+    console.log('✅ [saveUserApiKey] Usuário autenticado:', user.id);
+
     // Validar formato básico da API Key
     if (!apiKey || apiKey.trim().length < 10) {
-      throw new Error('API Key inválida');
+      throw new Error('API Key inválida (muito curta)');
     }
 
+    console.log('🔍 [saveUserApiKey] Verificando se já existe API Key para este provider...');
+    
     // Verificar se já existe uma API Key ativa para este provider
-    const { data: existing } = await supabase
+    const { data: existing, error: existingError } = await supabase
       .from('user_api_keys')
       .select('id')
       .eq('user_id', user.id)
       .eq('provider', provider)
       .eq('is_active', true)
-      .maybeSingle(); // Usar maybeSingle para não dar erro se não encontrar
+      .maybeSingle();
+
+    if (existingError) {
+      console.error('❌ [saveUserApiKey] Erro ao verificar existência:', existingError);
+    } else if (existing) {
+      console.log('📝 [saveUserApiKey] API Key existente encontrada:', existing.id);
+    } else {
+      console.log('➕ [saveUserApiKey] Nenhuma API Key existente, criando nova...');
+    }
 
     let result;
     if (existing) {
       // Atualizar existente
+      console.log('📝 [saveUserApiKey] Atualizando API Key existente:', existing.id);
+      
       const { data, error } = await supabase
         .from('user_api_keys')
         .update({
@@ -97,20 +118,41 @@ export async function saveUserApiKey(
         })
         .eq('id', existing.id)
         .select()
-        .maybeSingle(); // Usar maybeSingle para evitar erro se não encontrar
+        .single();
 
-      if (error) throw error;
-      if (!data) throw new Error('Erro ao atualizar API Key');
+      if (error) {
+        console.error('❌ [saveUserApiKey] Erro ao atualizar:', {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint,
+        });
+        throw error;
+      }
+      
+      if (!data) {
+        throw new Error('Erro ao atualizar API Key - nenhum dado retornado');
+      }
+      
+      console.log('✅ [saveUserApiKey] API Key atualizada com sucesso');
       result = data;
     } else {
       // Desativar outras API Keys do mesmo provider (se houver)
-      await supabase
+      console.log('🔄 [saveUserApiKey] Desativando outras API Keys do mesmo provider...');
+      
+      const { error: deactivateError } = await supabase
         .from('user_api_keys')
         .update({ is_active: false })
         .eq('user_id', user.id)
         .eq('provider', provider);
+      
+      if (deactivateError) {
+        console.warn('⚠️ [saveUserApiKey] Erro ao desativar chaves antigas (ignorado):', deactivateError);
+      }
 
       // Criar nova
+      console.log('➕ [saveUserApiKey] Inserindo nova API Key...');
+      
       const { data, error } = await supabase
         .from('user_api_keys')
         .insert({
@@ -121,16 +163,30 @@ export async function saveUserApiKey(
           is_active: true,
         })
         .select()
-        .maybeSingle(); // Usar maybeSingle para evitar erro se não encontrar
+        .single();
 
-      if (error) throw error;
-      if (!data) throw new Error('Erro ao criar API Key');
+      if (error) {
+        console.error('❌ [saveUserApiKey] Erro ao inserir:', {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint,
+        });
+        throw error;
+      }
+      
+      if (!data) {
+        throw new Error('Erro ao criar API Key - nenhum dado retornado');
+      }
+      
+      console.log('✅ [saveUserApiKey] Nova API Key criada com sucesso:', data.id);
       result = data;
     }
 
     return result as UserApiKey;
   } catch (error: any) {
-    console.error('Erro ao salvar API Key:', error);
+    console.error('❌ [saveUserApiKey] Erro GERAL ao salvar API Key:', error);
+    console.error('❌ [saveUserApiKey] Stack:', error.stack);
     throw new Error(error.message || 'Erro ao salvar API Key');
   }
 }

@@ -91,25 +91,58 @@ export const SettingsPage: React.FC = () => {
       setError(null);
       setSuccess(null);
       
-      // Validar API Key antes de salvar
+      console.log('🔑 [SettingsPage] Salvando API Key...', {
+        provider: apiKeyForm.provider,
+        keyLength: apiKeyForm.apiKey.trim().length,
+        isGlobal: apiKeyForm.isGlobal,
+      });
+      
+      // Validar API Key antes de salvar (pode ser pulado em caso de erro)
       let isValid = false;
-      if (apiKeyForm.provider === 'gemini') {
-        isValid = await validateGeminiApiKey(apiKeyForm.apiKey.trim());
-      } else if (apiKeyForm.provider === 'openai') {
-        isValid = await validateOpenAIApiKey(apiKeyForm.apiKey.trim());
+      let validationError = null;
+      
+      try {
+        if (apiKeyForm.provider === 'gemini') {
+          console.log('🔍 [SettingsPage] Validando chave Gemini...');
+          isValid = await validateGeminiApiKey(apiKeyForm.apiKey.trim());
+        } else if (apiKeyForm.provider === 'openai') {
+          console.log('🔍 [SettingsPage] Validando chave OpenAI...');
+          isValid = await validateOpenAIApiKey(apiKeyForm.apiKey.trim());
+        }
+        console.log('✅ [SettingsPage] Resultado da validação:', isValid);
+      } catch (validationErr: any) {
+        console.warn('⚠️ [SettingsPage] Erro na validação (será ignorado se usuário confirmar):', validationErr);
+        validationError = validationErr.message;
+        isValid = false;
       }
       
       if (!isValid) {
-        setError(`API Key inválida para ${apiKeyForm.provider === 'gemini' ? 'Gemini' : 'OpenAI'}. Verifique se a chave está correta.`);
-        setIsValidatingApiKey(false);
-        setIsSavingApiKey(false);
-        return;
+        const errorMsg = `API Key pode estar inválida para ${apiKeyForm.provider === 'gemini' ? 'Gemini' : 'OpenAI'}. ${validationError || 'Verifique se a chave está correta.'}`;
+        
+        // Dar opção de salvar mesmo assim
+        const forceConfirm = confirm(
+          `${errorMsg}\n\n` +
+          'Deseja salvar mesmo assim?\n' +
+          '(Pode ser útil se houver erro de rede na validação)\n\n' +
+          'Clique em OK para salvar ou Cancelar para revisar a chave.'
+        );
+        
+        if (!forceConfirm) {
+          setError(errorMsg);
+          setIsValidatingApiKey(false);
+          setIsSavingApiKey(false);
+          return;
+        }
+        
+        console.log('⚠️ [SettingsPage] Usuário optou por salvar chave não validada');
       }
       
       setIsValidatingApiKey(false);
       
       // Salvar API Key
-      await saveUserApiKey(apiKeyForm.provider, apiKeyForm.apiKey.trim(), apiKeyForm.isGlobal);
+      console.log('💾 [SettingsPage] Salvando no banco de dados...');
+      const result = await saveUserApiKey(apiKeyForm.provider, apiKeyForm.apiKey.trim(), apiKeyForm.isGlobal);
+      console.log('✅ [SettingsPage] API Key salva:', result.id);
       
       setSuccess(`API Key do ${apiKeyForm.provider === 'gemini' ? 'Gemini' : 'OpenAI'} salva com sucesso!`);
       setTimeout(() => setSuccess(null), 3000);
@@ -122,10 +155,17 @@ export const SettingsPage: React.FC = () => {
       });
       
       // Recarregar lista
+      console.log('🔄 [SettingsPage] Recarregando lista de API Keys...');
       await loadApiKeys();
     } catch (error: any) {
-      console.error('Erro ao salvar API Key:', error);
-      setError(error.message || 'Erro ao salvar API Key');
+      console.error('❌ [SettingsPage] Erro ao salvar API Key:', error);
+      console.error('❌ [SettingsPage] Erro detalhado:', {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+      });
+      setError(error.message || 'Erro ao salvar API Key. Verifique o console (F12) para mais detalhes.');
     } finally {
       setIsSavingApiKey(false);
       setIsValidatingApiKey(false);
