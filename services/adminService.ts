@@ -437,6 +437,7 @@ export async function listUsers(): Promise<UserWithSubscription[]> {
 
 /**
  * Cria um novo usuário com subscription premium (ADMIN ONLY)
+ * Usa API Route para ter acesso ao Service Role Key
  */
 export async function createUserWithPremium(userData: {
   email: string;
@@ -444,82 +445,44 @@ export async function createUserWithPremium(userData: {
   fullName: string;
 }): Promise<{ userId: string; message: string }> {
   try {
-    const supabase = await getSupabaseClient();
-    console.log('🔐 [Admin] Criando usuário com premium:', userData.email);
+    console.log('🔐 [Admin] Criando usuário com premium via API:', userData.email);
 
-    // 1. Criar usuário no Supabase Auth
-    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-      email: userData.email,
-      password: userData.password,
-      email_confirm: true, // Auto-confirmar email (admin criou)
-      user_metadata: {
-        full_name: userData.fullName,
+    // Obter token de autenticação do admin
+    const supabase = await getSupabaseClient();
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (!session?.access_token) {
+      throw new Error('Sessão de admin não encontrada');
+    }
+
+    // Chamar API Route que tem acesso ao Service Role
+    const response = await fetch('/api/admin/create-user', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
       },
+      body: JSON.stringify({
+        email: userData.email,
+        password: userData.password,
+        fullName: userData.fullName,
+      }),
     });
 
-    if (authError) {
-      console.error('❌ Erro ao criar usuário:', authError);
-      throw new Error(`Erro ao criar usuário: ${authError.message}`);
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error || 'Erro ao criar usuário');
     }
 
-    if (!authData.user) {
-      throw new Error('Usuário não foi criado corretamente');
-    }
-
-    const userId = authData.user.id;
-    console.log('✅ Usuário criado no Auth:', userId);
-
-    // 2. Criar perfil (caso não seja criado automaticamente)
-    const { error: profileError } = await supabase
-      .from('profiles')
-      .upsert({
-        id: userId,
-        email: userData.email,
-        full_name: userData.fullName,
-      });
-
-    if (profileError) {
-      console.warn('⚠️ Erro ao criar perfil (pode já existir):', profileError);
-    }
-
-    // 3. Buscar plano Premium
-    const { data: premiumPlan, error: planError } = await supabase
-      .from('plans')
-      .select('id')
-      .eq('name', 'premium')
-      .single();
-
-    if (planError || !premiumPlan) {
-      console.error('❌ Plano premium não encontrado:', planError);
-      throw new Error('Plano premium não encontrado no banco de dados');
-    }
-
-    console.log('✅ Plano premium encontrado:', premiumPlan.id);
-
-    // 4. Criar subscription premium
-    const { error: subscriptionError } = await supabase
-      .from('subscriptions')
-      .insert({
-        user_id: userId,
-        plan_id: premiumPlan.id,
-        status: 'active',
-        is_active: true,
-        subscription_started_at: new Date().toISOString(),
-      });
-
-    if (subscriptionError) {
-      console.error('❌ Erro ao criar subscription:', subscriptionError);
-      throw new Error(`Erro ao criar subscription premium: ${subscriptionError.message}`);
-    }
-
-    console.log('✅ Subscription premium criada para:', userId);
+    console.log('✅ [Admin] Usuário criado com sucesso:', result.userId);
 
     return {
-      userId,
-      message: `Usuário ${userData.email} criado com sucesso e subscription premium ativada!`,
+      userId: result.userId,
+      message: result.message,
     };
   } catch (error: any) {
-    console.error('❌ Erro ao criar usuário com premium:', error);
+    console.error('❌ [Admin] Erro ao criar usuário com premium:', error);
     throw error;
   }
 }
