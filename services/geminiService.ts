@@ -8,6 +8,22 @@ import { supabase } from './supabaseService';
 
 const MASTER_ADMIN_EMAIL = 'brunocostaads23@gmail.com';
 
+const resolvePublicEnv = (key: string): string | undefined => {
+    if (typeof process !== 'undefined' && process.env?.[key]) {
+        return process.env[key];
+    }
+    if (typeof window !== 'undefined' && (window as any).__NEXT_DATA__?.env?.[key]) {
+        return (window as any).__NEXT_DATA__.env[key];
+    }
+    if (typeof globalThis !== 'undefined' && (globalThis as any).__env__?.[key]) {
+        return (globalThis as any).__env__[key];
+    }
+    if (typeof import.meta !== 'undefined' && (import.meta as any).env?.[key]) {
+        return (import.meta as any).env[key];
+    }
+    return undefined;
+};
+
 const isMasterAccount = async (): Promise<boolean> => {
     try {
         const { data: { user }, error } = await supabase.auth.getUser();
@@ -41,11 +57,22 @@ const getAI = async (): Promise<{ ai: GoogleGenAI; usingUserKey: boolean; apiKey
         usingUserKey = true;
         console.log('✅ [getAI] Usando API Key do usuário (Gemini)');
     } else {
-        // NO CLIENTE, NÃO TENTA BUSCAR VARIÁVEIS DE AMBIENTE DO SERVIDOR
-        // Isso deve ser feito via API routes
-        console.error('❌ [getAI] GEMINI_API_KEY não configurada no cliente!');
-        console.error('❌ [getAI] As funções devem usar API routes quando não há chave do usuário.');
-        throw new Error("API_KEY não configurada. Configure sua própria API Key nas Configurações ou configure a GEMINI_API_KEY do sistema na Vercel.");
+        console.log('🔍 [getAI] Nenhuma API Key do usuário. Tentando chave global pública...');
+
+        const publicApiKey =
+            resolvePublicEnv('NEXT_PUBLIC_GEMINI_API_KEY') ||
+            resolvePublicEnv('NEXT_PUBLIC_API_KEY') ||
+            resolvePublicEnv('VITE_GEMINI_API_KEY') ||
+            resolvePublicEnv('VITE_API_KEY');
+
+        if (publicApiKey) {
+            apiKey = publicApiKey;
+            console.log('✅ [getAI] Usando GEMINI_API_KEY pública/global. Comprimento:', apiKey.length);
+        } else {
+            console.error('❌ [getAI] GEMINI_API_KEY não configurada no cliente!');
+            console.error('❌ [getAI] Configure NEXT_PUBLIC_GEMINI_API_KEY na Vercel para liberar o uso global.');
+            throw new Error("API_KEY não configurada. Configure sua própria API Key nas Configurações ou configure a GEMINI_API_KEY global na Vercel (NEXT_PUBLIC_GEMINI_API_KEY).");
+        }
     }
     
     return {
