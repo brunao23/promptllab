@@ -139,7 +139,9 @@ export async function POST(request: Request) {
       .from('plans')
       .select('id')
       .eq('name', 'premium')
-      .single();
+      .maybeSingle();
+
+    let planId: string;
 
     if (planError || !premiumPlan) {
       console.error('❌ [API] Plano premium não encontrado:', planError);
@@ -169,12 +171,12 @@ export async function POST(request: Request) {
       }
       
       console.log('✅ [API] Plano premium criado:', newPlan.id);
-      
-      // Usar o plano recém-criado
-      premiumPlan.id = newPlan.id;
+      planId = newPlan.id;
+    } else {
+      planId = premiumPlan.id;
     }
 
-    console.log('✅ [API] Plano premium encontrado:', premiumPlan.id);
+    console.log('✅ [API] Plano premium ID:', planId);
 
     // 4. Desativar outras subscriptions do usuário
     await adminClient
@@ -187,7 +189,7 @@ export async function POST(request: Request) {
       .from('subscriptions')
       .insert({
         user_id: userId,
-        plan_id: premiumPlan.id,
+        plan_id: planId,
         status: 'active',
         is_active: true,
         subscription_started_at: new Date().toISOString(),
