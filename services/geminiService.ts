@@ -49,11 +49,20 @@ export const createFinalPrompt = async (data: PromptData): Promise<string> => {
         throw new Error('Campo "Contexto da Interação" é obrigatório');
     }
 
-    // Primeiro, tenta usar API Key do usuário
+    // Verificar se é conta master (sempre usa API global)
+    const { isSuperAdmin } = await import('./adminService');
+    const isMaster = await isSuperAdmin();
+    
+    // Primeiro, tenta usar API Key do usuário (exceto se for master)
     const userApiKey = await getUserApiKey('gemini');
     
-    // Se o usuário NÃO tem API Key própria, usa a API route do servidor (chave global)
-    if (!userApiKey) {
+    // Se for master OU se o usuário NÃO tem API Key própria, usa a API route do servidor (chave global)
+    if (isMaster || !userApiKey) {
+        if (isMaster) {
+            console.log('🔐 [createFinalPrompt] Conta master detectada - usando API global');
+        } else {
+            console.log('🌐 [createFinalPrompt] Usando API route do servidor (chave global)');
+        }
         console.log('🌐 [createFinalPrompt] Usando API route do servidor (chave global)');
         
         try {
@@ -654,12 +663,20 @@ const retryWithBackoff = async <T>(
 };
 
 export const analyzeDocument = async (fileBase64: string, mimeType: string, fileName?: string): Promise<Partial<PromptData>> => {
-    // Primeiro, tenta usar API Key do usuário
+    // Verificar se é conta master (sempre usa API global)
+    const { isSuperAdmin } = await import('./adminService');
+    const isMaster = await isSuperAdmin();
+    
+    // Primeiro, tenta usar API Key do usuário (exceto se for master)
     const userApiKey = await getUserApiKey('gemini');
     
-    // Se o usuário NÃO tem API Key própria, usa a API route do servidor (chave global)
-    if (!userApiKey) {
-        console.log('🌐 [analyzeDocument] Usando API route do servidor (chave global)');
+    // Se for master OU se o usuário NÃO tem API Key própria, usa a API route do servidor (chave global)
+    if (isMaster || !userApiKey) {
+        if (isMaster) {
+            console.log('🔐 [analyzeDocument] Conta master detectada - usando API global');
+        } else {
+            console.log('🌐 [analyzeDocument] Usando API route do servidor (chave global)');
+        }
         
         try {
             const response = await fetch('/api/gemini/analyze-document', {
