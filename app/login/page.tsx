@@ -1,11 +1,13 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { 
-  validateEmail, 
+import {
+  validateEmail,
   sanitizeText,
   checkRateLimit,
   clearRateLimit,
@@ -16,7 +18,7 @@ import {
 export default function LoginPage() {
   const router = useRouter();
   const supabase = createClient();
-  
+
   // Redireciona se já estiver autenticado
   useEffect(() => {
     const checkAuth = async () => {
@@ -103,7 +105,7 @@ export default function LoginPage() {
         });
 
         const errorMessage = authError.message || '';
-        
+
         if (errorMessage.includes('Invalid login credentials') || errorMessage.includes('Invalid credentials')) {
           setError('E-mail ou senha incorretos. Tente novamente.');
         } else if (errorMessage.includes('Email not confirmed') || errorMessage.includes('email_not_confirmed')) {
@@ -140,7 +142,7 @@ export default function LoginPage() {
           identifier,
           timestamp: Date.now(),
         });
-        
+
         router.push('/dashboard');
       }
     } catch (err: any) {

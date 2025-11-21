@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
@@ -31,7 +33,7 @@ export default function AuthCallbackPage() {
           if (session) {
             setStatus('success');
             setMessage('Email confirmado com sucesso! Redirecionando...');
-            
+
             setTimeout(() => {
               router.push('/dashboard');
             }, 2000);
@@ -41,7 +43,7 @@ export default function AuthCallbackPage() {
         } else {
           // Outros tipos de callback
           const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-          
+
           if (sessionError) {
             throw sessionError;
           }
@@ -49,7 +51,7 @@ export default function AuthCallbackPage() {
           if (session) {
             setStatus('success');
             setMessage('Autenticação bem-sucedida! Redirecionando...');
-            
+
             setTimeout(() => {
               router.push('/dashboard');
             }, 2000);
@@ -60,9 +62,9 @@ export default function AuthCallbackPage() {
       } catch (error: any) {
         console.error('Erro no callback de autenticação:', error);
         setStatus('error');
-        
+
         const errorMessage = error.message || '';
-        
+
         if (errorMessage.includes('expired') || errorMessage.includes('expirado')) {
           setMessage('O link de confirmação expirou. Por favor, solicite um novo link de confirmação.');
         } else if (errorMessage.includes('invalid') || errorMessage.includes('inválido')) {

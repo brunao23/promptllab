@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { jsPDF } from 'jspdf';
 import { PromptInputForm } from './PromptInputForm';
 import { OutputDisplay } from './OutputDisplay';
 import { HistoryPanel } from './HistoryPanel';
@@ -14,661 +15,155 @@ import { ExplanationModal } from './ExplanationModal';
 import { WorkspaceManager } from './WorkspaceManager';
 import type { PromptData, PromptVersion, ChatMessage, FewShotExample, OptimizationPair } from '../types';
 import { INITIAL_PROMPT_DATA } from '../constants';
-import { createFinalPrompt, startChat, continueChat, optimizePrompt, generateExamples, processAudioCommand, explainPrompt } from '../services/geminiService';
-import type { GenerateContentResponse } from '@google/genai';
-import { jsPDF } from 'jspdf';
-import { 
-  createPrompt, 
-  getUserPrompts, 
-  getPrompt,
-  createPromptVersion, 
-  getPromptVersions, 
-  saveChatMessage, 
-  getChatMessages, 
-  getCurrentUser, 
-  getCurrentProfile,
-  getDefaultWorkspace
+import {
+    createPrompt,
+    getPrompt,
+    getUserPrompts,
+    createPromptVersion,
+    getPromptVersions,
+    saveChatMessage,
+    getChatMessages,
+    getDefaultWorkspace,
+    getCurrentProfile,
 } from '../services/supabaseService';
-import { 
-  checkAccess, 
-  getCurrentMonthVersions,
-  getCurrentPlanInfo,
-  canUseTokens,
-  checkUserLimits,
-  canCreateVersion,
-  canShareChat,
-  incrementVersionCount,
-  type UserLimits
+import {
+    createFinalPrompt,
+    optimizePrompt,
+    generateExamples,
+    explainPrompt,
+    continueChat,
+    startChat,
+    processAudioCommand,
+} from '../services/geminiService';
+import {
+    canCreateVersion,
+    checkAccess,
+    getCurrentMonthVersions,
+    incrementVersionCount,
+    checkUserLimits,
+    canShareChat,
 } from '../services/subscriptionService';
+import type { GenerateContentResponse } from '@google/genai';
 
-export const PromptManager: React.FC = () => {
+export default function PromptManager() {
     const searchParams = useSearchParams();
     const supabase = createClient();
+
+    // Estados do formulário
+    const [formData, setFormData] = useState<PromptData>(INITIAL_PROMPT_DATA);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+    // Estados de prompts e versões
+    const [currentPromptId, setCurrentPromptId] = useState<string | null>(null);
     const [versionHistory, setVersionHistory] = useState<PromptVersion[]>([]);
     const [activeVersion, setActiveVersion] = useState<PromptVersion | null>(null);
     const [validatedVersionId, setValidatedVersionId] = useState<string | null>(null);
+
+    // Estados de chat
     const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
     const [isChatLoading, setIsChatLoading] = useState(false);
+
+    // Estados de otimização
     const [isOptimizing, setIsOptimizing] = useState(false);
-    const [isGeneratingExamples, setIsGeneratingExamples] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const [formData, setFormData] = useState<PromptData>(INITIAL_PROMPT_DATA);
     const [optimizationPairs, setOptimizationPairs] = useState<OptimizationPair[]>([]);
     const [manualOptInstructions, setManualOptInstructions] = useState('');
-    const [isPasteModalOpen, setIsPasteModalOpen] = useState(false);
-    const fileInputRef = useRef<HTMLInputElement>(null);
-    
-    // Estados para controle de prompt ativo no banco
-    const [currentPromptId, setCurrentPromptId] = useState<string | null>(null);
-    const [isLoadingData, setIsLoadingData] = useState(true);
-    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-    const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-    const dataLoadedRef = useRef<boolean>(false);
-    const lastLoadTimeRef = useRef<number>(0);
-    const isVisibleRef = useRef<boolean>(true);
 
-    // Proteção contra recarregamento quando a aba/janela perde/ganha foco
-    useEffect(() => {
-        const handleVisibilityChange = () => {
-            isVisibleRef.current = !document.hidden;
-            // Quando a aba volta ao foco, NÃO recarrega os dados automaticamente
-            // Só recarrega se o usuário fizer logout/login explicitamente
-            if (!document.hidden) {
-                console.log('🔍 Aba voltou ao foco - mantendo dados carregados (sem recarregar)');
-            } else {
-                console.log('⏸️ Aba perdeu foco - pausando operações');
-            }
-        };
+    // Estados de exemplos
+    const [isGeneratingExamples, setIsGeneratingExamples] = useState(false);
 
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-        return () => {
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
-        };
-    }, []);
-
-    // Explanation State
+    // Estados de explicação
     const [isExplanationModalOpen, setIsExplanationModalOpen] = useState(false);
-    const [explanationContent, setExplanationContent] = useState('');
     const [isExplanationLoading, setIsExplanationLoading] = useState(false);
+    const [explanationContent, setExplanationContent] = useState('');
     const [explanationError, setExplanationError] = useState<string | null>(null);
 
-    // Assistant State
-    const [isApiKeySelected, setIsApiKeySelected] = useState(false);
-    const [assistantMessages, setAssistantMessages] = useState<ChatMessage[]>([]);
-    const [isRecording, setIsRecording] = useState(false);
-    const [isAssistantLoading, setIsAssistantLoading] = useState(false);
-    const [assistantError, setAssistantError] = useState<string | null>(null);
-    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-    const audioChunksRef = useRef<Blob[]>([]);
-    
-    // Estados para limites e assinatura
-    const [userLimits, setUserLimits] = useState<UserLimits | null>(null);
-    const [isCheckingLimits, setIsCheckingLimits] = useState(true);
-    
-    // Estados para workspace
+    // Estados de workspace
     const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string | null>(null);
     const [isSavingToRepository, setIsSavingToRepository] = useState(false);
 
-    // OTIMIZAÇÃO: Carregar limites do usuário de forma não-bloqueante (não trava o carregamento principal)
-    useEffect(() => {
-        // Carregar limites em background, não bloqueia o carregamento principal
-        checkUserLimits()
-            .then(limits => {
-                setUserLimits(limits);
-                setIsCheckingLimits(false);
-            })
-            .catch(error => {
-                console.error('❌ Erro ao carregar limites:', error);
-                setIsCheckingLimits(false);
-            });
-    }, []);
+    // Estados de assistente de voz
+    const [isRecording, setIsRecording] = useState(false);
+    const [isAssistantLoading, setIsAssistantLoading] = useState(false);
+    const [assistantError, setAssistantError] = useState<string | null>(null);
+    const [assistantMessages, setAssistantMessages] = useState<ChatMessage[]>([]);
+    const [isApiKeySelected, setIsApiKeySelected] = useState(false);
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const audioChunksRef = useRef<Blob[]>([]);
 
-    // Carregar dados do Supabase ao montar o componente E quando a sessão mudar
-    useEffect(() => {
-        const loadUserData = async (forceReload = false) => {
-            // Proteção: evitar recarregamento se já foi carregado recentemente (menos de 3 segundos)
-            // E só se NÃO for um forceReload
-            const now = Date.now();
-            const timeSinceLastLoad = now - lastLoadTimeRef.current;
-            if (!forceReload && dataLoadedRef.current && timeSinceLastLoad < 3000) {
-                console.log('⏭️ Dados já foram carregados recentemente, pulando recarregamento desnecessário');
-                setIsLoadingData(false); // Garantir que não fique preso em loading
-                return;
-            }
+    // Estados de limites do usuário
+    const [userLimits, setUserLimits] = useState<any>(null);
+
+    // Refs
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [isPasteModalOpen, setIsPasteModalOpen] = useState(false);
+
+    // Estado de carregamento inicial
+    const [isLoadingData, setIsLoadingData] = useState(true);
+
+    // Função para processar resposta do assistente de voz
+    const processAssistantResponse = useCallback((response: GenerateContentResponse) => {
+        try {
+            // Extrair texto da resposta
+            const text = response.text || '';
             
-            // Se já está carregando e não é forceReload, não iniciar outro carregamento
-            if (!forceReload && isLoadingData) {
-                console.log('⏸️ Já está carregando, aguardando...');
-                return;
-            }
-
-            try {
-                console.log('🔄 Iniciando carregamento de dados do usuário...');
-                setIsLoadingData(true);
-                lastLoadTimeRef.current = now;
-                
-                // Verificar se usuário está autenticado
-                const { data: { session } } = await supabase.auth.getSession();
-                if (!session) {
-                    console.log('⚠️ Usuário não autenticado, pulando carregamento');
-                    setIsLoadingData(false);
-                    // Limpar estados se não há sessão
-                    setCurrentPromptId(null);
-                    setVersionHistory([]);
-                    setActiveVersion(null);
-                    setChatMessages([]);
-                    return;
-                }
-
-                console.log('✅ Usuário autenticado:', session.user.email);
-
-                // Verificar se há um promptId nos query params (vindo do repositório)
-                const promptIdFromParams = searchParams ? searchParams.get('promptId') : null;
-                
-                if (promptIdFromParams) {
-                    // Limpar o query param após usar para evitar recarregamentos infinitos
-                    const url = new URL(window.location.href);
-                    url.searchParams.delete('promptId');
-                    window.history.replaceState({}, document.title, url.pathname + url.search);
-                }
-                
-                if (promptIdFromParams) {
-                    console.log('📋 Carregando prompt específico do repositório:', promptIdFromParams);
-                    try {
-                        // Carregar dados completos do prompt
-                        const { promptData } = await getPrompt(promptIdFromParams);
-                        console.log('✅ Dados do prompt carregados do repositório');
-                        setCurrentPromptId(promptIdFromParams);
-                        setFormData(promptData);
-                        
-                        // Carregar versões do prompt
-                        let versions = await getPromptVersions(promptIdFromParams);
-                        console.log('📜 Versões encontradas:', versions?.length || 0);
-                        
-                        // Se não houver versões, gerar uma versão inicial automaticamente
-                        if (!versions || versions.length === 0) {
-                            console.log('⚠️ Nenhuma versão encontrada. Gerando versão inicial...');
-                            try {
-                                // Verificar se pode criar versão
-                                const canCreate = await canCreateVersion();
-                                if (!canCreate.allowed) {
-                                    console.warn('⚠️ Não é possível criar versão:', canCreate.reason);
-                                    setError(canCreate.reason || 'Limite de versões atingido');
-                                } else {
-                                    // Validar campos obrigatórios antes de gerar
-                                    if (!promptData.persona || !promptData.objetivo || !promptData.contextoNegocio || !promptData.contexto) {
-                                        console.warn('⚠️ Campos obrigatórios faltando, pulando geração automática');
-                                        setError('Campos obrigatórios (Persona, Objetivo, Contexto do Negócio, Contexto) devem estar preenchidos para gerar versão inicial');
-                                    } else {
-                                        const initialPromptContent = await createFinalPrompt(promptData);
-                                        const newVersion = await createPromptVersion(
-                                            promptIdFromParams,
-                                            {
-                                                content: initialPromptContent,
-                                                format: promptData.formatoSaida || 'text',
-                                                masterFormat: promptData.masterPromptFormat || 'markdown',
-                                                sourceData: promptData
-                                            }
-                                        );
-                                        console.log('✅ Versão inicial gerada:', newVersion.id);
-                                        // Incrementar contador de versões
-                                        await incrementVersionCount();
-                                        versions = [newVersion];
-                                    }
-                                }
-                            } catch (genError: any) {
-                                console.error('❌ Erro ao gerar versão inicial:', genError);
-                                setError(genError.message || 'Erro ao gerar versão inicial');
-                                // Continuar mesmo se falhar a geração
-                            }
-                        }
-                        
-                        if (versions && versions.length > 0) {
-                            console.log('✅ Configurando versões no estado:', versions.length);
-                            setVersionHistory(versions);
-                            const latestVersion = versions[0];
-                            setActiveVersion(latestVersion);
-                            
-                            // Carregar mensagens do chat se houver
-                            try {
-                                const messages = await getChatMessages(latestVersion.id);
-                                if (messages && messages.length > 0) {
-                                    setChatMessages(messages);
-                                }
-                            } catch (msgError) {
-                                console.warn('⚠️ Erro ao carregar mensagens (pode não haver mensagens ainda):', msgError);
-                            }
-                            
-                            // Inicializar chat se houver conteúdo
-                            if (latestVersion.content) {
-                                try {
-                                    await startChat(latestVersion.content);
-                                    console.log('✅ Chat inicializado com sucesso');
-                                } catch (chatError) {
-                                    console.warn('⚠️ Erro ao inicializar chat:', chatError);
-                                }
-                            }
-                        } else {
-                            console.warn('⚠️ Ainda não há versões disponíveis após tentativa de geração');
-                        }
-                        setIsLoadingData(false);
-                        dataLoadedRef.current = true;
-                        return;
-                    } catch (err: any) {
-                        console.error('❌ Erro ao carregar prompt do repositório:', err);
-                        setError(err.message || 'Erro ao carregar prompt do repositório');
-                        // Garantir que isLoadingData seja false mesmo em caso de erro
-                        setIsLoadingData(false);
-                        dataLoadedRef.current = true;
-                        // Continuar o fluxo normal para tentar carregar os prompts do usuário
-                    }
-                }
-
-                // OTIMIZAÇÃO: Carregar workspace e prompts em paralelo
-                console.log('📥 Carregando dados iniciais...');
-                
-                const [defaultWorkspace, prompts] = await Promise.all([
-                    !currentWorkspaceId ? getDefaultWorkspace().catch(() => null) : Promise.resolve(null),
-                    (async () => {
-                        try {
-                            const workspaceId = currentWorkspaceId || (await getDefaultWorkspace())?.id;
-                            return await getUserPrompts(workspaceId || undefined);
-                        } catch (e) {
-                            console.error('❌ Erro ao carregar prompts:', e);
-                            return [];
-                        }
-                    })()
-                ]);
-
-                // Configurar workspace se encontrado
-                if (defaultWorkspace && !currentWorkspaceId) {
-                    setCurrentWorkspaceId(defaultWorkspace.id);
-                    console.log('✅ Workspace padrão carregado:', defaultWorkspace.id);
-                }
-
-                console.log('✅ Prompts carregados:', prompts?.length || 0);
-                
-                if (prompts && prompts.length > 0) {
-                    // Carregar o prompt mais recente
-                    const latestPrompt = prompts[0];
-                    console.log('📋 Carregando prompt mais recente:', latestPrompt.id);
-                    setCurrentPromptId(latestPrompt.id);
+            // Processar function calls se houver
+            if (response.functionCalls && response.functionCalls.length > 0) {
+                response.functionCalls.forEach((call: any) => {
+                    const { name, args } = call;
                     
-                    // OTIMIZAÇÃO: Carregar dados do prompt e versões em paralelo
-                    const [promptResult] = await Promise.all([
-                        getPrompt(latestPrompt.id).catch((e) => {
-                            console.error('❌ Erro ao carregar prompt:', e);
-                            return null;
-                        })
-                    ]);
-
-                    if (promptResult) {
-                        const { promptData } = promptResult;
-                        console.log('✅ Dados do prompt carregados');
-                        setFormData(promptData);
+                    switch (name) {
+                        case 'updatePersona':
+                            setFormData(prev => ({ ...prev, persona: args.text || prev.persona }));
+                            break;
+                        case 'updateObjetivo':
+                            setFormData(prev => ({ ...prev, objetivo: args.text || prev.objetivo }));
+                            break;
+                        case 'updateContextoNegocio':
+                            setFormData(prev => ({ ...prev, contextoNegocio: args.text || prev.contextoNegocio }));
+                            break;
+                        case 'updateContextoInteracao':
+                            setFormData(prev => ({ ...prev, contexto: args.text || prev.contexto }));
+                            break;
+                        case 'addRegra':
+                            if (args.text) {
+                                setFormData(prev => ({ ...prev, regras: [...prev.regras, args.text] }));
+                            }
+                            break;
+                        case 'addExemplo':
+                            if (args.user && args.agent) {
+                                setFormData(prev => ({
+                                    ...prev,
+                                    exemplos: [...prev.exemplos, {
+                                        id: crypto.randomUUID(),
+                                        user: args.user,
+                                        agent: args.agent,
+                                    }]
+                                }));
+                            }
+                            break;
                     }
-                    
-                    // OTIMIZAÇÃO: Carregar versões em paralelo enquanto o formData já está sendo exibido
-                    console.log('📜 Carregando versões do prompt...');
-                    let versions: PromptVersion[] = [];
-                    try {
-                        versions = await getPromptVersions(latestPrompt.id);
-                        console.log('✅ Versões carregadas:', versions?.length || 0);
-                        
-                        if (!versions) {
-                            versions = [];
-                        }
-                        
-                        if (versions.length > 0) {
-                            // OTIMIZAÇÃO: Definir versões e versão ativa imediatamente
-                            const latestVersion = versions[0];
-                            setVersionHistory(versions);
-                            setActiveVersion({ ...latestVersion });
-                            
-                            // OTIMIZAÇÃO: Carregar mensagens e inicializar chat em paralelo (não-bloqueante)
-                            Promise.all([
-                                getChatMessages(latestVersion.id).catch(() => []),
-                                latestVersion.content?.trim() ? startChat(latestVersion.content).catch(() => null) : Promise.resolve(null)
-                            ]).then(([messages]) => {
-                                if (messages && messages.length > 0) {
-                                    setChatMessages([...messages]);
-                                } else {
-                                    setChatMessages([]);
-                                }
-                            }).catch((err) => {
-                                console.error('❌ Erro ao carregar mensagens/chat:', err);
-                                setChatMessages([]);
-                            });
-                        } else {
-                            console.warn('⚠️ Nenhuma versão encontrada para o prompt:', latestPrompt.id);
-                            // Não limpar tudo, manter o prompt e formData carregados
-                            // Mas definir arrays vazios para que os componentes saibam que não há dados
-                            console.log('💾 Definindo arrays vazios no estado (sem versões)');
-                            setVersionHistory([]);
-                            setActiveVersion(null);
-                            setChatMessages([]);
-                            console.log('✅ Estados de versões limpos (sem versões)');
-                        }
-                    } catch (versionsError: any) {
-                        console.error('❌ ERRO CRÍTICO ao carregar versões:', versionsError);
-                        console.error('❌ Detalhes do erro:', {
-                            message: versionsError.message,
-                            stack: versionsError.stack,
-                            details: versionsError.details,
-                            hint: versionsError.hint,
-                            code: versionsError.code,
-                        });
-                        // Em caso de erro, não limpar tudo - manter o que já foi carregado
-                        // Mas definir arrays vazios para que os componentes saibam que não há dados
-                        setVersionHistory([]);
-                        setActiveVersion(null);
-                        setChatMessages([]);
-                    }
-                } else {
-                    console.log('ℹ️ Nenhum prompt encontrado. Usuário pode começar criando um novo.');
-                    // Limpar estados se não há prompts
-                    setCurrentPromptId(null);
-                    setVersionHistory([]);
-                    setActiveVersion(null);
-                    setChatMessages([]);
-                    // Resetar formData para valores iniciais quando não há prompts
-                    setFormData(INITIAL_PROMPT_DATA);
-                }
-            } catch (err: any) {
-                console.error('❌ Erro ao carregar dados do usuário:', err);
-                console.error('❌ Detalhes do erro:', {
-                    message: err.message,
-                    stack: err.stack,
-                    details: err.details,
-                    hint: err.hint,
-                    code: err.code,
                 });
-                const errorMessage = err?.message || err?.toString() || 'Erro desconhecido ao carregar dados';
-                setError(`Erro ao carregar dados: ${errorMessage}`);
-                // Garantir que estados sejam limpos mesmo em caso de erro
-                setCurrentPromptId(null);
-                setVersionHistory([]);
-                setActiveVersion(null);
-                setChatMessages([]);
-                setFormData(INITIAL_PROMPT_DATA);
-            } finally {
-                // CRÍTICO: Sempre garantir que isLoadingData seja false
-                console.log('✅ Carregamento de dados finalizado. isLoadingData = false');
-                setIsLoadingData(false);
-                dataLoadedRef.current = true;
             }
-        };
 
-        // SEMPRE carregar na primeira montagem - sem verificações que podem bloquear
-        if (!dataLoadedRef.current) {
-            console.log('🔄 Primeiro carregamento, iniciando...');
-            loadUserData();
+            // Adicionar mensagem do assistente
+            if (text) {
+                setAssistantMessages(prev => [...prev, { author: 'agent', text }]);
+            }
+        } catch (err: any) {
+            console.error('Erro ao processar resposta do assistente:', err);
+            setAssistantError(err.message || 'Erro ao processar resposta do assistente');
         }
-
-        // Timeout de segurança: se isLoadingData ficar true por mais de 15 segundos, resetar
-        const safetyTimeout = setTimeout(() => {
-            if (isLoadingData) {
-                console.warn('⚠️ Timeout de segurança (15s): isLoadingData ficou true por muito tempo, resetando...');
-                setIsLoadingData(false);
-                dataLoadedRef.current = true;
-            }
-        }, 15000);
-
-        // Listener para mudanças de autenticação (logout/login)
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-            console.log('🔐 Mudança de autenticação:', event);
-            if (event === 'SIGNED_IN') {
-                if (session) {
-                    console.log('✅ Usuário fez login, recarregando dados...');
-                    dataLoadedRef.current = false; // Forçar recarregamento em login
-                    await loadUserData(true);
-                }
-            } else if (event === 'TOKEN_REFRESHED') {
-                // Token refreshed - não recarregar dados, apenas logar
-                // Verifica se a aba está visível antes de fazer qualquer operação
-                if (!isVisibleRef.current) {
-                    console.log('⏸️ TOKEN_REFRESHED ignorado - aba não está visível');
-                    return;
-                }
-                console.log('🔄 Token atualizado (refresh automático), mantendo dados carregados');
-                // NÃO recarregar dados para evitar spinner desnecessário
-            } else if (event === 'SIGNED_OUT') {
-                console.log('🚪 Usuário fez logout, limpando dados...');
-                dataLoadedRef.current = false;
-                lastLoadTimeRef.current = 0;
-                setCurrentPromptId(null);
-                setVersionHistory([]);
-                setActiveVersion(null);
-                setChatMessages([]);
-                setFormData(INITIAL_PROMPT_DATA);
-            }
-        });
-
-        return () => {
-            subscription.unsubscribe();
-            clearTimeout(safetyTimeout);
-        };
-    }, []); // SEM dependências - só carrega uma vez na montagem
-
-    // Debug: Log quando versionHistory muda
-    useEffect(() => {
-        if (versionHistory.length > 0) {
-            console.log('📊 Histórico de versões atualizado no React:', {
-                total: versionHistory.length,
-                versoes: versionHistory.map(v => `v${v.version} (${v.id})`).join(', '),
-            });
-        } else {
-            console.log('📊 Histórico de versões está vazio no React');
-        }
-    }, [versionHistory]);
-
-    // Debug: Log quando activeVersion muda
-    useEffect(() => {
-        if (activeVersion) {
-            console.log('🎯 Versão ativa atualizada no React:', {
-                id: activeVersion.id,
-                version: activeVersion.version,
-                hasContent: !!activeVersion.content,
-                contentLength: activeVersion.content?.length || 0,
-            });
-        } else {
-            console.log('🎯 Versão ativa está null no React');
-        }
-    }, [activeVersion]);
-
-    // Debug: Log quando chatMessages muda
-    useEffect(() => {
-        if (chatMessages.length > 0) {
-            console.log('💬 Mensagens de chat atualizadas no React:', {
-                total: chatMessages.length,
-                mensagens: chatMessages.map(m => `${m.author}: ${m.text.substring(0, 30)}...`).join(', '),
-            });
-        } else {
-            console.log('💬 Mensagens de chat estão vazias no React');
-        }
-    }, [chatMessages]);
-
-    // Auto-save do formData quando muda (debounced)
-    useEffect(() => {
-        if (hasUnsavedChanges && !isLoadingData) {
-            // Limpar timeout anterior
-            if (autoSaveTimeoutRef.current) {
-                clearTimeout(autoSaveTimeoutRef.current);
-            }
-
-            // Aguardar 3 segundos após a última mudança antes de salvar
-            autoSaveTimeoutRef.current = setTimeout(async () => {
-                try {
-                    let promptId = currentPromptId;
-                    
-                    if (!promptId) {
-                        // Criar novo prompt se não existe
-                        const newPrompt = await createPrompt(formData, `Prompt ${new Date().toLocaleDateString('pt-BR')}`);
-                        promptId = newPrompt.id;
-                        setCurrentPromptId(promptId);
-                        console.log('✅ Novo prompt criado no auto-save:', promptId);
-                    } else {
-                        // Atualizar prompt existente (criar novo registro)
-                        await createPrompt(formData, `Prompt ${new Date().toLocaleDateString('pt-BR')}`);
-                        console.log('✅ Prompt atualizado no auto-save:', promptId);
-                    }
-                    
-                    setHasUnsavedChanges(false);
-                } catch (err: any) {
-                    console.error('❌ Erro no auto-save:', err);
-                    // Não mostrar erro para o usuário no auto-save
-                }
-            }, 3000);
-        }
-
-        return () => {
-            if (autoSaveTimeoutRef.current) {
-                clearTimeout(autoSaveTimeoutRef.current);
-            }
-        };
-    }, [formData, currentPromptId, hasUnsavedChanges, isLoadingData]);
-
-    useEffect(() => {
-        const checkApiKey = async () => {
-            if (window.aistudio && typeof window.aistudio.hasSelectedApiKey === 'function') {
-                const hasKey = await window.aistudio.hasSelectedApiKey();
-                setIsApiKeySelected(hasKey);
-            }
-        };
-        checkApiKey();
     }, []);
 
-    // Carregar dados quando a versão ativa muda (mas não durante o carregamento inicial)
-    useEffect(() => {
-        // CRÍTICO: Ignorar durante o carregamento inicial para evitar conflitos
-        if (isLoadingData) {
-            console.log('⏸️ Carregamento inicial em andamento, ignorando mudança de versão');
-            return;
-        }
-
-        // Só executar quando o ID da versão muda, não quando o objeto inteiro muda
-        if (activeVersion?.id) {
-            console.log('🔄 [USE_EFFECT] Versão ativa mudou (não é carregamento inicial):', activeVersion.id);
-            
-            // Só carregar mensagens se ainda não foram carregadas OU se mudou para uma versão diferente
-            // Isso evita recarregar mensagens que já foram carregadas durante o carregamento inicial
-            const currentVersionId = activeVersion.id;
-            const shouldReloadMessages = !chatMessages.length || 
-                (chatMessages.length > 0 && !chatMessages.some(() => true)); // Simplificado
-            
-            if (shouldReloadMessages) {
-                // Carregar mensagens de chat do banco ANTES de inicializar o chat
-                const loadChatMessages = async () => {
-                    try {
-                        console.log('💬 [USE_EFFECT] Carregando mensagens para versão:', currentVersionId);
-                        const messages = await getChatMessages(currentVersionId);
-                        console.log('✅ [USE_EFFECT] Mensagens carregadas:', messages?.length || 0);
-                        
-                        // Definir mensagens ANTES de inicializar o chat
-                        if (messages && messages.length > 0) {
-                            console.log('💬 [USE_EFFECT] Restaurando histórico de chat:', messages.length, 'mensagens');
-                            setChatMessages(messages);
-                        } else {
-                            // Limpar se realmente não há mensagens
-                            setChatMessages([]);
-                            console.log('ℹ️ [USE_EFFECT] Nenhuma mensagem encontrada para esta versão');
-                        }
-                        
-                        // Inicializar chat DEPOIS de carregar as mensagens
-                        if (activeVersion.content && activeVersion.content.trim().length > 0) {
-                            console.log('🔄 [USE_EFFECT] Inicializando chat com nova versão...');
-                            await startChat(activeVersion.content);
-                            console.log('✅ [USE_EFFECT] Chat inicializado com nova versão');
-                        }
-                    } catch (err: any) {
-                        console.warn('⚠️ [USE_EFFECT] Erro ao carregar mensagens de chat:', err);
-                        // Mesmo com erro, tentar inicializar o chat se houver conteúdo
-                        if (activeVersion.content && activeVersion.content.trim().length > 0) {
-                            await startChat(activeVersion.content);
-                        }
-                    }
-                };
-                
-                loadChatMessages();
-            } else {
-                console.log('⏭️ [USE_EFFECT] Pulando recarregamento de mensagens (já carregadas)');
-                // Apenas inicializar chat se houver conteúdo e ainda não foi inicializado
-                if (activeVersion.content && activeVersion.content.trim().length > 0) {
-                    console.log('🔄 [USE_EFFECT] Apenas reinicializando chat com conteúdo da versão');
-                    startChat(activeVersion.content).catch(err => {
-                        console.error('Erro ao reinicializar chat:', err);
-                    });
-                }
-            }
-            
-            // NÃO atualizar formData aqui durante mudança de versão manual
-            // O formData já está correto do carregamento inicial
-        } else if (!isLoadingData && !currentPromptId && !isLoadingData) {
-            // Só resetar se realmente não há dados (e já terminou de carregar)
-            console.log('🔄 [USE_EFFECT] Sem versão ativa e sem prompt, resetando formData');
-            setFormData(INITIAL_PROMPT_DATA);
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [activeVersion?.id, isLoadingData]); // Dependência do ID e do estado de carregamento
-    
-    const handleAssistantToolCall = (toolCall: any) => {
-        const { name, args } = toolCall;
-        
-        switch (name) {
-            case 'updatePersona':
-                setFormData(prev => ({ ...prev, persona: args.text }));
-                setHasUnsavedChanges(true);
-                break;
-            case 'updateObjetivo':
-                setFormData(prev => ({ ...prev, objetivo: args.text }));
-                setHasUnsavedChanges(true);
-                break;
-            case 'updateContextoNegocio':
-                setFormData(prev => ({ ...prev, contextoNegocio: args.text }));
-                setHasUnsavedChanges(true);
-                break;
-            case 'updateContextoInteracao':
-                setFormData(prev => ({ ...prev, contexto: args.text }));
-                setHasUnsavedChanges(true);
-                break;
-            case 'addRegra':
-                setFormData(prev => ({ ...prev, regras: [...prev.regras, args.text] }));
-                setHasUnsavedChanges(true);
-                break;
-            case 'addExemplo':
-                 setFormData(prev => ({ ...prev, exemplos: [...prev.exemplos, { ...args, id: crypto.randomUUID() }] }));
-                 setHasUnsavedChanges(true);
-                 break;
-            default:
-                console.warn(`Função ${name} não reconhecida.`);
-        }
-    };
-    
-    const processAssistantResponse = (response: GenerateContentResponse) => {
-        if (response.functionCalls && response.functionCalls.length > 0) {
-            response.functionCalls.forEach(handleAssistantToolCall);
-        }
-        const responseText = response.text?.trim();
-        if (responseText) {
-            const transcriptionMatch = responseText.match(/\[TRANSCRIÇÃO:\s*(.*?)\]/i);
-            const userTranscription = transcriptionMatch ? transcriptionMatch[1] : "Comando de áudio não transcrito.";
-            setAssistantMessages(prev => [
-                ...prev, 
-                { author: 'user', text: userTranscription },
-                { author: 'agent', text: responseText.replace(/\[TRANSCRIÇÃO:.*?\]\s*/i, '') }
-            ]);
-        }
-    }
-
-    const startRecording = async () => {
-        if (isRecording) return;
-        setAssistantError(null);
+    // Função para iniciar gravação
+    const startRecording = useCallback(async () => {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             mediaRecorderRef.current = new MediaRecorder(stream);
             audioChunksRef.current = [];
-            mediaRecorderRef.current.ondataavailable = (event) => {
+            mediaRecorderRef.current.ondataavailable = (event: BlobEvent) => {
                 audioChunksRef.current.push(event.data);
             };
             mediaRecorderRef.current.onstop = async () => {
@@ -697,24 +192,24 @@ export const PromptManager: React.FC = () => {
             console.error("Error starting recording:", err);
             setAssistantError("Falha ao iniciar a gravação. Verifique as permissões do microfone.");
         }
-    };
-    
-    const stopRecording = () => {
+    }, [processAssistantResponse]);
+
+    const stopRecording = useCallback(() => {
         if (mediaRecorderRef.current && isRecording) {
             mediaRecorderRef.current.stop();
             setIsRecording(false);
         }
-    };
+    }, [isRecording]);
 
-    const handleToggleRecording = () => {
+    const handleToggleRecording = useCallback(() => {
         if (isRecording) {
             stopRecording();
         } else {
             startRecording();
         }
-    };
+    }, [isRecording, startRecording, stopRecording]);
 
-    const handleSelectApiKey = async () => {
+    const handleSelectApiKey = useCallback(async () => {
         try {
             if (window.aistudio && typeof window.aistudio.openSelectKey === 'function') {
                 await window.aistudio.openSelectKey();
@@ -725,230 +220,230 @@ export const PromptManager: React.FC = () => {
             console.error("Error opening API key selection:", error);
             setAssistantError("Não foi possível abrir o seletor de chave de API.");
         }
-    };
+    }, []);
 
-    const handleGeneratePrompt = async () => {
-        setIsLoading(true);
-        setError(null);
-        try {
-            // Obter workspace atual
-            const workspaceIdToUse = currentWorkspaceId || (await getDefaultWorkspace())?.id || undefined;
-            
-            // Salvar ou criar prompt no banco
-            let promptId = currentPromptId;
-            if (!promptId) {
-                // Criar novo prompt
-                console.log('📝 Criando novo prompt no banco...', workspaceIdToUse ? `(workspace: ${workspaceIdToUse})` : '');
-                try {
-                    const newPrompt = await createPrompt(formData, undefined, workspaceIdToUse);
-                    promptId = newPrompt.id;
-                    setCurrentPromptId(promptId);
-                    console.log('✅ Novo prompt criado:', promptId);
-                } catch (promptError: any) {
-                    console.error('❌ ERRO ao criar prompt:', promptError);
-                    setError(`Erro ao salvar prompt no banco: ${promptError.message || 'Erro desconhecido'}. Verifique o console para mais detalhes.`);
-                    setIsLoading(false);
-                    return;
-                }
-            } else {
-                // Criar novo registro de prompt (histórico)
-                console.log('📝 Atualizando prompt no banco:', promptId);
-                try {
-                    await createPrompt(formData, `Prompt ${new Date().toLocaleDateString('pt-BR')}`, workspaceIdToUse);
-                    console.log('✅ Prompt atualizado');
-                } catch (promptError: any) {
-                    console.error('❌ ERRO ao atualizar prompt:', promptError);
-                    setError(`Erro ao atualizar prompt no banco: ${promptError.message || 'Erro desconhecido'}. Verifique o console para mais detalhes.`);
-                    setIsLoading(false);
-                    return;
-                }
-            }
+    const handleGeneratePrompt = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+        // Obter workspace atual
+        const workspaceIdToUse = currentWorkspaceId || (await getDefaultWorkspace())?.id || undefined;
 
-            console.log('🤖 Gerando conteúdo do prompt...');
-            const promptContent = await createFinalPrompt(formData);
-            
-            // Verificar limite de versões antes de criar
-            const versionCheck = await canCreateVersion();
-            if (!versionCheck.allowed) {
-                setError(versionCheck.reason || 'Limite de versões atingido');
-                setIsLoading(false);
-                return;
-            }
-
-            // Verificar se promptId existe (TypeScript check)
-            if (!promptId) {
-                setError('Erro: ID do prompt não encontrado. Tente novamente.');
-                setIsLoading(false);
-                return;
-            }
-
-            // Criar versão no banco (promptId é garantidamente string aqui)
-            console.log('💾 Salvando versão no banco...');
-            let newVersion: PromptVersion;
-            const finalPromptId: string = promptId; // Type assertion para garantir que é string
+        // Salvar ou criar prompt no banco
+        let promptId = currentPromptId;
+        if (!promptId) {
+            // Criar novo prompt
+            console.log('📝 Criando novo prompt no banco...', workspaceIdToUse ? `(workspace: ${workspaceIdToUse})` : '');
             try {
-                newVersion = await createPromptVersion(finalPromptId, {
-                    content: promptContent,
-                    format: formData.formatoSaida,
-                    masterFormat: formData.masterPromptFormat,
-                    sourceData: formData,
-                });
-                console.log('✅ Versão salva:', newVersion.id);
-                
-                // Incrementar contador de versões
-                await incrementVersionCount();
-                
-                // Atualizar limites locais
-                const updatedLimits = await checkUserLimits();
-                setUserLimits(updatedLimits);
-            } catch (versionError: any) {
-                console.error('❌ ERRO ao salvar versão:', versionError);
-                setError(`Erro ao salvar versão no banco: ${versionError.message || 'Erro desconhecido'}. Verifique o console para mais detalhes.`);
+                const newPrompt = await createPrompt(formData, undefined, workspaceIdToUse);
+                promptId = newPrompt.id;
+                setCurrentPromptId(promptId);
+                console.log('✅ Novo prompt criado:', promptId);
+            } catch (promptError: any) {
+                console.error('❌ ERRO ao criar prompt:', promptError);
+                setError(`Erro ao salvar prompt no banco: ${promptError.message || 'Erro desconhecido'}. Verifique o console para mais detalhes.`);
                 setIsLoading(false);
                 return;
             }
-
-            setVersionHistory(prev => [...prev, newVersion]);
-            setActiveVersion(newVersion);
-            setHasUnsavedChanges(false);
-            
-            // Reiniciar chat
-            await startChat(promptContent);
-        } catch (e: any) {
-            console.error('❌ Erro ao gerar prompt:', e);
-            setError(e.message || "Ocorreu um erro desconhecido. Verifique o console para mais detalhes.");
-        } finally {
-            setIsLoading(false);
+        } else {
+            // Criar novo registro de prompt (histórico)
+            console.log('📝 Atualizando prompt no banco:', promptId);
+            try {
+                await createPrompt(formData, `Prompt ${new Date().toLocaleDateString('pt-BR')}`, workspaceIdToUse);
+                console.log('✅ Prompt atualizado');
+            } catch (promptError: any) {
+                console.error('❌ ERRO ao atualizar prompt:', promptError);
+                setError(`Erro ao atualizar prompt no banco: ${promptError.message || 'Erro desconhecido'}. Verifique o console para mais detalhes.`);
+                setIsLoading(false);
+                return;
+            }
         }
-    };
-    
-    const handleOptimizePrompt = async () => {
-        // Verificar limite de versões antes de otimizar
-        const hasAccess = await checkAccess('create_version');
-        if (!hasAccess) {
-            const versionsInfo = await getCurrentMonthVersions();
-            alert(`Limite de versões atingido! Você já criou ${versionsInfo.versionsCount} de ${versionsInfo.versionsLimit} versões permitidas no seu plano este mês. Upgrade para Premium para criar versões ilimitadas.`);
+
+        console.log('🤖 Gerando conteúdo do prompt...');
+        const promptContent = await createFinalPrompt(formData);
+
+        // Verificar limite de versões antes de criar
+        const versionCheck = await canCreateVersion();
+        if (!versionCheck.allowed) {
+            setError(versionCheck.reason || 'Limite de versões atingido');
+            setIsLoading(false);
             return;
         }
-        if (!activeVersion || !currentPromptId) return;
-        if (optimizationPairs.length === 0 && !manualOptInstructions.trim()) return;
 
-        setIsOptimizing(true);
-        setError(null);
+        // Verificar se promptId existe (TypeScript check)
+        if (!promptId) {
+            setError('Erro: ID do prompt não encontrado. Tente novamente.');
+            setIsLoading(false);
+            return;
+        }
+
+        // Criar versão no banco (promptId é garantidamente string aqui)
+        console.log('💾 Salvando versão no banco...');
+        let newVersion: PromptVersion;
+        const finalPromptId: string = promptId; // Type assertion para garantir que é string
         try {
-            const optimizedContent = await optimizePrompt(activeVersion.content, optimizationPairs, manualOptInstructions);
-            
-            // Verificar limite de versões antes de criar
-            const versionCheck = await canCreateVersion();
-            if (!versionCheck.allowed) {
-                setError(versionCheck.reason || 'Limite de versões atingido');
-                setIsOptimizing(false);
-                return;
-            }
-
-            // Criar nova versão no banco
-            const newVersion = await createPromptVersion(currentPromptId, {
-                content: optimizedContent,
-                format: activeVersion.sourceData.formatoSaida,
-                masterFormat: activeVersion.sourceData.masterPromptFormat,
-                sourceData: activeVersion.sourceData,
+            newVersion = await createPromptVersion(finalPromptId, {
+                content: promptContent,
+                format: formData.formatoSaida,
+                masterFormat: formData.masterPromptFormat,
+                sourceData: formData,
             });
-            
+            console.log('✅ Versão salva:', newVersion.id);
+
             // Incrementar contador de versões
             await incrementVersionCount();
-            
+
             // Atualizar limites locais
             const updatedLimits = await checkUserLimits();
             setUserLimits(updatedLimits);
-
-            setVersionHistory(prev => [...prev, newVersion]);
-            setActiveVersion(newVersion);
-            setOptimizationPairs([]);
-            setManualOptInstructions('');
-        } catch (error: any) {
-            console.error('❌ Erro ao otimizar prompt:', error);
-            // Garantir que sempre temos uma mensagem de erro válida
-            const errorMessage = error?.message || error?.toString() || "Ocorreu um erro desconhecido ao otimizar.";
-            setError(errorMessage);
-        } finally {
-            setIsOptimizing(false);
-        }
-    };
-    
-    const handleGenerateExamples = async () => {
-        setIsGeneratingExamples(true);
-        setError(null);
-        try {
-            const newExamplesData = await generateExamples(formData);
-            const newExamplesWithIds: FewShotExample[] = newExamplesData.map(ex => ({
-                ...ex,
-                id: crypto.randomUUID(),
-            }));
-            setFormData(prev => ({ ...prev, exemplos: [...prev.exemplos, ...newExamplesWithIds] }));
-        } catch (e: any) {
-             setError(e.message || "Ocorreu um erro ao gerar exemplos.");
-        } finally {
-            setIsGeneratingExamples(false);
-        }
-    };
-
-    const handleSendMessage = async (message: string) => {
-        if (!activeVersion) {
-            setError('Crie um prompt primeiro antes de enviar mensagens.');
+        } catch (versionError: any) {
+            console.error('❌ ERRO ao salvar versão:', versionError);
+            setError(`Erro ao salvar versão no banco: ${versionError.message || 'Erro desconhecido'}. Verifique o console para mais detalhes.`);
+            setIsLoading(false);
             return;
         }
 
-        // Adicionar mensagem do usuário ao estado e salvar no banco
-        const userMessage: ChatMessage = { author: 'user', text: message };
-        setChatMessages(prev => [...prev, userMessage]);
-        
-        // Salvar mensagem do usuário no banco
+        setVersionHistory(prev => [...prev, newVersion]);
+        setActiveVersion(newVersion);
+        setHasUnsavedChanges(false);
+
+        // Reiniciar chat
+        await startChat(promptContent);
+    } catch (e: any) {
+        console.error('❌ Erro ao gerar prompt:', e);
+        setError(e.message || "Ocorreu um erro desconhecido. Verifique o console para mais detalhes.");
+    } finally {
+        setIsLoading(false);
+    }
+    }, [currentWorkspaceId, currentPromptId, formData]);
+
+    const handleOptimizePrompt = useCallback(async () => {
+    // Verificar limite de versões antes de otimizar
+    const hasAccess = await checkAccess('create_version');
+    if (!hasAccess) {
+        const versionsInfo = await getCurrentMonthVersions();
+        alert(`Limite de versões atingido! Você já criou ${versionsInfo.versionsCount} de ${versionsInfo.versionsLimit} versões permitidas no seu plano este mês. Upgrade para Premium para criar versões ilimitadas.`);
+        return;
+    }
+    if (!activeVersion || !currentPromptId) return;
+    if (optimizationPairs.length === 0 && !manualOptInstructions.trim()) return;
+
+    setIsOptimizing(true);
+    setError(null);
+    try {
+        const optimizedContent = await optimizePrompt(activeVersion.content, optimizationPairs, manualOptInstructions);
+
+        // Verificar limite de versões antes de criar
+        const versionCheck = await canCreateVersion();
+        if (!versionCheck.allowed) {
+            setError(versionCheck.reason || 'Limite de versões atingido');
+            setIsOptimizing(false);
+            return;
+        }
+
+        // Criar nova versão no banco
+        const newVersion = await createPromptVersion(currentPromptId, {
+            content: optimizedContent,
+            format: activeVersion.sourceData.formatoSaida,
+            masterFormat: activeVersion.sourceData.masterPromptFormat,
+            sourceData: activeVersion.sourceData,
+        });
+
+        // Incrementar contador de versões
+        await incrementVersionCount();
+
+        // Atualizar limites locais
+        const updatedLimits = await checkUserLimits();
+        setUserLimits(updatedLimits);
+
+        setVersionHistory(prev => [...prev, newVersion]);
+        setActiveVersion(newVersion);
+        setOptimizationPairs([]);
+        setManualOptInstructions('');
+    } catch (error: any) {
+        console.error('❌ Erro ao otimizar prompt:', error);
+        // Garantir que sempre temos uma mensagem de erro válida
+        const errorMessage = error?.message || error?.toString() || "Ocorreu um erro desconhecido ao otimizar.";
+        setError(errorMessage);
+    } finally {
+        setIsOptimizing(false);
+    }
+    }, [activeVersion, currentPromptId, optimizationPairs, manualOptInstructions]);
+
+    const handleGenerateExamples = useCallback(async () => {
+    setIsGeneratingExamples(true);
+    setError(null);
+    try {
+        const newExamplesData = await generateExamples(formData);
+        const newExamplesWithIds: FewShotExample[] = newExamplesData.map(ex => ({
+            ...ex,
+            id: crypto.randomUUID(),
+        }));
+        setFormData(prev => ({ ...prev, exemplos: [...prev.exemplos, ...newExamplesWithIds] }));
+    } catch (e: any) {
+        setError(e.message || "Ocorreu um erro ao gerar exemplos.");
+    } finally {
+        setIsGeneratingExamples(false);
+    }
+    }, [formData]);
+
+    const handleSendMessage = useCallback(async (message: string) => {
+    if (!activeVersion) {
+        setError('Crie um prompt primeiro antes de enviar mensagens.');
+        return;
+    }
+
+    // Adicionar mensagem do usuário ao estado e salvar no banco
+    const userMessage: ChatMessage = { author: 'user', text: message };
+    setChatMessages(prev => [...prev, userMessage]);
+
+    // Salvar mensagem do usuário no banco
+    if (activeVersion.id) {
+        try {
+            await saveChatMessage(activeVersion.id, userMessage);
+        } catch (err) {
+            console.error('Erro ao salvar mensagem do usuário:', err);
+        }
+    }
+
+    setIsChatLoading(true);
+    try {
+        const response = await continueChat(message);
+        const agentMessage: ChatMessage = { author: 'agent', text: response };
+        setChatMessages(prev => [...prev, agentMessage]);
+
+        // Salvar mensagem do agente no banco
         if (activeVersion.id) {
             try {
-                await saveChatMessage(activeVersion.id, userMessage);
+                await saveChatMessage(activeVersion.id, agentMessage);
             } catch (err) {
-                console.error('Erro ao salvar mensagem do usuário:', err);
+                console.error('Erro ao salvar mensagem do agente:', err);
             }
         }
+    } catch (e: any) {
+        const errorMessage: ChatMessage = { author: 'agent', text: `Erro: ${e.message}` };
+        setChatMessages(prev => [...prev, errorMessage]);
 
-        setIsChatLoading(true);
-        try {
-            const response = await continueChat(message);
-            const agentMessage: ChatMessage = { author: 'agent', text: response };
-            setChatMessages(prev => [...prev, agentMessage]);
-            
-            // Salvar mensagem do agente no banco
-            if (activeVersion.id) {
-                try {
-                    await saveChatMessage(activeVersion.id, agentMessage);
-                } catch (err) {
-                    console.error('Erro ao salvar mensagem do agente:', err);
-                }
+        // Salvar mensagem de erro no banco
+        if (activeVersion.id) {
+            try {
+                await saveChatMessage(activeVersion.id, errorMessage);
+            } catch (err) {
+                console.error('Erro ao salvar mensagem de erro:', err);
             }
-        } catch (e: any) {
-            const errorMessage: ChatMessage = { author: 'agent', text: `Erro: ${e.message}` };
-            setChatMessages(prev => [...prev, errorMessage]);
-            
-            // Salvar mensagem de erro no banco
-            if (activeVersion.id) {
-                try {
-                    await saveChatMessage(activeVersion.id, errorMessage);
-                } catch (err) {
-                    console.error('Erro ao salvar mensagem de erro:', err);
-                }
-            }
-        } finally {
-            setIsChatLoading(false);
         }
-    };
+    } finally {
+        setIsChatLoading(false);
+    }
+    }, [activeVersion]);
 
-    const handleClearChat = async () => {
+    const handleClearChat = useCallback(async () => {
         if (activeVersion) {
             await startChat(activeVersion.content);
             setChatMessages([]);
         }
-    };
-    
+    }, [activeVersion]);
+
     // Função para detectar e extrair ferramentas do texto
     interface ExtractedTool {
         name: string;
@@ -956,684 +451,683 @@ export const PromptManager: React.FC = () => {
         rawText: string;
     }
 
-    const extractTools = (text: string): { conversationText: string; tools: ExtractedTool[] } => {
-        const tools: ExtractedTool[] = [];
-        let conversationText = text;
+    const extractTools = useCallback((text: string): { conversationText: string; tools: ExtractedTool[] } => {
+    const tools: ExtractedTool[] = [];
+    let conversationText = text;
 
-        // Padrão 1: [CALL: functionName(...args...)] - padrão específico para chamadas de ferramentas
-        const callPattern = /\[CALL:\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\(([^)]*)\)\]/gi;
-        let match;
-        
-        while ((match = callPattern.exec(text)) !== null) {
-            const toolName = match[1];
-            const argsText = match[2];
-            let args: any = {};
-            
-            // Tentar parsear argumentos JSON
-            try {
-                // Se os argumentos estão em formato de objeto JavaScript
-                if (argsText.trim().startsWith('{') || argsText.includes(':')) {
-                    // Tentar extrair objeto JSON
-                    const jsonMatch = argsText.match(/\{[\s\S]*\}/);
-                    if (jsonMatch) {
-                        args = JSON.parse(jsonMatch[0]);
-                    } else {
-                        // Tentar parsear argumentos nomeados simples
-                        const argPairs = argsText.split(',').map(arg => arg.trim());
-                        argPairs.forEach(pair => {
-                            const [key, ...valueParts] = pair.split(':');
-                            if (key && valueParts.length > 0) {
-                                const value = valueParts.join(':').trim().replace(/^['"]|['"]$/g, '');
-                                try {
-                                    args[key.trim()] = JSON.parse(value);
-                                } catch {
-                                    args[key.trim()] = value;
-                                }
+    // Padrão 1: [CALL: functionName(...args...)] - padrão específico para chamadas de ferramentas
+    const callPattern = /\[CALL:\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\(([^)]*)\)\]/gi;
+    let match;
+
+    while ((match = callPattern.exec(text)) !== null) {
+        const toolName = match[1];
+        const argsText = match[2];
+        let args: any = {};
+
+        // Tentar parsear argumentos JSON
+        try {
+            // Se os argumentos estão em formato de objeto JavaScript
+            if (argsText.trim().startsWith('{') || argsText.includes(':')) {
+                // Tentar extrair objeto JSON
+                const jsonMatch = argsText.match(/\{[\s\S]*\}/);
+                if (jsonMatch) {
+                    args = JSON.parse(jsonMatch[0]);
+                } else {
+                    // Tentar parsear argumentos nomeados simples
+                    const argPairs = argsText.split(',').map(arg => arg.trim());
+                    argPairs.forEach(pair => {
+                        const [key, ...valueParts] = pair.split(':');
+                        if (key && valueParts.length > 0) {
+                            const value = valueParts.join(':').trim().replace(/^['"]|['"]$/g, '');
+                            try {
+                                args[key.trim()] = JSON.parse(value);
+                            } catch {
+                                args[key.trim()] = value;
                             }
-                        });
-                    }
-                } else if (argsText.trim()) {
-                    // Argumentos simples como string
-                    args = { value: argsText.trim().replace(/^['"]|['"]$/g, '') };
+                        }
+                    });
                 }
-            } catch (e) {
-                // Se falhar, armazenar como string
-                args = { raw: argsText };
+            } else if (argsText.trim()) {
+                // Argumentos simples como string
+                args = { value: argsText.trim().replace(/^['"]|['"]$/g, '') };
             }
-
-            tools.push({
-                name: toolName,
-                args: args,
-                rawText: match[0]
-            });
-
-            // Remover do texto conversacional
-            conversationText = conversationText.replace(match[0], '').trim();
+        } catch (e) {
+            // Se falhar, armazenar como string
+            args = { raw: argsText };
         }
 
-        // NÃO detectar funções genéricas - apenas [CALL: ...] para evitar falsos positivos
+        tools.push({
+            name: toolName,
+            args: args,
+            rawText: match[0]
+        });
 
-        // Limpar espaços extras do texto conversacional
-        conversationText = conversationText.replace(/\n\s*\n\s*\n/g, '\n\n').trim();
+        // Remover do texto conversacional
+        conversationText = conversationText.replace(match[0], '').trim();
+    }
+
+    // NÃO detectar funções genéricas - apenas [CALL: ...] para evitar falsos positivos
+
+    // Limpar espaços extras do texto conversacional
+    conversationText = conversationText.replace(/\n\s*\n\s*\n/g, '\n\n').trim();
 
         return { conversationText, tools };
-    };
+    }, []);
 
     // Função para limpar e normalizar texto
-    const cleanTextForPDF = (text: string): string => {
-        if (!text) return '';
-        
-        // Remover placeholders não processados como {{ $now }}, {{$now}}, etc.
-        let cleaned = text
-            .replace(/\{\{\s*\$now\s*\}\}/gi, new Date().toLocaleString('pt-BR'))
-            .replace(/\{\{[^}]*\}\}/g, '') // Remover outros placeholders genéricos
-            .replace(/Ø=[^ ]*/g, '') // Remover caracteres estranhos como Ø=ÜM, Ø=, etc.
-            .replace(/[^\x20-\x7E\u00A0-\u024F\u1E00-\u1EFF]/g, (char) => {
-                // Manter apenas caracteres ASCII e Unicode latino estendido
-                // Substituir outros caracteres problemáticos por equivalente ou espaço
-                const code = char.charCodeAt(0);
-                if (code === 8203) return ''; // Zero-width space
-                if (code === 8202) return ''; // Zero-width no-break space
-                if (code >= 0x2000 && code <= 0x200F) return ''; // Espaços especiais
-                return ' ';
-            })
-            .replace(/\s+/g, ' ') // Normalizar espaços múltiplos
-            .trim();
-        
+    const cleanTextForPDF = useCallback((text: string): string => {
+    if (!text) return '';
+
+    // Remover placeholders não processados como {{ $now }}, {{$now}}, etc.
+    let cleaned = text
+        .replace(/\{\{\s*\$now\s*\}\}/gi, new Date().toLocaleString('pt-BR'))
+        .replace(/\{\{[^}]*\}\}/g, '') // Remover outros placeholders genéricos
+        .replace(/Ø=[^ ]*/g, '') // Remover caracteres estranhos como Ø=ÜM, Ø=, etc.
+        .replace(/[^\x20-\x7E\u00A0-\u024F\u1E00-\u1EFF]/g, (char) => {
+            // Manter apenas caracteres ASCII e Unicode latino estendido
+            // Substituir outros caracteres problemáticos por equivalente ou espaço
+            const code = char.charCodeAt(0);
+            if (code === 8203) return ''; // Zero-width space
+            if (code === 8202) return ''; // Zero-width no-break space
+            if (code >= 0x2000 && code <= 0x200F) return ''; // Espaços especiais
+            return ' ';
+        })
+        .replace(/\s+/g, ' ') // Normalizar espaços múltiplos
+        .trim();
+
         return cleaned;
-    };
+    }, []);
 
     // Função para formatar argumentos de ferramenta para exibição
-    const formatToolArgs = (args: any): string => {
-        if (!args || Object.keys(args).length === 0) {
-            return '(sem argumentos)';
-        }
+    const formatToolArgs = useCallback((args: any): string => {
+    if (!args || Object.keys(args).length === 0) {
+        return '(sem argumentos)';
+    }
 
-        try {
-            // Formatar de forma legível
-            const formatted = Object.entries(args)
-                .map(([key, value]) => {
-                    if (typeof value === 'object' && value !== null) {
-                        return `  • ${key}: ${JSON.stringify(value, null, 2).replace(/\n/g, '\n    ')}`;
-                    } else if (typeof value === 'string' && value.length > 100) {
-                        return `  • ${key}: ${value.substring(0, 100)}...`;
-                    } else {
-                        return `  • ${key}: ${String(value)}`;
-                    }
-                })
-                .join('\n');
-            
-            return formatted;
+    try {
+        // Formatar de forma legível
+        const formatted = Object.entries(args)
+            .map(([key, value]) => {
+                if (typeof value === 'object' && value !== null) {
+                    return `  • ${key}: ${JSON.stringify(value, null, 2).replace(/\n/g, '\n    ')}`;
+                } else if (typeof value === 'string' && value.length > 100) {
+                    return `  • ${key}: ${value.substring(0, 100)}...`;
+                } else {
+                    return `  • ${key}: ${String(value)}`;
+                }
+            })
+            .join('\n');
+
+        return formatted;
         } catch (e) {
             return String(args);
         }
-    };
+    }, []);
 
-    const handleDownloadChat = async (format: 'txt' | 'pdf') => {
-        if (chatMessages.length === 0 || !activeVersion) return;
+    const handleDownloadChat = useCallback(async (format: 'txt' | 'pdf') => {
+    if (chatMessages.length === 0 || !activeVersion) return;
 
-        // Buscar informações do especialista e agente
-        let specialistName = 'Especialista';
-        let agentName = 'Agente de IA';
-        
-        try {
-            const profile = await getCurrentProfile();
-            if (profile?.full_name) {
-                specialistName = profile.full_name;
-            }
-        } catch (err) {
-            console.error('Erro ao buscar nome do especialista:', err);
+    // Buscar informações do especialista e agente
+    let specialistName = 'Especialista';
+    let agentName = 'Agente de IA';
+
+    try {
+        const profile = await getCurrentProfile();
+        if (profile?.full_name) {
+            specialistName = profile.full_name;
         }
+    } catch (err) {
+        console.error('Erro ao buscar nome do especialista:', err);
+    }
 
-        // Extrair nome do agente da persona
-        try {
-            if (formData.persona) {
-                const personaText = cleanTextForPDF(formData.persona);
-                // Tentar extrair nome comum da persona (ex: "Eu sou a Isa", "Meu nome é X", "Eu sou X")
-                const nameMatch = personaText.match(/(?:eu sou (?:a|o)?|meu nome é|sou (?:a|o)?|chamo-me|me chamo)\s+([A-ZÁÉÍÓÚÀÈÌÒÙÂÊÎÔÛÃÕÇ][a-záéíóúàèìòùâêîôûãõç]+)/i);
-                if (nameMatch && nameMatch[1]) {
-                    agentName = nameMatch[1];
-                } else {
-                    // Se não encontrar, usar primeira palavra após "sou" ou similar
-                    const fallbackMatch = personaText.match(/(?:sou|é)\s+([A-ZÁÉÍÓÚÀÈÌÒÙÂÊÎÔÛÃÕÇ][a-záéíóúàèìòùâêîôûãõç]+(?:\s+[a-záéíóúàèìòùâêîôûãõç]+)?)/i);
-                    if (fallbackMatch && fallbackMatch[1]) {
-                        agentName = fallbackMatch[1].trim();
-                    }
-                }
-            }
-        } catch (err) {
-            console.error('Erro ao extrair nome do agente:', err);
-        }
-
-        const toolName = 'LaBPrompT';
-        const header = `Histórico de Chat - Prompt v${activeVersion.version}`;
-        const timestamp = `Exportado em: ${new Date().toLocaleString('pt-BR')}`;
-        
-        if (format === 'txt') {
-            const chatParts: string[] = [];
-            
-            chatMessages.forEach(msg => {
-                const author = msg.author === 'user' ? 'Usuário' : agentName;
-                const { conversationText, tools } = extractTools(msg.text);
-                
-                // Adicionar mensagem conversacional
-                if (conversationText.trim()) {
-                    const cleanedText = cleanTextForPDF(conversationText);
-                    chatParts.push(`${author}: ${cleanedText}`);
-                }
-                
-                // Adicionar ferramentas usadas (se houver) - apenas para mensagens do agente
-                if (tools.length > 0 && msg.author === 'agent') {
-                    chatParts.push(`\n[Ferramentas Utilizadas por ${author}]`);
-                    tools.forEach(tool => {
-                        chatParts.push(`  • ${tool.name}`);
-                        const argsFormatted = formatToolArgs(tool.args);
-                        if (argsFormatted !== '(sem argumentos)') {
-                            chatParts.push(`    ${argsFormatted.replace(/\n/g, '\n    ')}`);
-                        }
-                    });
-                    chatParts.push(''); // Linha em branco após ferramentas
-                }
-            });
-
-            const fullContent = `${toolName}\n${header}\n\nEspecialista: ${specialistName}\nAgente: ${agentName}\n\n${timestamp}\n\n${chatParts.join('\n')}`;
-
-            const blob = new Blob([fullContent], { type: 'text/plain;charset=utf-8' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `historico_chat_v${activeVersion.version}.txt`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-        } else {
-            const doc = new jsPDF({
-                orientation: 'portrait',
-                unit: 'mm',
-                format: 'a4',
-                compress: true
-            });
-            
-            let y = 20;
-            const margin = 10;
-            const pageWidth = doc.internal.pageSize.getWidth();
-            const pageHeight = doc.internal.pageSize.getHeight();
-
-            // Configurar fonte para melhor suporte a caracteres UTF-8
-            // jsPDF usa Helvetica por padrão que suporta bem caracteres latinos
-            doc.setFont('helvetica', 'normal');
-
-            // Logo/Ícone (usando texto estilizado como logo)
-            doc.setFontSize(24);
-            doc.setTextColor(16, 185, 129); // Verde esmeralda
-            const toolNameText = cleanTextForPDF(toolName);
-            doc.text(toolNameText, margin, y);
-            y += 10;
-
-            // Linha divisória
-            doc.setDrawColor(200, 200, 200);
-            doc.setLineWidth(0.5);
-            doc.line(margin, y, pageWidth - margin, y);
-            y += 10;
-
-            // Cabeçalho
-            doc.setFontSize(16);
-            doc.setTextColor(0, 0, 0); // Preto para o cabeçalho
-            const headerText = cleanTextForPDF(header);
-            doc.text(headerText, margin, y);
-            y += 8;
-
-            // Informações do especialista e agente
-            doc.setFontSize(11);
-            doc.setTextColor(60, 60, 60);
-            doc.text(`Especialista: ${cleanTextForPDF(specialistName)}`, margin, y);
-            y += 6;
-            doc.text(`Agente: ${cleanTextForPDF(agentName)}`, margin, y);
-            y += 8;
-            
-            // Timestamp
-            doc.setFontSize(10);
-            doc.setTextColor(100, 100, 100); // Cinza
-            const timestampText = cleanTextForPDF(timestamp);
-            doc.text(timestampText, margin, y);
-            y += 12;
-
-            // Linha divisória antes das mensagens
-            doc.setDrawColor(200, 200, 200);
-            doc.setLineWidth(0.5);
-            doc.line(margin, y, pageWidth - margin, y);
-            y += 10;
-
-            // Mensagens do chat
-            doc.setFontSize(11);
-
-            chatMessages.forEach((msg, index) => {
-                const isUser = msg.author === 'user';
-                const { conversationText, tools } = extractTools(msg.text);
-                
-                // Renderizar mensagem conversacional (se houver)
-                if (conversationText.trim()) {
-                    const text = cleanTextForPDF(conversationText);
-                    const bubbleWidth = pageWidth * 0.7;
-                    
-                    // Dividir texto em linhas que cabem na largura
-                    const lines = doc.splitTextToSize(text, bubbleWidth - 20);
-                    const lineHeight = 6;
-                    const padding = 8;
-                    const labelHeight = 5;
-                    const bubbleHeight = (lines.length * lineHeight) + (padding * 2) + labelHeight;
-                    
-                    // Nova página se necessário
-                    if (y + bubbleHeight > pageHeight - margin) {
-                        doc.addPage();
-                        y = 20;
-                    }
-
-                    const x = isUser ? pageWidth - bubbleWidth - margin : margin;
-                    
-                    // Cores: verde para usuário, cinza escuro para agente
-                    const userColor = [16, 185, 129]; // emerald-500
-                    const agentColor = [60, 60, 60]; // dark gray (mais escuro para melhor legibilidade)
-                    
-                    // Desenhar balão
-                    doc.setFillColor(isUser ? userColor[0] : agentColor[0], isUser ? userColor[1] : agentColor[1], isUser ? userColor[2] : agentColor[2]);
-                    doc.setDrawColor(isUser ? userColor[0] : agentColor[0], isUser ? userColor[1] : agentColor[1], isUser ? userColor[2] : agentColor[2]);
-                    doc.roundedRect(x, y, bubbleWidth, bubbleHeight, 3, 3, 'FD');
-                    
-                    // Label do autor (pequeno)
-                    doc.setFontSize(9);
-                    doc.setTextColor(255, 255, 255, 80); // Branco semi-transparente
-                    const authorLabel = isUser ? 'Usuário' : agentName;
-                    doc.text(authorLabel, x + padding, y + padding + labelHeight);
-                    
-                    // Texto branco para melhor contraste
-                    doc.setFontSize(11);
-                    doc.setTextColor(255, 255, 255);
-                    doc.text(lines, x + padding, y + padding + labelHeight + lineHeight);
-                    
-                    y += bubbleHeight + 8;
-                }
-
-                // Renderizar ferramentas utilizadas (se houver) - apenas para mensagens do agente
-                if (tools.length > 0 && !isUser) {
-                    const toolsWidth = pageWidth - (margin * 2);
-                    let toolsHeight = 15; // Altura inicial para título
-                    
-                    // Calcular altura total necessária
-                    tools.forEach(tool => {
-                        const toolNameHeight = 6;
-                        const argsText = formatToolArgs(tool.args);
-                        const argsLines = doc.splitTextToSize(argsText, toolsWidth - 20);
-                        toolsHeight += toolNameHeight + (argsLines.length * 4) + 4;
-                    });
-
-                    // Nova página se necessário
-                    if (y + toolsHeight > pageHeight - margin) {
-                        doc.addPage();
-                        y = 20;
-                    }
-
-                    // Container para ferramentas (fundo diferente)
-                    const toolsX = margin;
-                    const toolsY = y;
-                    
-                    // Fundo claro para seção de ferramentas (cinza muito claro)
-                    doc.setFillColor(249, 250, 251); // gray-50
-                    doc.setDrawColor(251, 191, 36); // amber-400 para borda
-                    doc.setLineWidth(1);
-                    doc.roundedRect(toolsX, toolsY, toolsWidth, toolsHeight, 3, 3, 'FD');
-                    
-                    // Título da seção (sem emoji para evitar problemas de encoding)
-                    doc.setFontSize(10);
-                    doc.setFont('helvetica', 'bold');
-                    doc.setTextColor(245, 158, 11); // amber-600 para título
-                    doc.text('Ferramentas Utilizadas:', toolsX + 8, toolsY + 8);
-                    
-                    let toolY = toolsY + 15;
-                    
-                    // Listar cada ferramenta
-                    tools.forEach(tool => {
-                        doc.setFontSize(9);
-                        doc.setFont('helvetica', 'bold');
-                        doc.setTextColor(0, 0, 0); // Preto para nome da ferramenta
-                        doc.text(`• ${tool.name}`, toolsX + 12, toolY);
-                        toolY += 6;
-                        
-                        // Argumentos da ferramenta
-                        const argsText = formatToolArgs(tool.args);
-                        if (argsText !== '(sem argumentos)') {
-                            const argsLines = doc.splitTextToSize(argsText, toolsWidth - 24);
-                            doc.setFont('helvetica', 'normal');
-                            doc.setTextColor(40, 40, 40); // Cinza escuro para argumentos
-                            doc.text(argsLines, toolsX + 16, toolY);
-                            toolY += argsLines.length * 4 + 2;
-                        } else {
-                            toolY += 2;
-                        }
-                    });
-                    
-                    y = toolY + 8;
-                }
-            });
-
-            doc.save(`historico_chat_v${activeVersion.version}.pdf`);
-        }
-    };
-
-    const handleUpdateMessage = (messageIndex: number, update: Partial<ChatMessage>) => {
-        setChatMessages(prevMessages =>
-            prevMessages.map((msg, index) =>
-                index === messageIndex ? { ...msg, ...update } : msg
-            )
-        );
-    };
-
-    const handleSaveCorrection = (messageIndex: number, correctedText: string) => {
-        let userQuery = '';
-        for (let i = messageIndex - 1; i >= 0; i--) {
-            if (chatMessages[i].author === 'user') {
-                userQuery = chatMessages[i].text;
-                break;
-            }
-        }
-        if (userQuery) {
-            const originalMessage = chatMessages[messageIndex];
-            setOptimizationPairs(prev => [...prev, {
-                id: crypto.randomUUID(),
-                userQuery,
-                originalResponse: originalMessage.text,
-                correctedResponse: correctedText
-            }]);
-        }
-        handleUpdateMessage(messageIndex, { correction: correctedText, isEditing: false });
-    };
-
-    const handleSelectVersion = (id: string) => {
-        const version = versionHistory.find(v => v.id === id);
-        if (version) setActiveVersion(version);
-    };
-
-    const handleValidateVersion = (id: string) => setValidatedVersionId(id);
-
-    const handleDeleteVersion = (id: string) => {
-        const updatedHistory = versionHistory.filter(v => v.id !== id);
-        setVersionHistory(updatedHistory);
-        if (validatedVersionId === id) setValidatedVersionId(null);
-        if (activeVersion?.id === id) setActiveVersion(updatedHistory.length > 0 ? updatedHistory[updatedHistory.length - 1] : null);
-    };
-    
-    const handleExplainPrompt = async (content: string) => {
-        if (!content) return;
-        setIsExplanationModalOpen(true);
-        setIsExplanationLoading(true);
-        setExplanationContent('');
-        setExplanationError(null);
-        try {
-            const explanation = await explainPrompt(content);
-            setExplanationContent(explanation);
-        } catch (e: any) {
-            setExplanationError(e.message || "Ocorreu um erro desconhecido ao gerar a explicação.");
-        } finally {
-            setIsExplanationLoading(false);
-        }
-    };
-
-    const handleDownloadExplanation = (format: 'txt' | 'pdf') => {
-        if (!explanationContent) return;
-        const title = 'Explicacao_do_Prompt';
-
-        if (format === 'txt') {
-            const blob = new Blob([explanationContent], { type: 'text/plain;charset=utf-8' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `${title}.txt`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-        } else {
-            const doc = new jsPDF();
-            let y = 15;
-            const margin = 10;
-            const maxWidth = doc.internal.pageSize.getWidth() - margin * 2;
-            
-            doc.setFontSize(18);
-            doc.text('Explicação do Prompt', margin, y);
-            y += 10;
-            
-            const lines = explanationContent.split('\n');
-
-            lines.forEach(line => {
-                if (y > 280) { // Page break check
-                    doc.addPage();
-                    y = 15;
-                }
-                
-                line = line.replace(/\*\*(.*?)\*\*/g, '$1'); // Basic bold removal for size calculation
-                const isHeader1 = line.startsWith('# ');
-                const isHeader2 = line.startsWith('## ');
-                const isListItem = line.startsWith('- ') || /^\d+\.\s/.test(line);
-
-                let text = line;
-                doc.setFont('helvetica', 'normal');
-                doc.setFontSize(10);
-
-                if (isHeader1) {
-                    text = line.substring(2);
-                    doc.setFont('helvetica', 'bold');
-                    doc.setFontSize(16);
-                } else if (isHeader2) {
-                    text = line.substring(3);
-                    doc.setFont('helvetica', 'bold');
-                    doc.setFontSize(14);
-                } else if (isListItem) {
-                    text = '  • ' + line.replace(/(-|\d+\.)\s/, '');
-                }
-
-                const splitText = doc.splitTextToSize(text, maxWidth);
-                doc.text(splitText, margin, y);
-                y += (splitText.length * 5); // Line height approx 5
-
-                if (isHeader1 || isHeader2) {
-                    y += 3; // Extra space after headers
-                }
-            });
-
-            doc.save(`${title}.pdf`);
-        }
-    };
-
-
-    const loadExternalPrompt = async (content: string, sourceName: string) => {
-        try {
-            // Tenta detectar se é JSON
-            let detectedMasterFormat: 'markdown' | 'json' = 'markdown';
-            try {
-                JSON.parse(content);
-                detectedMasterFormat = 'json';
-            } catch (e) {}
-
-            const importedSourceData: PromptData = {
-                ...INITIAL_PROMPT_DATA,
-                persona: sourceName,
-                objetivo: 'Prompt importado externamente.',
-                contexto: `Conteúdo carregado via ${sourceName}.`,
-                masterPromptFormat: detectedMasterFormat
-            };
-
-            // Atualizar formData
-            setFormData(importedSourceData);
-            
-            // Salvar prompt no banco se não existir
-            let promptId = currentPromptId;
-            if (!promptId) {
-                const newPrompt = await createPrompt(importedSourceData, sourceName);
-                promptId = newPrompt.id;
-                setCurrentPromptId(promptId);
+    // Extrair nome do agente da persona
+    try {
+        if (formData.persona) {
+            const personaText = cleanTextForPDF(formData.persona);
+            // Tentar extrair nome comum da persona (ex: "Eu sou a Isa", "Meu nome é X", "Eu sou X")
+            const nameMatch = personaText.match(/(?:eu sou (?:a|o)?|meu nome é|sou (?:a|o)?|chamo-me|me chamo)\s+([A-ZÁÉÍÓÚÀÈÌÒÙÂÊÎÔÛÃÕÇ][a-záéíóúàèìòùâêîôûãõç]+)/i);
+            if (nameMatch && nameMatch[1]) {
+                agentName = nameMatch[1];
             } else {
-                // Atualizar prompt existente
-                await createPrompt(importedSourceData, `Prompt Importado - ${new Date().toLocaleDateString('pt-BR')}`);
+                // Se não encontrar, usar primeira palavra após "sou" ou similar
+                const fallbackMatch = personaText.match(/(?:sou|é)\s+([A-ZÁÉÍÓÚÀÈÌÒÙÂÊÎÔÛÃÕÇ][a-záéíóúàèìòùâêîôûãõç]+(?:\s+[a-záéíóúàèìòùâêîôûãõç]+)?)/i);
+                if (fallbackMatch && fallbackMatch[1]) {
+                    agentName = fallbackMatch[1].trim();
+                }
             }
-
-            // Verificar se promptId existe (TypeScript check)
-            if (!promptId) {
-                setError('Erro: ID do prompt não encontrado. Tente novamente.');
-                return;
-            }
-
-            // Criar versão no banco (promptId é garantidamente string aqui)
-            const finalPromptId: string = promptId;
-            const newVersion = await createPromptVersion(finalPromptId, {
-                content: content,
-                format: 'markdown',
-                masterFormat: detectedMasterFormat,
-                sourceData: importedSourceData,
-            });
-
-            setVersionHistory(prev => [...prev, newVersion]);
-            setActiveVersion(newVersion);
-            setHasUnsavedChanges(false);
-            
-            // Reiniciar chat com o novo prompt
-            await startChat(content);
-        } catch (err: any) {
-            console.error('Erro ao carregar prompt externo:', err);
-            setError(err.message || 'Erro ao importar prompt. Verifique o console para mais detalhes.');
         }
-    };
+    } catch (err) {
+        console.error('Erro ao extrair nome do agente:', err);
+    }
 
-    const handleImportClick = () => fileInputRef.current?.click();
+    const toolName = 'LaBPrompT';
+    const header = `Histórico de Chat - Prompt v${activeVersion.version}`;
+    const timestamp = `Exportado em: ${new Date().toLocaleString('pt-BR')}`;
 
-    const handleFileSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-            const content = e.target?.result as string;
-            if (content) await loadExternalPrompt(content, 'Arquivo Importado');
+    if (format === 'txt') {
+        const chatParts: string[] = [];
+
+        chatMessages.forEach(msg => {
+            const author = msg.author === 'user' ? 'Usuário' : agentName;
+            const { conversationText, tools } = extractTools(msg.text);
+
+            // Adicionar mensagem conversacional
+            if (conversationText.trim()) {
+                const cleanedText = cleanTextForPDF(conversationText);
+                chatParts.push(`${author}: ${cleanedText}`);
+            }
+
+            // Adicionar ferramentas usadas (se houver) - apenas para mensagens do agente
+            if (tools.length > 0 && msg.author === 'agent') {
+                chatParts.push(`\n[Ferramentas Utilizadas por ${author}]`);
+                tools.forEach(tool => {
+                    chatParts.push(`  • ${tool.name}`);
+                    const argsFormatted = formatToolArgs(tool.args);
+                    if (argsFormatted !== '(sem argumentos)') {
+                        chatParts.push(`    ${argsFormatted.replace(/\n/g, '\n    ')}`);
+                    }
+                });
+                chatParts.push(''); // Linha em branco após ferramentas
+            }
+        });
+
+        const fullContent = `${toolName}\n${header}\n\nEspecialista: ${specialistName}\nAgente: ${agentName}\n\n${timestamp}\n\n${chatParts.join('\n')}`;
+
+        const blob = new Blob([fullContent], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `historico_chat_v${activeVersion.version}.txt`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    } else {
+        const doc = new jsPDF({
+            orientation: 'portrait',
+            unit: 'mm',
+            format: 'a4',
+            compress: true
+        });
+
+        let y = 20;
+        const margin = 10;
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+
+        // Configurar fonte para melhor suporte a caracteres UTF-8
+        // jsPDF usa Helvetica por padrão que suporta bem caracteres latinos
+        doc.setFont('helvetica', 'normal');
+
+        // Logo/Ícone (usando texto estilizado como logo)
+        doc.setFontSize(24);
+        doc.setTextColor(16, 185, 129); // Verde esmeralda
+        const toolNameText = cleanTextForPDF(toolName);
+        doc.text(toolNameText, margin, y);
+        y += 10;
+
+        // Linha divisória
+        doc.setDrawColor(200, 200, 200);
+        doc.setLineWidth(0.5);
+        doc.line(margin, y, pageWidth - margin, y);
+        y += 10;
+
+        // Cabeçalho
+        doc.setFontSize(16);
+        doc.setTextColor(0, 0, 0); // Preto para o cabeçalho
+        const headerText = cleanTextForPDF(header);
+        doc.text(headerText, margin, y);
+        y += 8;
+
+        // Informações do especialista e agente
+        doc.setFontSize(11);
+        doc.setTextColor(60, 60, 60);
+        doc.text(`Especialista: ${cleanTextForPDF(specialistName)}`, margin, y);
+        y += 6;
+        doc.text(`Agente: ${cleanTextForPDF(agentName)}`, margin, y);
+        y += 8;
+
+        // Timestamp
+        doc.setFontSize(10);
+        doc.setTextColor(100, 100, 100); // Cinza
+        const timestampText = cleanTextForPDF(timestamp);
+        doc.text(timestampText, margin, y);
+        y += 12;
+
+        // Linha divisória antes das mensagens
+        doc.setDrawColor(200, 200, 200);
+        doc.setLineWidth(0.5);
+        doc.line(margin, y, pageWidth - margin, y);
+        y += 10;
+
+        // Mensagens do chat
+        doc.setFontSize(11);
+
+        chatMessages.forEach((msg, index) => {
+            const isUser = msg.author === 'user';
+            const { conversationText, tools } = extractTools(msg.text);
+
+            // Renderizar mensagem conversacional (se houver)
+            if (conversationText.trim()) {
+                const text = cleanTextForPDF(conversationText);
+                const bubbleWidth = pageWidth * 0.7;
+
+                // Dividir texto em linhas que cabem na largura
+                const lines = doc.splitTextToSize(text, bubbleWidth - 20);
+                const lineHeight = 6;
+                const padding = 8;
+                const labelHeight = 5;
+                const bubbleHeight = (lines.length * lineHeight) + (padding * 2) + labelHeight;
+
+                // Nova página se necessário
+                if (y + bubbleHeight > pageHeight - margin) {
+                    doc.addPage();
+                    y = 20;
+                }
+
+                const x = isUser ? pageWidth - bubbleWidth - margin : margin;
+
+                // Cores: verde para usuário, cinza escuro para agente
+                const userColor = [16, 185, 129]; // emerald-500
+                const agentColor = [60, 60, 60]; // dark gray (mais escuro para melhor legibilidade)
+
+                // Desenhar balão
+                doc.setFillColor(isUser ? userColor[0] : agentColor[0], isUser ? userColor[1] : agentColor[1], isUser ? userColor[2] : agentColor[2]);
+                doc.setDrawColor(isUser ? userColor[0] : agentColor[0], isUser ? userColor[1] : agentColor[1], isUser ? userColor[2] : agentColor[2]);
+                doc.roundedRect(x, y, bubbleWidth, bubbleHeight, 3, 3, 'FD');
+
+                // Label do autor (pequeno)
+                doc.setFontSize(9);
+                doc.setTextColor(255, 255, 255, 80); // Branco semi-transparente
+                const authorLabel = isUser ? 'Usuário' : agentName;
+                doc.text(authorLabel, x + padding, y + padding + labelHeight);
+
+                // Texto branco para melhor contraste
+                doc.setFontSize(11);
+                doc.setTextColor(255, 255, 255);
+                doc.text(lines, x + padding, y + padding + labelHeight + lineHeight);
+
+                y += bubbleHeight + 8;
+            }
+
+            // Renderizar ferramentas utilizadas (se houver) - apenas para mensagens do agente
+            if (tools.length > 0 && !isUser) {
+                const toolsWidth = pageWidth - (margin * 2);
+                let toolsHeight = 15; // Altura inicial para título
+
+                // Calcular altura total necessária
+                tools.forEach(tool => {
+                    const toolNameHeight = 6;
+                    const argsText = formatToolArgs(tool.args);
+                    const argsLines = doc.splitTextToSize(argsText, toolsWidth - 20);
+                    toolsHeight += toolNameHeight + (argsLines.length * 4) + 4;
+                });
+
+                // Nova página se necessário
+                if (y + toolsHeight > pageHeight - margin) {
+                    doc.addPage();
+                    y = 20;
+                }
+
+                // Container para ferramentas (fundo diferente)
+                const toolsX = margin;
+                const toolsY = y;
+
+                // Fundo claro para seção de ferramentas (cinza muito claro)
+                doc.setFillColor(249, 250, 251); // gray-50
+                doc.setDrawColor(251, 191, 36); // amber-400 para borda
+                doc.setLineWidth(1);
+                doc.roundedRect(toolsX, toolsY, toolsWidth, toolsHeight, 3, 3, 'FD');
+
+                // Título da seção (sem emoji para evitar problemas de encoding)
+                doc.setFontSize(10);
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(245, 158, 11); // amber-600 para título
+                doc.text('Ferramentas Utilizadas:', toolsX + 8, toolsY + 8);
+
+                let toolY = toolsY + 15;
+
+                // Listar cada ferramenta
+                tools.forEach(tool => {
+                    doc.setFontSize(9);
+                    doc.setFont('helvetica', 'bold');
+                    doc.setTextColor(0, 0, 0); // Preto para nome da ferramenta
+                    doc.text(`• ${tool.name}`, toolsX + 12, toolY);
+                    toolY += 6;
+
+                    // Argumentos da ferramenta
+                    const argsText = formatToolArgs(tool.args);
+                    if (argsText !== '(sem argumentos)') {
+                        const argsLines = doc.splitTextToSize(argsText, toolsWidth - 24);
+                        doc.setFont('helvetica', 'normal');
+                        doc.setTextColor(40, 40, 40); // Cinza escuro para argumentos
+                        doc.text(argsLines, toolsX + 16, toolY);
+                        toolY += argsLines.length * 4 + 2;
+                    } else {
+                        toolY += 2;
+                    }
+                });
+
+                y = toolY + 8;
+            }
+        });
+
+        doc.save(`historico_chat_v${activeVersion.version}.pdf`);
+    }
+    }, [chatMessages, activeVersion, formData]);
+
+    const handleUpdateMessage = useCallback((messageIndex: number, update: Partial<ChatMessage>) => {
+    setChatMessages(prevMessages =>
+        prevMessages.map((msg, index) =>
+            index === messageIndex ? { ...msg, ...update } : msg
+        )
+    );
+    }, []);
+
+    const handleSaveCorrection = useCallback((messageIndex: number, correctedText: string) => {
+    let userQuery = '';
+    for (let i = messageIndex - 1; i >= 0; i--) {
+        if (chatMessages[i].author === 'user') {
+            userQuery = chatMessages[i].text;
+            break;
+        }
+    }
+    if (userQuery) {
+        const originalMessage = chatMessages[messageIndex];
+        setOptimizationPairs(prev => [...prev, {
+            id: crypto.randomUUID(),
+            userQuery,
+            originalResponse: originalMessage.text,
+            correctedResponse: correctedText
+        }]);
+    }
+    handleUpdateMessage(messageIndex, { correction: correctedText, isEditing: false });
+    }, [chatMessages, handleUpdateMessage]);
+
+    const handleSelectVersion = useCallback((id: string) => {
+    const version = versionHistory.find(v => v.id === id);
+    if (version) setActiveVersion(version);
+    }, [versionHistory]);
+
+    const handleValidateVersion = useCallback((id: string) => setValidatedVersionId(id), []);
+
+    const handleDeleteVersion = useCallback((id: string) => {
+    const updatedHistory = versionHistory.filter(v => v.id !== id);
+    setVersionHistory(updatedHistory);
+    if (validatedVersionId === id) setValidatedVersionId(null);
+    if (activeVersion?.id === id) setActiveVersion(updatedHistory.length > 0 ? updatedHistory[updatedHistory.length - 1] : null);
+    }, [versionHistory, validatedVersionId, activeVersion]);
+
+    const handleExplainPrompt = useCallback(async (content: string) => {
+    if (!content) return;
+    setIsExplanationModalOpen(true);
+    setIsExplanationLoading(true);
+    setExplanationContent('');
+    setExplanationError(null);
+    try {
+        const explanation = await explainPrompt(content);
+        setExplanationContent(explanation);
+    } catch (e: any) {
+        setExplanationError(e.message || "Ocorreu um erro desconhecido ao gerar a explicação.");
+    } finally {
+        setIsExplanationLoading(false);
+    }
+    }, []);
+
+    const handleDownloadExplanation = useCallback((format: 'txt' | 'pdf') => {
+    if (!explanationContent) return;
+    const title = 'Explicacao_do_Prompt';
+
+    if (format === 'txt') {
+        const blob = new Blob([explanationContent], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${title}.txt`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    } else {
+        const doc = new jsPDF();
+        let y = 15;
+        const margin = 10;
+        const maxWidth = doc.internal.pageSize.getWidth() - margin * 2;
+
+        doc.setFontSize(18);
+        doc.text('Explicação do Prompt', margin, y);
+        y += 10;
+
+        const lines = explanationContent.split('\n');
+
+        lines.forEach(line => {
+            if (y > 280) { // Page break check
+                doc.addPage();
+                y = 15;
+            }
+
+            line = line.replace(/\*\*(.*?)\*\*/g, '$1'); // Basic bold removal for size calculation
+            const isHeader1 = line.startsWith('# ');
+            const isHeader2 = line.startsWith('## ');
+            const isListItem = line.startsWith('- ') || /^\d+\.\s/.test(line);
+
+            let text = line;
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(10);
+
+            if (isHeader1) {
+                text = line.substring(2);
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(16);
+            } else if (isHeader2) {
+                text = line.substring(3);
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(14);
+            } else if (isListItem) {
+                text = '  • ' + line.replace(/(-|\d+\.)\s/, '');
+            }
+
+            const splitText = doc.splitTextToSize(text, maxWidth);
+            doc.text(splitText, margin, y);
+            y += (splitText.length * 5); // Line height approx 5
+
+            if (isHeader1 || isHeader2) {
+                y += 3; // Extra space after headers
+            }
+        });
+
+        doc.save(`${title}.pdf`);
+    }
+    }, [explanationContent]);
+
+    const loadExternalPrompt = useCallback(async (content: string, sourceName: string) => {
+    try {
+        // Tenta detectar se é JSON
+        let detectedMasterFormat: 'markdown' | 'json' = 'markdown';
+        try {
+            JSON.parse(content);
+            detectedMasterFormat = 'json';
+        } catch (e) { }
+
+        const importedSourceData: PromptData = {
+            ...INITIAL_PROMPT_DATA,
+            persona: sourceName,
+            objetivo: 'Prompt importado externamente.',
+            contexto: `Conteúdo carregado via ${sourceName}.`,
+            masterPromptFormat: detectedMasterFormat
         };
-        reader.onerror = (e) => setError("Falha ao ler o arquivo.");
-        reader.readAsText(file);
-        if (event.target) event.target.value = '';
-    };
 
-    const handlePasteClick = () => setIsPasteModalOpen(true);
-    const handlePasteConfirm = async (text: string) => {
-        await loadExternalPrompt(text, 'Prompt Colado');
+        // Atualizar formData
+        setFormData(importedSourceData);
+
+        // Salvar prompt no banco se não existir
+        let promptId = currentPromptId;
+        if (!promptId) {
+            const newPrompt = await createPrompt(importedSourceData, sourceName);
+            promptId = newPrompt.id;
+            setCurrentPromptId(promptId);
+        } else {
+            // Atualizar prompt existente
+            await createPrompt(importedSourceData, `Prompt Importado - ${new Date().toLocaleDateString('pt-BR')}`);
+        }
+
+        // Verificar se promptId existe (TypeScript check)
+        if (!promptId) {
+            setError('Erro: ID do prompt não encontrado. Tente novamente.');
+            return;
+        }
+
+        // Criar versão no banco (promptId é garantidamente string aqui)
+        const finalPromptId: string = promptId;
+        const newVersion = await createPromptVersion(finalPromptId, {
+            content: content,
+            format: 'markdown',
+            masterFormat: detectedMasterFormat,
+            sourceData: importedSourceData,
+        });
+
+        setVersionHistory(prev => [...prev, newVersion]);
+        setActiveVersion(newVersion);
+        setHasUnsavedChanges(false);
+
+        // Reiniciar chat com o novo prompt
+        await startChat(content);
+    } catch (err: any) {
+        console.error('Erro ao carregar prompt externo:', err);
+        setError(err.message || 'Erro ao importar prompt. Verifique o console para mais detalhes.');
+    }
+    }, [currentPromptId]);
+
+    const handleImportClick = useCallback(() => fileInputRef.current?.click(), []);
+
+    const handleFileSelected = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        const content = e.target?.result as string;
+        if (content) await loadExternalPrompt(content, 'Arquivo Importado');
     };
+    reader.onerror = (e) => setError("Falha ao ler o arquivo.");
+    reader.readAsText(file);
+    if (event.target) event.target.value = '';
+    }, [loadExternalPrompt]);
+
+    const handlePasteClick = useCallback(() => setIsPasteModalOpen(true), []);
+    const handlePasteConfirm = useCallback(async (text: string) => {
+    await loadExternalPrompt(text, 'Prompt Colado');
+    }, [loadExternalPrompt]);
 
     // Função para salvar no repositório
-    const handleSaveToRepository = async () => {
-        if (!formData.persona.trim()) {
-            setError('Persona não pode estar vazia para salvar no repositório');
-            return;
+    const handleSaveToRepository = useCallback(async () => {
+    if (!formData.persona.trim()) {
+        setError('Persona não pode estar vazia para salvar no repositório');
+        return;
+    }
+
+    setIsSavingToRepository(true);
+    setError(null);
+
+    try {
+        // Obter workspace atual
+        const workspaceIdToUse = currentWorkspaceId || (await getDefaultWorkspace())?.id || undefined;
+
+        // Criar ou atualizar prompt no banco
+        let promptId = currentPromptId;
+        if (!promptId) {
+            const newPrompt = await createPrompt(formData, undefined, workspaceIdToUse);
+            promptId = newPrompt.id;
+            setCurrentPromptId(promptId);
+            console.log('✅ Prompt salvo no repositório:', promptId);
+        } else {
+            // Atualizar prompt existente
+            await createPrompt(formData, `Prompt ${new Date().toLocaleDateString('pt-BR')}`, workspaceIdToUse);
+            console.log('✅ Prompt atualizado no repositório:', promptId);
         }
 
-        setIsSavingToRepository(true);
-        setError(null);
-
-        try {
-            // Obter workspace atual
-            const workspaceIdToUse = currentWorkspaceId || (await getDefaultWorkspace())?.id || undefined;
-            
-            // Criar ou atualizar prompt no banco
-            let promptId = currentPromptId;
-            if (!promptId) {
-                const newPrompt = await createPrompt(formData, undefined, workspaceIdToUse);
-                promptId = newPrompt.id;
-                setCurrentPromptId(promptId);
-                console.log('✅ Prompt salvo no repositório:', promptId);
-            } else {
-                // Atualizar prompt existente
-                await createPrompt(formData, `Prompt ${new Date().toLocaleDateString('pt-BR')}`, workspaceIdToUse);
-                console.log('✅ Prompt atualizado no repositório:', promptId);
-            }
-            
-            setHasUnsavedChanges(false);
-            alert('Prompt salvo no repositório com sucesso!');
-        } catch (err: any) {
-            console.error('❌ Erro ao salvar no repositório:', err);
-            setError(err.message || 'Erro ao salvar no repositório');
-            alert('Erro ao salvar no repositório: ' + (err.message || 'Erro desconhecido'));
-        } finally {
-            setIsSavingToRepository(false);
-        }
-    };
+        setHasUnsavedChanges(false);
+        alert('Prompt salvo no repositório com sucesso!');
+    } catch (err: any) {
+        console.error('❌ Erro ao salvar no repositório:', err);
+        setError(err.message || 'Erro ao salvar no repositório');
+        alert('Erro ao salvar no repositório: ' + (err.message || 'Erro desconhecido'));
+    } finally {
+        setIsSavingToRepository(false);
+    }
+    }, [formData, currentWorkspaceId, currentPromptId]);
 
     // Função para mudar de workspace
-    const handleWorkspaceChange = async (workspaceId: string) => {
-        console.log('📁 Mudando para workspace:', workspaceId);
-        setCurrentWorkspaceId(workspaceId);
-        
-        // Limpar área atual
-        setVersionHistory([]);
-        setActiveVersion(null);
-        setChatMessages([]);
-        setFormData(INITIAL_PROMPT_DATA);
-        setCurrentPromptId(null);
-        setHasUnsavedChanges(false);
-        
-        // Carregar prompts do novo workspace
-        try {
-            const prompts = await getUserPrompts(workspaceId);
-            console.log('✅ Prompts carregados do workspace:', prompts?.length || 0);
-            
-            if (prompts && prompts.length > 0) {
-                const latestPrompt = prompts[0];
-                setCurrentPromptId(latestPrompt.id);
-                const { promptData } = await getPrompt(latestPrompt.id);
-                setFormData(promptData);
-                
-                const versions = await getPromptVersions(latestPrompt.id);
-                if (versions && versions.length > 0) {
-                    setVersionHistory(versions);
-                    const latestVersion = versions[0];
-                    setActiveVersion(latestVersion);
-                    
-                    const messages = await getChatMessages(latestVersion.id);
-                    if (messages && messages.length > 0) {
-                        setChatMessages(messages);
-                    }
-                    
-                    if (latestVersion.content) {
-                        await startChat(latestVersion.content);
-                    }
+    const handleWorkspaceChange = useCallback(async (workspaceId: string) => {
+    console.log('📁 Mudando para workspace:', workspaceId);
+    setCurrentWorkspaceId(workspaceId);
+
+    // Limpar área atual
+    setVersionHistory([]);
+    setActiveVersion(null);
+    setChatMessages([]);
+    setFormData(INITIAL_PROMPT_DATA);
+    setCurrentPromptId(null);
+    setHasUnsavedChanges(false);
+
+    // Carregar prompts do novo workspace
+    try {
+        const prompts = await getUserPrompts(workspaceId);
+        console.log('✅ Prompts carregados do workspace:', prompts?.length || 0);
+
+        if (prompts && prompts.length > 0) {
+            const latestPrompt = prompts[0];
+            setCurrentPromptId(latestPrompt.id);
+            const { promptData } = await getPrompt(latestPrompt.id);
+            setFormData(promptData);
+
+            const versions = await getPromptVersions(latestPrompt.id);
+            if (versions && versions.length > 0) {
+                setVersionHistory(versions);
+                const latestVersion = versions[0];
+                setActiveVersion(latestVersion);
+
+                const messages = await getChatMessages(latestVersion.id);
+                if (messages && messages.length > 0) {
+                    setChatMessages(messages);
+                }
+
+                if (latestVersion.content) {
+                    await startChat(latestVersion.content);
                 }
             }
-        } catch (err: any) {
-            console.error('❌ Erro ao carregar prompts do workspace:', err);
-            setError(err.message || 'Erro ao carregar prompts do workspace');
         }
-    };
+    } catch (err: any) {
+        console.error('❌ Erro ao carregar prompts do workspace:', err);
+        setError(err.message || 'Erro ao carregar prompts do workspace');
+    }
+    }, []);
 
     // Função para quando criar novo workspace
-    const handleWorkspaceCreated = () => {
-        // Limpar área (já feito no handleWorkspaceChange, mas garantir)
-        setVersionHistory([]);
-        setActiveVersion(null);
-        setChatMessages([]);
-        setFormData(INITIAL_PROMPT_DATA);
-        setCurrentPromptId(null);
-        setHasUnsavedChanges(false);
-    };
+    const handleWorkspaceCreated = useCallback(() => {
+    // Limpar área (já feito no handleWorkspaceChange, mas garantir)
+    setVersionHistory([]);
+    setActiveVersion(null);
+    setChatMessages([]);
+    setFormData(INITIAL_PROMPT_DATA);
+    setCurrentPromptId(null);
+    setHasUnsavedChanges(false);
+    }, []);
 
-    const handleShareVersion = async (versionId: string) => {
-        // Verificar se pode compartilhar chat
-        const shareCheck = await canShareChat();
-        if (!shareCheck.allowed) {
-            setError(shareCheck.reason || 'Compartilhamento não disponível no seu plano');
-            return;
-        }
-        
-        const baseUrl = window.location.origin;
-        const shareUrl = `${baseUrl}/chat/${versionId}`;
-        
-        // Criar modal de compartilhamento
-        const shareModal = document.createElement('div');
-        shareModal.className = 'fixed inset-0 bg-black/70 flex items-center justify-center z-50 backdrop-blur-sm';
-        shareModal.innerHTML = `
+    const handleShareVersion = useCallback(async (versionId: string) => {
+    // Verificar se pode compartilhar chat
+    const shareCheck = await canShareChat();
+    if (!shareCheck.allowed) {
+        setError(shareCheck.reason || 'Compartilhamento não disponível no seu plano');
+        return;
+    }
+
+    const baseUrl = window.location.origin;
+    const shareUrl = `${baseUrl}/chat/${versionId}`;
+
+    // Criar modal de compartilhamento
+    const shareModal = document.createElement('div');
+    shareModal.className = 'fixed inset-0 bg-black/70 flex items-center justify-center z-50 backdrop-blur-sm';
+    shareModal.innerHTML = `
             <div class="bg-black/90 backdrop-blur-sm p-6 rounded-xl shadow-2xl w-full max-w-md border border-white/10 animate-in fade-in zoom-in duration-200" style="animation: fadeIn 0.2s ease-out">
                 <div class="flex justify-between items-center mb-4">
                     <h3 class="text-xl font-bold text-white">Compartilhar Chat</h3>
@@ -1668,19 +1162,79 @@ export const PromptManager: React.FC = () => {
                 </div>
             </div>
         `;
-        shareModal.onclick = (e) => {
-            if (e.target === shareModal) {
-                shareModal.remove();
-            }
-        };
-        document.body.appendChild(shareModal);
-        
-        // Auto-selecionar e copiar
-        const input = shareModal.querySelector('#shareLinkInput') as HTMLInputElement;
-        if (input) {
-            input.select();
+    shareModal.onclick = (e) => {
+        if (e.target === shareModal) {
+            shareModal.remove();
         }
     };
+    document.body.appendChild(shareModal);
+
+    // Auto-selecionar e copiar
+    const input = shareModal.querySelector('#shareLinkInput') as HTMLInputElement;
+    if (input) {
+        input.select();
+    }
+    }, []);
+
+    // Carregar dados iniciais
+    useEffect(() => {
+        const loadInitialData = async () => {
+            setIsLoadingData(true);
+            try {
+                // Carregar workspace padrão e prompts em paralelo
+                const [defaultWorkspace, allPrompts] = await Promise.all([
+                    getDefaultWorkspace(),
+                    getUserPrompts()
+                ]);
+
+                if (defaultWorkspace) {
+                    setCurrentWorkspaceId(defaultWorkspace.id);
+                    
+                    // Carregar prompts do workspace padrão
+                    const workspacePrompts = await getUserPrompts(defaultWorkspace.id);
+                    
+                    if (workspacePrompts && workspacePrompts.length > 0) {
+                        const latestPrompt = workspacePrompts[0];
+                        setCurrentPromptId(latestPrompt.id);
+                        
+                        // Carregar prompt completo e versões em paralelo
+                        const [promptResult, versions] = await Promise.all([
+                            getPrompt(latestPrompt.id),
+                            getPromptVersions(latestPrompt.id)
+                        ]);
+                        
+                        setFormData(promptResult.promptData);
+                        setVersionHistory(versions);
+                        
+                        if (versions && versions.length > 0) {
+                            const latestVersion = versions[0];
+                            setActiveVersion(latestVersion);
+                            
+                            // Carregar mensagens apenas se necessário (lazy)
+                            getChatMessages(latestVersion.id).then(messages => {
+                                if (messages && messages.length > 0) {
+                                    setChatMessages(messages);
+                                }
+                            }).catch(err => {
+                                console.error('Erro ao carregar mensagens:', err);
+                            });
+                            
+                            if (latestVersion.content) {
+                                await startChat(latestVersion.content);
+                            }
+                        }
+                    }
+                }
+            } catch (err: any) {
+                console.error('Erro ao carregar dados iniciais:', err);
+                setError(err.message || 'Erro ao carregar dados');
+            } finally {
+                setIsLoadingData(false);
+            }
+        };
+        
+        loadInitialData();
+    }, []);
 
     const isUIBlocked = isLoading || isOptimizing;
 
@@ -1703,182 +1257,55 @@ export const PromptManager: React.FC = () => {
     }
 
     return (
-        <div className="h-full w-full overflow-auto bg-black">
-            <ExplanationModal
-                isOpen={isExplanationModalOpen}
-                onClose={() => setIsExplanationModalOpen(false)}
-                content={explanationContent}
-                isLoading={isExplanationLoading}
-                error={explanationError}
-                onDownload={handleDownloadExplanation}
-            />
-            <PasteModal isOpen={isPasteModalOpen} onClose={() => setIsPasteModalOpen(false)} onConfirm={handlePasteConfirm} />
-            <input type="file" ref={fileInputRef} onChange={handleFileSelected} className="hidden" accept=".txt,.md,.json" />
-            
-            {/* Desktop Layout - Grid 3 Colunas Fixas */}
-            <div className="hidden lg:grid lg:grid-cols-12 gap-4 xl:gap-5 2xl:gap-6">
-                {/* Coluna Esquerda - Input Form (4 colunas) */}
-                <div className="col-span-12 xl:col-span-4 bg-white/5 backdrop-blur-sm rounded-xl xl:rounded-2xl overflow-hidden border border-white/10 shadow-xl flex flex-col" style={{ height: 'calc(100vh - 180px)' }}>
-                    <PromptInputForm
-                        formData={formData}
-                        setFormData={(newData) => {
-                            setFormData(newData);
-                            setHasUnsavedChanges(true);
-                        }}
-                        onGenerate={handleGeneratePrompt}
-                        isLoading={isLoading}
-                        onGenerateExamples={handleGenerateExamples}
-                        isGeneratingExamples={isGeneratingExamples}
-                        activePromptContent={activeVersion?.content ?? ''}
-                        onSaveToRepository={handleSaveToRepository}
-                        isSavingToRepository={isSavingToRepository}
-                    />
-                </div>
+    <div className="h-full w-full overflow-auto bg-black">
+        <ExplanationModal
+            isOpen={isExplanationModalOpen}
+            onClose={() => setIsExplanationModalOpen(false)}
+            content={explanationContent}
+            isLoading={isExplanationLoading}
+            error={explanationError}
+            onDownload={handleDownloadExplanation}
+        />
+        <PasteModal isOpen={isPasteModalOpen} onClose={() => setIsPasteModalOpen(false)} onConfirm={handlePasteConfirm} />
+        <input type="file" ref={fileInputRef} onChange={handleFileSelected} className="hidden" accept=".txt,.md,.json" />
 
-                {/* Coluna Central - Output e Chat (5 colunas) */}
-                <div className="col-span-12 xl:col-span-5 space-y-4 xl:space-y-5 2xl:space-y-6">
-                    {/* Output Display */}
-                    <div className="bg-white/5 backdrop-blur-sm rounded-xl xl:rounded-2xl overflow-hidden flex flex-col border border-white/10 shadow-xl" style={{ height: 'calc(50vh - 100px)' }}>
-                        <OutputDisplay 
-                            version={activeVersion} 
-                            isLoading={isUIBlocked} 
-                            error={error} 
-                            isValidated={!!validatedVersionId && activeVersion?.id === validatedVersionId}
-                            onValidate={handleValidateVersion}
-                            onExplain={handleExplainPrompt}
-                        />
-                    </div>
-
-                    {/* Chat Interface */}
-                    <div className="bg-white/5 backdrop-blur-sm rounded-xl xl:rounded-2xl overflow-hidden border border-white/10 shadow-xl flex flex-col" style={{ height: 'calc(50vh - 100px)' }}>
-                        <ChatInterface
-                            messages={chatMessages}
-                            onSendMessage={handleSendMessage}
-                            onClearChat={handleClearChat}
-                            isLoading={isChatLoading}
-                            disabled={!activeVersion || isUIBlocked}
-                            onUpdateMessage={handleUpdateMessage}
-                            onSaveCorrection={handleSaveCorrection}
-                            onDownloadChat={handleDownloadChat}
-                        />
-                    </div>
-                </div>
-
-                {/* Coluna Direita - Workspace, History, Optimizer, Assistant (3 colunas) */}
-                <div className="col-span-12 xl:col-span-3 space-y-4 xl:space-y-5 2xl:space-y-6">
-                    {/* Workspace Manager */}
-                    <div className="bg-white/5 backdrop-blur-sm rounded-xl xl:rounded-2xl overflow-hidden border border-white/10 shadow-xl flex flex-col" style={{ minHeight: '150px' }}>
-                        <WorkspaceManager
-                            currentWorkspaceId={currentWorkspaceId}
-                            onWorkspaceChange={handleWorkspaceChange}
-                            onWorkspaceCreated={handleWorkspaceCreated}
-                        />
-                    </div>
-                    
-                    {/* History Panel */}
-                    <div className="bg-white/5 backdrop-blur-sm rounded-xl xl:rounded-2xl overflow-hidden border border-white/10 shadow-xl flex flex-col" style={{ height: 'calc(35vh - 80px)' }}>
-                        <HistoryPanel
-                            history={versionHistory}
-                            activeVersionId={activeVersion?.id ?? null}
-                            onSelectVersion={handleSelectVersion}
-                            onDeleteVersion={handleDeleteVersion}
-                            validatedVersionId={validatedVersionId}
-                            onImport={handleImportClick}
-                            onPaste={handlePasteClick}
-                            onShare={handleShareVersion}
-                        />
-                    </div>
-
-                    {/* Optimizer */}
-                    <div className="bg-white/5 backdrop-blur-sm rounded-xl xl:rounded-2xl overflow-hidden border border-white/10 shadow-xl flex flex-col" style={{ minHeight: '150px' }}>
-                        <PromptOptimizer 
-                            onOptimize={handleOptimizePrompt}
-                            isLoading={isOptimizing}
-                            disabled={!activeVersion || isUIBlocked}
-                            optimizationPairs={optimizationPairs}
-                            onClearCorrections={() => setOptimizationPairs([])}
-                            manualInstructions={manualOptInstructions}
-                            onManualInstructionsChange={setManualOptInstructions}
-                        />
-                    </div>
-
-                    {/* Assistant Panel */}
-                    <div className="bg-white/5 backdrop-blur-sm rounded-xl xl:rounded-2xl overflow-hidden border border-white/10 shadow-xl flex flex-col" style={{ height: 'calc(35vh - 80px)' }}>
-                        <AssistantPanel 
-                            messages={assistantMessages}
-                            isRecording={isRecording}
-                            onToggleRecording={handleToggleRecording}
-                            isAssistantLoading={isAssistantLoading}
-                            error={assistantError}
-                            isApiKeySelected={isApiKeySelected}
-                            onSelectKey={handleSelectApiKey}
-                        />
-                    </div>
-                </div>
+        {/* Desktop Layout - Grid 3 Colunas Fixas */}
+        <div className="hidden lg:grid lg:grid-cols-12 gap-4 xl:gap-5 2xl:gap-6">
+            {/* Coluna Esquerda - Input Form (4 colunas) */}
+            <div className="col-span-12 xl:col-span-4 bg-white/5 backdrop-blur-sm rounded-xl xl:rounded-2xl overflow-hidden border border-white/10 shadow-xl flex flex-col" style={{ height: 'calc(100vh - 180px)' }}>
+                <PromptInputForm
+                    formData={formData}
+                    setFormData={(newData) => {
+                        setFormData(newData);
+                        setHasUnsavedChanges(true);
+                    }}
+                    onGenerate={handleGeneratePrompt}
+                    isLoading={isLoading}
+                    onGenerateExamples={handleGenerateExamples}
+                    isGeneratingExamples={isGeneratingExamples}
+                    activePromptContent={activeVersion?.content ?? ''}
+                    onSaveToRepository={handleSaveToRepository}
+                    isSavingToRepository={isSavingToRepository}
+                />
             </div>
 
-            {/* Mobile Layout - Totalmente Responsivo */}
-            <div className="lg:hidden space-y-3 sm:space-y-4 p-3 sm:p-4">
-                {/* Mobile - Input Form */}
-                <div className="bg-white/5 backdrop-blur-sm rounded-xl overflow-hidden border border-white/10 shadow-xl w-full">
-                    <PromptInputForm
-                        formData={formData}
-                        setFormData={(newData) => {
-                            setFormData(newData);
-                            setHasUnsavedChanges(true);
-                        }}
-                        onGenerate={handleGeneratePrompt}
-                        isLoading={isLoading}
-                        onGenerateExamples={handleGenerateExamples}
-                        isGeneratingExamples={isGeneratingExamples}
-                        activePromptContent={activeVersion?.content ?? ''}
-                        onSaveToRepository={handleSaveToRepository}
-                        isSavingToRepository={isSavingToRepository}
-                    />
-                </div>
-
-                {/* Mobile - Output Display */}
-                <div className="bg-white/5 backdrop-blur-sm rounded-xl overflow-hidden flex flex-col border border-white/10 shadow-xl min-h-[300px] sm:min-h-[400px] w-full">
-                    <OutputDisplay 
-                        version={activeVersion} 
-                        isLoading={isUIBlocked} 
-                        error={error} 
+            {/* Coluna Central - Output e Chat (5 colunas) */}
+            <div className="col-span-12 xl:col-span-5 space-y-4 xl:space-y-5 2xl:space-y-6">
+                {/* Output Display */}
+                <div className="bg-white/5 backdrop-blur-sm rounded-xl xl:rounded-2xl overflow-hidden flex flex-col border border-white/10 shadow-xl" style={{ height: 'calc(50vh - 100px)' }}>
+                    <OutputDisplay
+                        version={activeVersion}
+                        isLoading={isUIBlocked}
+                        error={error}
                         isValidated={!!validatedVersionId && activeVersion?.id === validatedVersionId}
                         onValidate={handleValidateVersion}
                         onExplain={handleExplainPrompt}
                     />
                 </div>
 
-                {/* Mobile - History Panel */}
-                <div className="bg-white/5 backdrop-blur-sm rounded-xl overflow-hidden border border-white/10 shadow-xl min-h-[250px] sm:min-h-[300px] w-full">
-                    <HistoryPanel
-                    history={versionHistory}
-                    activeVersionId={activeVersion?.id ?? null}
-                    onSelectVersion={handleSelectVersion}
-                    onDeleteVersion={handleDeleteVersion}
-                    validatedVersionId={validatedVersionId}
-                    onImport={handleImportClick}
-                    onPaste={handlePasteClick}
-                    onShare={handleShareVersion}
-                    />
-                </div>
-
-                {/* Mobile - Optimizer */}
-                <div className="bg-white/5 backdrop-blur-sm rounded-xl overflow-hidden border border-white/10 shadow-xl min-h-[250px] sm:min-h-[300px] w-full">
-                    <PromptOptimizer 
-                        onOptimize={handleOptimizePrompt}
-                        isLoading={isOptimizing}
-                        disabled={!activeVersion || isUIBlocked}
-                        optimizationPairs={optimizationPairs}
-                        onClearCorrections={() => setOptimizationPairs([])}
-                        manualInstructions={manualOptInstructions}
-                        onManualInstructionsChange={setManualOptInstructions}
-                     />
-                </div>
-
-                {/* Mobile - Chat Interface */}
-                <div className="bg-white/5 backdrop-blur-sm rounded-xl overflow-hidden border border-white/10 shadow-xl min-h-[300px] sm:min-h-[400px] w-full">
-                     <ChatInterface 
+                {/* Chat Interface */}
+                <div className="bg-white/5 backdrop-blur-sm rounded-xl xl:rounded-2xl overflow-hidden border border-white/10 shadow-xl flex flex-col" style={{ height: 'calc(50vh - 100px)' }}>
+                    <ChatInterface
                         messages={chatMessages}
                         onSendMessage={handleSendMessage}
                         onClearChat={handleClearChat}
@@ -1887,12 +1314,51 @@ export const PromptManager: React.FC = () => {
                         onUpdateMessage={handleUpdateMessage}
                         onSaveCorrection={handleSaveCorrection}
                         onDownloadChat={handleDownloadChat}
-                     />
+                    />
+                </div>
+            </div>
+
+            {/* Coluna Direita - Workspace, History, Optimizer, Assistant (3 colunas) */}
+            <div className="col-span-12 xl:col-span-3 space-y-4 xl:space-y-5 2xl:space-y-6">
+                {/* Workspace Manager */}
+                <div className="bg-white/5 backdrop-blur-sm rounded-xl xl:rounded-2xl overflow-hidden border border-white/10 shadow-xl flex flex-col" style={{ minHeight: '150px' }}>
+                    <WorkspaceManager
+                        currentWorkspaceId={currentWorkspaceId}
+                        onWorkspaceChange={handleWorkspaceChange}
+                        onWorkspaceCreated={handleWorkspaceCreated}
+                    />
                 </div>
 
-                {/* Mobile - Assistant Panel */}
-                <div className="bg-white/5 backdrop-blur-sm rounded-xl overflow-hidden border border-white/10 shadow-xl min-h-[250px] sm:min-h-[300px] w-full">
-                    <AssistantPanel 
+                {/* History Panel */}
+                <div className="bg-white/5 backdrop-blur-sm rounded-xl xl:rounded-2xl overflow-hidden border border-white/10 shadow-xl flex flex-col" style={{ height: 'calc(35vh - 80px)' }}>
+                    <HistoryPanel
+                        history={versionHistory}
+                        activeVersionId={activeVersion?.id ?? null}
+                        onSelectVersion={handleSelectVersion}
+                        onDeleteVersion={handleDeleteVersion}
+                        validatedVersionId={validatedVersionId}
+                        onImport={handleImportClick}
+                        onPaste={handlePasteClick}
+                        onShare={handleShareVersion}
+                    />
+                </div>
+
+                {/* Optimizer */}
+                <div className="bg-white/5 backdrop-blur-sm rounded-xl xl:rounded-2xl overflow-hidden border border-white/10 shadow-xl flex flex-col" style={{ minHeight: '150px' }}>
+                    <PromptOptimizer
+                        onOptimize={handleOptimizePrompt}
+                        isLoading={isOptimizing}
+                        disabled={!activeVersion || isUIBlocked}
+                        optimizationPairs={optimizationPairs}
+                        onClearCorrections={() => setOptimizationPairs([])}
+                        manualInstructions={manualOptInstructions}
+                        onManualInstructionsChange={setManualOptInstructions}
+                    />
+                </div>
+
+                {/* Assistant Panel */}
+                <div className="bg-white/5 backdrop-blur-sm rounded-xl xl:rounded-2xl overflow-hidden border border-white/10 shadow-xl flex flex-col" style={{ height: 'calc(35vh - 80px)' }}>
+                    <AssistantPanel
                         messages={assistantMessages}
                         isRecording={isRecording}
                         onToggleRecording={handleToggleRecording}
@@ -1900,9 +1366,97 @@ export const PromptManager: React.FC = () => {
                         error={assistantError}
                         isApiKeySelected={isApiKeySelected}
                         onSelectKey={handleSelectApiKey}
-                     />
+                    />
                 </div>
             </div>
         </div>
+
+        {/* Mobile Layout - Totalmente Responsivo */}
+        <div className="lg:hidden space-y-3 sm:space-y-4 p-3 sm:p-4">
+            {/* Mobile - Input Form */}
+            <div className="bg-white/5 backdrop-blur-sm rounded-xl overflow-hidden border border-white/10 shadow-xl w-full">
+                <PromptInputForm
+                    formData={formData}
+                    setFormData={(newData) => {
+                        setFormData(newData);
+                        setHasUnsavedChanges(true);
+                    }}
+                    onGenerate={handleGeneratePrompt}
+                    isLoading={isLoading}
+                    onGenerateExamples={handleGenerateExamples}
+                    isGeneratingExamples={isGeneratingExamples}
+                    activePromptContent={activeVersion?.content ?? ''}
+                    onSaveToRepository={handleSaveToRepository}
+                    isSavingToRepository={isSavingToRepository}
+                />
+            </div>
+
+            {/* Mobile - Output Display */}
+            <div className="bg-white/5 backdrop-blur-sm rounded-xl overflow-hidden flex flex-col border border-white/10 shadow-xl min-h-[300px] sm:min-h-[400px] w-full">
+                <OutputDisplay
+                    version={activeVersion}
+                    isLoading={isUIBlocked}
+                    error={error}
+                    isValidated={!!validatedVersionId && activeVersion?.id === validatedVersionId}
+                    onValidate={handleValidateVersion}
+                    onExplain={handleExplainPrompt}
+                />
+            </div>
+
+            {/* Mobile - History Panel */}
+            <div className="bg-white/5 backdrop-blur-sm rounded-xl overflow-hidden border border-white/10 shadow-xl min-h-[250px] sm:min-h-[300px] w-full">
+                <HistoryPanel
+                    history={versionHistory}
+                    activeVersionId={activeVersion?.id ?? null}
+                    onSelectVersion={handleSelectVersion}
+                    onDeleteVersion={handleDeleteVersion}
+                    validatedVersionId={validatedVersionId}
+                    onImport={handleImportClick}
+                    onPaste={handlePasteClick}
+                    onShare={handleShareVersion}
+                />
+            </div>
+
+            {/* Mobile - Optimizer */}
+            <div className="bg-white/5 backdrop-blur-sm rounded-xl overflow-hidden border border-white/10 shadow-xl min-h-[250px] sm:min-h-[300px] w-full">
+                <PromptOptimizer
+                    onOptimize={handleOptimizePrompt}
+                    isLoading={isOptimizing}
+                    disabled={!activeVersion || isUIBlocked}
+                    optimizationPairs={optimizationPairs}
+                    onClearCorrections={() => setOptimizationPairs([])}
+                    manualInstructions={manualOptInstructions}
+                    onManualInstructionsChange={setManualOptInstructions}
+                />
+            </div>
+
+            {/* Mobile - Chat Interface */}
+            <div className="bg-white/5 backdrop-blur-sm rounded-xl overflow-hidden border border-white/10 shadow-xl min-h-[300px] sm:min-h-[400px] w-full">
+                <ChatInterface
+                    messages={chatMessages}
+                    onSendMessage={handleSendMessage}
+                    onClearChat={handleClearChat}
+                    isLoading={isChatLoading}
+                    disabled={!activeVersion || isUIBlocked}
+                    onUpdateMessage={handleUpdateMessage}
+                    onSaveCorrection={handleSaveCorrection}
+                    onDownloadChat={handleDownloadChat}
+                />
+            </div>
+
+            {/* Mobile - Assistant Panel */}
+            <div className="bg-white/5 backdrop-blur-sm rounded-xl overflow-hidden border border-white/10 shadow-xl min-h-[250px] sm:min-h-[300px] w-full">
+                <AssistantPanel
+                    messages={assistantMessages}
+                    isRecording={isRecording}
+                    onToggleRecording={handleToggleRecording}
+                    isAssistantLoading={isAssistantLoading}
+                    error={assistantError}
+                    isApiKeySelected={isApiKeySelected}
+                    onSelectKey={handleSelectApiKey}
+                />
+            </div>
+        </div>
+    </div>
     );
-};
+}

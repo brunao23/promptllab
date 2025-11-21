@@ -1,0 +1,12 @@
+{
+  "/_not-found/page": "/_not-found",
+  "/chat/[versionId]/page": "/chat/[versionId]",
+  "/page": "/",
+  "/admin/page": "/admin",
+  "/auth/callback/page": "/auth/callback",
+  "/login/page": "/login",
+  "/register/page": "/register",
+  "/dashboard/page": "/dashboard",
+  "/dashboard/settings/page": "/dashboard/settings",
+  "/dashboard/repository/page": "/dashboard/repository"
+}

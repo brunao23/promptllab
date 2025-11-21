@@ -142,14 +142,15 @@ export async function isSuperAdmin(): Promise<boolean> {
 }
 
 /**
- * Lista todos os tenants
+ * Lista todos os tenants (Limitado aos 50 mais recentes para performance)
  */
 export async function listTenants(): Promise<Tenant[]> {
   try {
     const { data, error } = await supabase
       .from('tenants')
       .select('*')
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(50);
 
     if (error) throw error;
     return data || [];
@@ -213,7 +214,7 @@ export async function updateTenant(
 }
 
 /**
- * Lista todas as subscriptions
+ * Lista todas as subscriptions (Limitado as 50 mais recentes)
  */
 export async function listSubscriptions(): Promise<any[]> {
   try {
@@ -224,7 +225,8 @@ export async function listSubscriptions(): Promise<any[]> {
         plan:plans(*),
         user:profiles(id, email, full_name)
       `)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(50);
 
     if (error) throw error;
     return data || [];
@@ -294,7 +296,7 @@ export async function createSubscription(
       const now = new Date();
       const trialEndsAt = new Date(now);
       trialEndsAt.setDate(trialEndsAt.getDate() + plan.data.trial_days);
-      
+
       subscriptionData.status = 'trial';
       subscriptionData.trial_started_at = now.toISOString();
       subscriptionData.trial_ends_at = trialEndsAt.toISOString();
@@ -330,45 +332,49 @@ export async function createSubscription(
 }
 
 /**
- * Lista usuários com suas subscriptions
+ * Lista usuários com suas subscriptions (Otimizado com JOIN e Limite)
  */
 export async function listUsers(): Promise<UserWithSubscription[]> {
   try {
-    // Buscar todos os profiles
-    const { data: profiles, error: profilesError } = await supabase
+    // Query otimizada: Busca profiles e subscriptions em uma única requisição
+    // Limitado a 50 usuários mais recentes para evitar sobrecarga
+    const { data: profiles, error } = await supabase
       .from('profiles')
-      .select('id, email, full_name')
-      .order('created_at', { ascending: false });
+      .select(`
+        id, 
+        email, 
+        full_name,
+        subscriptions (
+          id,
+          plan_id,
+          status,
+          trial_ends_at,
+          subscription_ends_at,
+          is_active
+        )
+      `)
+      .order('created_at', { ascending: false })
+      .limit(50);
 
-    if (profilesError) throw profilesError;
+    if (error) throw error;
 
     if (!profiles) return [];
 
-    // Buscar subscriptions ativas para cada usuário
-    const userIds = profiles.map(p => p.id);
-    const { data: subscriptions, error: subsError } = await supabase
-      .from('subscriptions')
-      .select('*')
-      .in('user_id', userIds)
-      .eq('is_active', true);
+    // Mapear para o formato esperado pela interface
+    return profiles.map((profile: any) => {
+      // Encontrar a subscription ativa, se houver
+      const activeSubscription = profile.subscriptions?.find((s: any) => s.is_active === true) || null;
 
-    if (subsError) {
-      console.warn('⚠️ Erro ao buscar subscriptions:', subsError);
-    }
-
-    // Combinar dados
-    return profiles.map(profile => {
-      const subscription = subscriptions?.find(s => s.user_id === profile.id) || null;
       return {
         id: profile.id,
         email: profile.email,
         full_name: profile.full_name,
-        subscription: subscription ? {
-          id: subscription.id,
-          plan_id: subscription.plan_id,
-          status: subscription.status,
-          trial_ends_at: subscription.trial_ends_at,
-          subscription_ends_at: subscription.subscription_ends_at,
+        subscription: activeSubscription ? {
+          id: activeSubscription.id,
+          plan_id: activeSubscription.plan_id,
+          status: activeSubscription.status,
+          trial_ends_at: activeSubscription.trial_ends_at,
+          subscription_ends_at: activeSubscription.subscription_ends_at,
         } : null,
       };
     });
@@ -505,7 +511,7 @@ export async function changeUserPlan(
       const now = new Date();
       const trialEndsAt = new Date(now);
       trialEndsAt.setDate(trialEndsAt.getDate() + plan.trial_days);
-      
+
       subscriptionData.status = 'trial';
       subscriptionData.trial_started_at = now.toISOString();
       subscriptionData.trial_ends_at = trialEndsAt.toISOString();
@@ -535,7 +541,7 @@ export async function changeUserPlan(
 }
 
 /**
- * Obtém estatísticas gerais
+ * Obtém estatísticas gerais (Otimizado com COUNT)
  */
 export async function getAdminStats(): Promise<{
   totalUsers: number;
@@ -545,26 +551,27 @@ export async function getAdminStats(): Promise<{
   totalTenants: number;
 }> {
   try {
-    const [profiles, subscriptions, tenants] = await Promise.all([
-      supabase.from('profiles').select('id', { count: 'exact', head: true }),
-      supabase.from('subscriptions').select('status', { count: 'exact' }).eq('is_active', true),
-      supabase.from('tenants').select('id', { count: 'exact', head: true }),
+    // Executa queries de contagem em paralelo sem baixar os dados
+    const [
+      { count: totalUsers },
+      { count: activeSubscriptions },
+      { count: trialUsers },
+      { count: premiumUsers },
+      { count: totalTenants }
+    ] = await Promise.all([
+      supabase.from('profiles').select('*', { count: 'exact', head: true }),
+      supabase.from('subscriptions').select('*', { count: 'exact', head: true }).eq('is_active', true),
+      supabase.from('subscriptions').select('*', { count: 'exact', head: true }).eq('is_active', true).eq('status', 'trial'),
+      supabase.from('subscriptions').select('*', { count: 'exact', head: true }).eq('is_active', true).eq('status', 'active'),
+      supabase.from('tenants').select('*', { count: 'exact', head: true }),
     ]);
 
-    const totalUsers = profiles.count || 0;
-    const activeSubscriptions = subscriptions.count || 0;
-    const totalTenants = tenants.count || 0;
-
-    const subsData = subscriptions.data || [];
-    const trialUsers = subsData.filter(s => s.status === 'trial').length;
-    const premiumUsers = subsData.filter(s => s.status === 'active').length;
-
     return {
-      totalUsers,
-      activeSubscriptions,
-      trialUsers,
-      premiumUsers,
-      totalTenants,
+      totalUsers: totalUsers || 0,
+      activeSubscriptions: activeSubscriptions || 0,
+      trialUsers: trialUsers || 0,
+      premiumUsers: premiumUsers || 0,
+      totalTenants: totalTenants || 0,
     };
   } catch (error: any) {
     console.error('❌ Erro ao buscar estatísticas:', error);

@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense } from 'react';
-import { PromptManager } from '@/components/PromptManager';
+import PromptManager from '@/components/PromptManager';
 
 export default function DashboardPage() {
   return (

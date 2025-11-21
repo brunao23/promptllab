@@ -1,13 +1,15 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { 
-  validateEmail, 
-  validatePassword, 
-  validateName, 
+import {
+  validateEmail,
+  validatePassword,
+  validateName,
   sanitizeText,
   checkRateLimit,
   clearRateLimit,
@@ -18,7 +20,7 @@ import {
 export default function RegisterPage() {
   const router = useRouter();
   const supabase = createClient();
-  
+
   // Redireciona se já estiver autenticado
   useEffect(() => {
     const checkAuth = async () => {
@@ -143,7 +145,7 @@ export default function RegisterPage() {
         });
 
         const errorMessage = authError.message || '';
-        
+
         if (errorMessage.includes('User already registered') || errorMessage.includes('already registered') || errorMessage.includes('email_already_exists')) {
           setError('Este e-mail já está cadastrado. Tente fazer login ou recuperar sua senha.');
         } else if (errorMessage.includes('Failed to fetch') || errorMessage.includes('NetworkError')) {
@@ -170,7 +172,7 @@ export default function RegisterPage() {
           identifier,
           timestamp: Date.now(),
         });
-        
+
         // Limpar formulário
         setFormData({
           name: '',
