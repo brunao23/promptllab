@@ -8,26 +8,42 @@ import { getUserApiKey, updateApiKeyUsage } from './apiKeyService';
 // Helper function to get the API key and initialize the AI client
 // Tenta usar a API Key do usuário primeiro, depois a do sistema
 const getAI = async (): Promise<{ ai: GoogleGenAI; usingUserKey: boolean; apiKey: string }> => {
+    console.log('🔑 [getAI] Buscando API Key...');
+    
     // Primeiro, tenta buscar a API Key do usuário
     let apiKey = await getUserApiKey('gemini');
     let usingUserKey = false;
     
     if (apiKey) {
         usingUserKey = true;
-        console.log('🔑 Usando API Key do usuário (Gemini)');
+        console.log('✅ [getAI] Usando API Key do usuário (Gemini)');
     } else {
+        console.log('🔍 [getAI] Nenhuma API Key do usuário, buscando chave do sistema...');
+        
         // Se não houver API Key do usuário, usa a do sistema
         // Suporta tanto Next.js quanto Vite
         apiKey = 
           (typeof process !== 'undefined' && process.env?.GEMINI_API_KEY) ||
+          (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_GEMINI_API_KEY) ||
           (typeof process !== 'undefined' && process.env?.API_KEY) ||
           (typeof import.meta !== 'undefined' && (import.meta as any).env?.GEMINI_API_KEY) ||
           (typeof import.meta !== 'undefined' && (import.meta as any).env?.API_KEY) ||
           '';
+        
+        console.log('🔍 [getAI] Verificando variáveis de ambiente:', {
+            hasGeminiApiKey: !!(typeof process !== 'undefined' && process.env?.GEMINI_API_KEY),
+            hasNextPublicGeminiKey: !!(typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_GEMINI_API_KEY),
+            hasApiKey: !!(typeof process !== 'undefined' && process.env?.API_KEY),
+            foundKey: !!apiKey,
+            keyLength: apiKey?.length || 0,
+        });
+        
         if (!apiKey) {
-            throw new Error("API_KEY não configurada. Configure sua própria API Key nas Configurações ou configure a GEMINI_API_KEY do sistema.");
+            console.error('❌ [getAI] GEMINI_API_KEY não configurada!');
+            console.error('❌ [getAI] Configure na Vercel: Settings → Environment Variables → GEMINI_API_KEY');
+            throw new Error("API_KEY não configurada. Configure sua própria API Key nas Configurações ou configure a GEMINI_API_KEY do sistema na Vercel.");
         }
-        console.log('🔑 Usando API Key do sistema (Gemini)');
+        console.log('✅ [getAI] Usando API Key do sistema (Gemini) - comprimento:', apiKey.length);
     }
     
     return {
