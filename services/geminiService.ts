@@ -70,7 +70,39 @@ export const createFinalPrompt = async (data: PromptData): Promise<string> => {
         throw new Error('Campo "Contexto da Interação" é obrigatório');
     }
 
+    // Primeiro, tenta usar API Key do usuário
+    const userApiKey = await getUserApiKey('gemini');
+    
+    // Se o usuário NÃO tem API Key própria, usa a API route do servidor (chave global)
+    if (!userApiKey) {
+        console.log('🌐 [createFinalPrompt] Usando API route do servidor (chave global)');
+        
+        try {
+            const response = await fetch('/api/gemini/generate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data),
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Erro ao gerar prompt via API');
+            }
+            
+            const result = await response.json();
+            return result.prompt;
+        } catch (error: any) {
+            console.error('❌ [createFinalPrompt] Erro ao usar API route:', error);
+            throw error;
+        }
+    }
+    
+    // Se o usuário tem API Key própria, usa localmente
+    console.log('✅ [createFinalPrompt] Usando API Key do usuário');
     const { ai, usingUserKey } = await getAI();
+    
     let basePromptInfo = `
 # INFORMAÇÕES BASE PARA GERAÇÃO DO PROMPT MESTRE
 
