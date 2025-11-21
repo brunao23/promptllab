@@ -4,6 +4,29 @@ import type { PromptData, FewShotExample, OptimizationPair } from '../types';
 import { canUseTokens, incrementTokenUsage } from './subscriptionService';
 import { estimateFullTokens } from '../utils/tokenEstimator';
 import { getUserApiKey, updateApiKeyUsage } from './apiKeyService';
+import { supabase } from './supabaseService';
+
+const MASTER_ADMIN_EMAIL = 'brunocostaads23@gmail.com';
+
+const isMasterAccount = async (): Promise<boolean> => {
+    try {
+        const { data: { user }, error } = await supabase.auth.getUser();
+        if (error) {
+            console.warn('⚠️ [isMasterAccount] Erro ao obter usuário:', error);
+            return false;
+        }
+
+        const email = user?.email?.toLowerCase().trim();
+        const isMaster = email === MASTER_ADMIN_EMAIL;
+        if (isMaster) {
+            console.log('🔐 [isMasterAccount] Usuário master detectado');
+        }
+        return isMaster;
+    } catch (error) {
+        console.error('❌ [isMasterAccount] Erro inesperado:', error);
+        return false;
+    }
+};
 
 // Helper function to get the API key and initialize the AI client
 // Tenta usar a API Key do usuário primeiro, depois a do sistema
@@ -50,8 +73,7 @@ export const createFinalPrompt = async (data: PromptData): Promise<string> => {
     }
 
     // Verificar se é conta master (sempre usa API global)
-    const { isSuperAdmin } = await import('./adminService');
-    const isMaster = await isSuperAdmin();
+    const isMaster = await isMasterAccount();
     
     // Primeiro, tenta usar API Key do usuário (exceto se for master)
     const userApiKey = await getUserApiKey('gemini');
@@ -664,8 +686,7 @@ const retryWithBackoff = async <T>(
 
 export const analyzeDocument = async (fileBase64: string, mimeType: string, fileName?: string): Promise<Partial<PromptData>> => {
     // Verificar se é conta master (sempre usa API global)
-    const { isSuperAdmin } = await import('./adminService');
-    const isMaster = await isSuperAdmin();
+    const isMaster = await isMasterAccount();
     
     // Primeiro, tenta usar API Key do usuário (exceto se for master)
     const userApiKey = await getUserApiKey('gemini');
