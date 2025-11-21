@@ -52,16 +52,23 @@ export const AdminPage: React.FC = () => {
   useEffect(() => {
     const checkAuth = async () => {
       try {
+        console.log('🔐 [AdminPage] Verificando permissões de admin...');
         const isSuper = await isSuperAdmin();
+        console.log('🔐 [AdminPage] Resultado da verificação:', isSuper);
+        
         if (!isSuper) {
+          console.warn('⚠️ [AdminPage] Acesso negado - não é super admin');
           alert('Acesso negado. Apenas administradores master podem acessar este painel.');
           router.push('/dashboard');
           return;
         }
+        
+        console.log('✅ [AdminPage] Acesso autorizado - carregando dados...');
         setIsAuthorized(true);
         await loadData();
       } catch (error) {
-        console.error('Erro ao verificar permissões:', error);
+        console.error('❌ [AdminPage] Erro ao verificar permissões:', error);
+        alert('Erro ao verificar permissões. Por favor, tente fazer logout e login novamente.');
         router.push('/dashboard');
       } finally {
         setIsLoading(false);
@@ -73,22 +80,32 @@ export const AdminPage: React.FC = () => {
 
   const loadData = async () => {
     try {
+      console.log('📊 [AdminPage] Carregando dados para aba:', activeTab);
+      
       if (activeTab === 'dashboard') {
+        console.log('📊 [AdminPage] Carregando estatísticas...');
         const statsData = await getAdminStats();
+        console.log('✅ [AdminPage] Estatísticas carregadas:', statsData);
         setStats(statsData);
       } else if (activeTab === 'users') {
+        console.log('👥 [AdminPage] Carregando usuários...');
         const usersData = await listUsers();
+        console.log('✅ [AdminPage] Usuários carregados:', usersData.length);
         setUsers(usersData);
       } else if (activeTab === 'tenants') {
+        console.log('🏢 [AdminPage] Carregando tenants...');
         const tenantsData = await listTenants();
+        console.log('✅ [AdminPage] Tenants carregados:', tenantsData.length);
         setTenants(tenantsData);
       } else if (activeTab === 'subscriptions') {
+        console.log('💳 [AdminPage] Carregando subscriptions...');
         const subsData = await listSubscriptions();
+        console.log('✅ [AdminPage] Subscriptions carregadas:', subsData.length);
         setSubscriptions(subsData);
       }
     } catch (error: any) {
-      console.error('Erro ao carregar dados:', error);
-      alert(`Erro ao carregar dados: ${error.message}`);
+      console.error('❌ [AdminPage] Erro ao carregar dados:', error);
+      alert(`Erro ao carregar dados: ${error.message || 'Erro desconhecido'}`);
     }
   };
 

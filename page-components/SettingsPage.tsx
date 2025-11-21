@@ -592,13 +592,15 @@ export const SettingsPage: React.FC = () => {
             {/* Formulário para adicionar API Key */}
             <form onSubmit={handleSaveApiKey} className="mb-6 space-y-4 p-4 bg-white/5 rounded-lg border border-white/10">
               <div>
-                <label className="block text-sm font-medium text-white/80 mb-2">
+                <label htmlFor="api-provider-select" className="block text-sm font-medium text-white/80 mb-2">
                   Provedor
                 </label>
                 <select
+                  id="api-provider-select"
                   value={apiKeyForm.provider}
                   onChange={(e) => setApiKeyForm({ ...apiKeyForm, provider: e.target.value as ApiProvider })}
                   className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50"
+                  aria-label="Selecione o provedor de API"
                 >
                   <option value="gemini">Google Gemini</option>
                   <option value="openai">OpenAI</option>

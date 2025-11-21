@@ -127,12 +127,14 @@ export const SubscriptionInfo: React.FC = () => {
     );
   }
 
+  const isAdmin = planInfo.displayName.includes('Admin') || planInfo.maxTokens === -1 || planInfo.maxVersions === -1;
+  
   const tokensLimitText =
     planInfo.maxTokens === -1
-      ? 'Ilimitado'
+      ? '♾️ Ilimitado'
       : `${planInfo.maxTokens.toLocaleString('pt-BR')} tokens/mês`;
   const versionsLimitText =
-    planInfo.maxVersions === -1 ? 'Ilimitado' : `Máx. ${planInfo.maxVersions} versões/mês`;
+    planInfo.maxVersions === -1 ? '♾️ Ilimitado' : `Máx. ${planInfo.maxVersions} versões/mês`;
 
   return (
     <div className="bg-white/5 backdrop-blur-sm rounded-xl p-3 sm:p-4 border border-white/10 shadow-xl w-full">
@@ -140,22 +142,29 @@ export const SubscriptionInfo: React.FC = () => {
         <div className="flex-1 min-w-0">
           <div className="flex items-center space-x-2 mb-1 flex-wrap">
             <h3 className="text-white font-bold text-sm sm:text-base truncate">{planInfo.displayName}</h3>
-            {planInfo.isTrial && (
+            {isAdmin ? (
+              <span className="px-2 py-0.5 bg-gradient-to-r from-amber-500/20 to-yellow-500/20 border border-amber-500/50 rounded text-amber-400 text-xs font-bold">
+                MASTER
+              </span>
+            ) : planInfo.isTrial && (
               <span className="px-2 py-0.5 bg-emerald-500/20 border border-emerald-500/50 rounded text-emerald-400 text-xs font-bold">
                 TRIAL
               </span>
             )}
           </div>
-          {planInfo.isTrial && planInfo.trialDaysLeft !== null && (
+          {isAdmin ? (
+            <p className="text-amber-400 text-xs sm:text-sm font-medium mt-1">
+              ♾️ Acesso Ilimitado Permanente
+            </p>
+          ) : planInfo.isTrial && planInfo.trialDaysLeft !== null ? (
             <p className="text-emerald-400 text-xs sm:text-sm font-medium mt-1">
               ⏰ {planInfo.trialDaysLeft} {planInfo.trialDaysLeft === 1 ? 'dia' : 'dias'} restantes
             </p>
-          )}
-          {!planInfo.isTrial && (
+          ) : !planInfo.isTrial && (
             <p className="text-white/60 text-xs mt-1">Plano ativo</p>
           )}
         </div>
-        {!planInfo.isTrial && (
+        {!isAdmin && !planInfo.isTrial && (
           <a
             href="https://wa.me/5511999999999?text=Olá! Gostaria de fazer upgrade do meu plano."
             target="_blank"

@@ -38,6 +38,18 @@ export const WorkspaceManager: React.FC<WorkspaceManagerProps> = ({
   const loadWorkspaces = async () => {
     try {
       setIsLoading(true);
+      
+      // Verificar sessão antes de carregar workspaces
+      const { createClient } = await import('../lib/supabase/client');
+      const supabase = createClient();
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !session) {
+        console.error('Erro ao verificar sessão:', sessionError);
+        setError('Sessão não encontrada. Por favor, faça login novamente.');
+        return;
+      }
+      
       const loadedWorkspaces = await getUserWorkspaces();
       setWorkspaces(loadedWorkspaces);
       

@@ -339,6 +339,8 @@ export const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onDataExtrac
                     accept=".pdf,.txt,.md,.html,.csv,.xlsx,.xls"
                     disabled={isLoading}
                     multiple
+                    aria-label="Upload de documentos para análise (PDF, TXT, MD, HTML, CSV, XLSX, XLS)"
+                    title="Arraste ou clique para fazer upload de documentos"
                 />
                 <div className="flex flex-col items-center justify-center space-y-2">
                     {isLoading ? (

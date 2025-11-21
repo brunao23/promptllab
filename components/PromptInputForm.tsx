@@ -120,19 +120,49 @@ export const PromptInputForm: React.FC<PromptInputFormProps> = ({
         </InputSection>
         
         <InputSection title="2. Contexto do Negócio">
-             <textarea value={formData.contextoNegocio} onChange={(e) => handleInputChange('contextoNegocio', e.target.value)} rows={4} className={baseInputClasses} />
+            <label className="block text-sm font-medium text-white/80 mb-1 sr-only">Contexto do Negócio</label>
+            <textarea 
+                value={formData.contextoNegocio} 
+                onChange={(e) => handleInputChange('contextoNegocio', e.target.value)} 
+                rows={4} 
+                className={baseInputClasses}
+                aria-label="Contexto do Negócio"
+                placeholder="Descreva o contexto do negócio, empresa ou organização..."
+            />
         </InputSection>
         
         <InputSection title="3. Contexto da Interação">
-             <textarea value={formData.contexto} onChange={(e) => handleInputChange('contexto', e.target.value)} rows={4} className={baseInputClasses} />
+            <label className="block text-sm font-medium text-white/80 mb-1 sr-only">Contexto da Interação</label>
+            <textarea 
+                value={formData.contexto} 
+                onChange={(e) => handleInputChange('contexto', e.target.value)} 
+                rows={4} 
+                className={baseInputClasses}
+                aria-label="Contexto da Interação"
+                placeholder="Descreva o contexto específico da interação ou conversa..."
+            />
         </InputSection>
         
         <InputSection title="4. Regras Invioláveis">
             <div className="space-y-2">
                 {formData.regras.map((rule, index) => (
                     <div key={index} className="flex items-center space-x-2">
-                        <input type="text" value={rule} onChange={e => handleRuleChange(index, e.target.value)} className={baseInputClasses} />
-                        <button onClick={() => removeRule(index)} className="p-2 text-red-400 hover:text-red-300">&times;</button>
+                        <label className="sr-only" htmlFor={`regra-${index}`}>Regra {index + 1}</label>
+                        <input 
+                            type="text" 
+                            id={`regra-${index}`}
+                            value={rule} 
+                            onChange={e => handleRuleChange(index, e.target.value)} 
+                            className={baseInputClasses}
+                            aria-label={`Regra inviolável ${index + 1}`}
+                            placeholder="Ex: Seja sempre educado e profissional."
+                        />
+                        <button 
+                            onClick={() => removeRule(index)} 
+                            className="p-2 text-red-400 hover:text-red-300"
+                            aria-label={`Remover regra ${index + 1}`}
+                            title="Remover regra"
+                        >&times;</button>
                     </div>
                 ))}
                 <button onClick={addRule} className="text-emerald-400 hover:text-emerald-300">+ Adicionar Regra</button>
@@ -184,9 +214,15 @@ export const PromptInputForm: React.FC<PromptInputFormProps> = ({
         <InputSection title="9. Formatos (Prompt e Agente)">
           <div className="space-y-4">
             <div className="p-3 bg-white/5 border border-emerald-500/30 rounded-md">
-              <label className="block text-sm font-bold text-emerald-300 mb-1">Formato do PROMPT MESTRE (Artefato Gerado)</label>
+              <label htmlFor="master-prompt-format-select" className="block text-sm font-bold text-emerald-300 mb-1">Formato do PROMPT MESTRE (Artefato Gerado)</label>
               <p className="text-xs text-white/40 mb-2">Escolha como você quer que o prompt final seja estruturado.</p>
-              <select value={formData.masterPromptFormat} onChange={e => handleInputChange('masterPromptFormat', e.target.value as MasterPromptFormat)} className={baseInputClasses}>
+              <select 
+                id="master-prompt-format-select"
+                value={formData.masterPromptFormat} 
+                onChange={e => handleInputChange('masterPromptFormat', e.target.value as MasterPromptFormat)} 
+                className={baseInputClasses}
+                aria-label="Formato do prompt mestre"
+              >
                 {masterPromptFormats.map(f => (
                     <option key={f} value={f}>
                         {f.toUpperCase()}
@@ -195,9 +231,15 @@ export const PromptInputForm: React.FC<PromptInputFormProps> = ({
               </select>
             </div>
             <div className="p-3 bg-white/5 border border-emerald-500/30 rounded-md">
-              <label className="block text-sm font-bold text-emerald-300 mb-1">Formato de Resposta do AGENTE (Final)</label>
+              <label htmlFor="agent-output-format-select" className="block text-sm font-bold text-emerald-300 mb-1">Formato de Resposta do AGENTE (Final)</label>
               <p className="text-xs text-white/40 mb-2">Escolha como o agente deve responder ao usuário final.</p>
-              <select value={formData.formatoSaida} onChange={e => handleInputChange('formatoSaida', e.target.value as OutputFormat)} className={baseInputClasses}>
+              <select 
+                id="agent-output-format-select"
+                value={formData.formatoSaida} 
+                onChange={e => handleInputChange('formatoSaida', e.target.value as OutputFormat)} 
+                className={baseInputClasses}
+                aria-label="Formato de resposta do agente"
+              >
                 {agentOutputFormats.map(f => (
                     <option key={f} value={f}>
                         {f === 'text' ? 'TEXTO PURO (Chatbot/Natural)' : f.toUpperCase()}
@@ -220,8 +262,11 @@ export const PromptInputForm: React.FC<PromptInputFormProps> = ({
 
         <InputSection title="10. Tamanho e Complexidade">
             <div>
-                <label className="block text-sm font-medium text-white/80 mb-2">Tamanho Alvo do Prompt: <span className="font-bold text-emerald-400">{formData.promptSize.toLocaleString('pt-BR')}</span> caracteres</label>
+                <label htmlFor="prompt-size-range" className="block text-sm font-medium text-white/80 mb-2">
+                    Tamanho Alvo do Prompt: <span className="font-bold text-emerald-400">{formData.promptSize.toLocaleString('pt-BR')}</span> caracteres
+                </label>
                 <input
+                    id="prompt-size-range"
                     type="range"
                     min="5000"
                     max="50000"
@@ -230,6 +275,11 @@ export const PromptInputForm: React.FC<PromptInputFormProps> = ({
                     onChange={(e) => handleInputChange('promptSize', parseInt(e.target.value, 10))}
                     className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-emerald-500"
                     disabled={isUploading}
+                    aria-label="Tamanho alvo do prompt em caracteres"
+                    aria-valuemin={5000}
+                    aria-valuemax={50000}
+                    aria-valuenow={formData.promptSize}
+                    aria-valuetext={`${formData.promptSize.toLocaleString('pt-BR')} caracteres`}
                 />
                  <div className="flex justify-between text-xs text-white/40 mt-1">
                     <span>Simples</span>

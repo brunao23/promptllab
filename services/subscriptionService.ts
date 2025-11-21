@@ -3,7 +3,8 @@
  * Gerencia subscriptions, plans e limitações do SaaS
  */
 
-import { supabase } from './supabaseService';
+import { getSupabaseClient } from './supabaseService';
+import { isSuperAdmin } from './adminService';
 
 export interface Plan {
   id: string;
@@ -31,6 +32,36 @@ export interface Subscription {
   status: 'trial' | 'active' | 'cancelled' | 'expired';
   is_active: boolean;
   plan?: Plan;
+}
+
+const ADMIN_PLAN: Plan = {
+  id: 'admin-master-plan',
+  name: 'admin_master',
+  display_name: '🔐 Admin Master',
+  description: 'Acesso total e ilimitado para administradores',
+  max_prompt_versions: -1,  // -1 = ilimitado
+  max_tokens_per_month: -1,  // -1 = ilimitado
+  can_share_chat: true,
+  trial_days: null,
+  price_monthly: null,
+  price_yearly: null,
+  is_active: true,
+};
+
+function buildAdminSubscription(userId: string): Subscription {
+  return {
+    id: `admin-subscription-${userId}`,
+    user_id: userId,
+    tenant_id: null,
+    plan_id: ADMIN_PLAN.id,
+    trial_started_at: null,
+    trial_ends_at: null,
+    subscription_started_at: new Date().toISOString(),
+    subscription_ends_at: null,
+    status: 'active',
+    is_active: true,
+    plan: ADMIN_PLAN,
+  };
 }
 
 export interface UsageTracking {
@@ -64,6 +95,7 @@ export async function getCurrentUserTenantId(): Promise<string | null> {
  */
 export async function getCurrentSubscription(): Promise<Subscription | null> {
   try {
+    const supabase = await getSupabaseClient();
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) {
       console.log('⚠️ [getCurrentSubscription] Nenhuma sessão ativa');
@@ -71,6 +103,21 @@ export async function getCurrentSubscription(): Promise<Subscription | null> {
     }
 
     console.log('🔍 [getCurrentSubscription] Buscando subscription para usuário:', session.user.id);
+    console.log('🔍 [getCurrentSubscription] Email do usuário:', session.user.email);
+
+    // 🔐 VERIFICAÇÃO DIRETA: Admin Master por email (fallback rápido)
+    const userEmail = session.user.email?.toLowerCase().trim();
+    if (userEmail === 'brunocostaads23@gmail.com') {
+      console.log('👑 [getCurrentSubscription] 🔥 ADMIN MASTER DETECTADO POR EMAIL - CONCEDENDO PLANO ILIMITADO 🔥');
+      return buildAdminSubscription(session.user.id);
+    }
+
+    // Verificação normal de admin
+    const adminOverride = await isSuperAdmin();
+    if (adminOverride) {
+      console.log('👑 [getCurrentSubscription] Admin master detectado via isSuperAdmin - concedendo plano ilimitado');
+      return buildAdminSubscription(session.user.id);
+    }
 
     const { data, error } = await supabase
       .from('subscriptions')
@@ -143,6 +190,11 @@ export async function canShareChat(): Promise<{ allowed: boolean; reason?: strin
  */
 export async function checkAccess(feature: 'share_chat' | 'create_version' | 'use_tokens'): Promise<boolean> {
   try {
+    const supabase = await getSupabaseClient();
+    if (await isSuperAdmin()) {
+      return true;
+    }
+
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) return false;
 
@@ -174,6 +226,11 @@ export async function trackTokenUsage(
   versionId?: string
 ): Promise<boolean> {
   try {
+    const supabase = await getSupabaseClient();
+    if (await isSuperAdmin()) {
+      return true;
+    }
+
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) {
       console.error('❌ Usuário não autenticado para registrar uso');
@@ -211,6 +268,7 @@ export async function getCurrentMonthUsage(): Promise<{
   percentage: number;
 }> {
   try {
+    const supabase = await getSupabaseClient();
     const subscription = await getCurrentSubscription();
     if (!subscription) {
       return { tokensUsed: 0, tokensLimit: 1000000, percentage: 0 };
@@ -257,6 +315,7 @@ export async function getCurrentMonthVersions(): Promise<{
   canCreateMore: boolean;
 }> {
   try {
+    const supabase = await getSupabaseClient();
     const subscription = await getCurrentSubscription();
     if (!subscription) {
       return { versionsCount: 0, versionsLimit: 4, canCreateMore: true };
@@ -342,7 +401,10 @@ export async function getCurrentPlanInfo(): Promise<{
   console.log('📋 [getCurrentPlanInfo] Subscription encontrada:', {
     status: subscription.status,
     plan_name: subscription.plan.name,
-    trial_ends_at: subscription.trial_ends_at
+    display_name: subscription.plan.display_name,
+    trial_ends_at: subscription.trial_ends_at,
+    max_versions: subscription.plan.max_prompt_versions,
+    max_tokens: subscription.plan.max_tokens_per_month,
   });
 
   const isTrial = subscription.status === 'trial';

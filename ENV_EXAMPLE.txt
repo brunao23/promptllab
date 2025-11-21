@@ -1,0 +1,15 @@
+# ============================================
+# VARIÁVEIS DE AMBIENTE - LABPROMPT
+# Cole isso em um arquivo .env.local
+# ============================================
+
+NEXT_PUBLIC_SUPABASE_URL=sua-url-do-supabase
+NEXT_PUBLIC_SUPABASE_ANON_KEY=sua-chave-anonima-do-supabase
+GEMINI_API_KEY=sua-chave-do-google-gemini
+
+# Como obter a chave do Gemini:
+# 1. Acesse: https://aistudio.google.com/app/apikey
+# 2. Clique em "Create API Key"
+# 3. Copie a chave
+# 4. Cole aqui no lugar de "sua-chave-do-google-gemini"
+

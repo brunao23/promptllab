@@ -46,7 +46,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
   }
 }
 
-// Criar cliente Supabase
+// Criar cliente Supabase estático (fallback)
 // Mesmo sem variáveis válidas, criamos o cliente para que os erros sejam claros nas chamadas
 export const supabase: SupabaseClient = createClient(
   supabaseUrl || 'https://placeholder.supabase.co',
@@ -69,6 +69,37 @@ if (supabaseUrl && supabaseAnonKey) {
   });
 } else {
   console.warn('⚠️ Supabase não configurado corretamente. A autenticação pode falhar.');
+}
+
+let browserSupabasePromise: Promise<SupabaseClient | null> | null = null;
+
+async function loadBrowserSupabaseClient(): Promise<SupabaseClient | null> {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  if (!browserSupabasePromise) {
+    browserSupabasePromise = import('@/lib/supabase/client')
+      .then(({ createClient: createBrowserClient }) => {
+        const client = createBrowserClient();
+        console.log('✅ [SupabaseService] Cliente Supabase (browser) inicializado');
+        return client;
+      })
+      .catch((error) => {
+        console.warn('⚠️ [SupabaseService] Falha ao criar cliente Supabase no browser:', error);
+        return null;
+      });
+  }
+
+  return browserSupabasePromise;
+}
+
+export async function getSupabaseClient(): Promise<SupabaseClient> {
+  const browserClient = await loadBrowserSupabaseClient();
+  if (browserClient) {
+    return browserClient;
+  }
+  return supabase;
 }
 
 // =====================================================
@@ -208,7 +239,8 @@ export async function resendConfirmationEmail(email: string) {
  * Faz logout do usuário atual
  */
 export async function signOut() {
-  const { error } = await supabase.auth.signOut();
+  const client = await getSupabaseClient();
+  const { error } = await client.auth.signOut();
   if (error) throw error;
 }
 
@@ -216,29 +248,119 @@ export async function signOut() {
  * Obtém o usuário atual
  */
 export async function getCurrentUser() {
-  const { data: { user }, error } = await supabase.auth.getUser();
-  if (error) throw error;
+  // No cliente, SEMPRE usar o cliente SSR que tem acesso às sessões corretas
+  let clientToUse = supabase;
+  
+  if (typeof window !== 'undefined') {
+    try {
+      const { createClient: createBrowserClient } = await import('@/lib/supabase/client');
+      clientToUse = createBrowserClient();
+      console.log('✅ [getCurrentUser] Usando cliente SSR');
+    } catch (e) {
+      // Se falhar, usa o cliente estático
+      console.warn('⚠️ [getCurrentUser] Não foi possível usar cliente SSR, usando cliente estático:', e);
+    }
+  }
+  
+  // Primeiro verificar se há sessão
+  const { data: { session }, error: sessionError } = await clientToUse.auth.getSession();
+  
+  if (sessionError) {
+    console.error('❌ [getCurrentUser] Erro ao obter sessão:', {
+      error: sessionError,
+      message: sessionError.message,
+      code: sessionError.status
+    });
+    throw sessionError;
+  }
+  
+  if (!session) {
+    console.warn('⚠️ [getCurrentUser] Nenhuma sessão encontrada. Verificando localStorage...');
+    
+    // Tentar verificar se há token no localStorage (fallback)
+    if (typeof window !== 'undefined') {
+      const storedSession = localStorage.getItem('sb-' + (process.env.NEXT_PUBLIC_SUPABASE_URL?.split('//')[1]?.split('.')[0] || '') + '-auth-token');
+      if (storedSession) {
+        console.log('ℹ️ [getCurrentUser] Token encontrado no localStorage, mas sessão não está ativa');
+      }
+    }
+    
+    throw new Error('Auth session missing!');
+  }
+  
+  console.log('✅ [getCurrentUser] Sessão encontrada para usuário:', session.user.email);
+  
+  // Agora obter o usuário
+  const { data: { user }, error } = await clientToUse.auth.getUser();
+  if (error) {
+    console.error('❌ [getCurrentUser] Erro ao obter usuário:', {
+      error,
+      message: error.message,
+      code: error.status
+    });
+    throw error;
+  }
+  
+  if (!user) {
+    console.warn('⚠️ [getCurrentUser] Usuário não encontrado na sessão');
+    throw new Error('User not found in session');
+  }
+  
   return user;
 }
 
 /**
- * Obtém o perfil do usuário atual
+ * Obtém o perfil do usuário atual, criando automaticamente se não existir
  */
 export async function getCurrentProfile() {
   const user = await getCurrentUser();
   if (!user) return null;
 
-  const { data, error } = await supabase
+  // Usar o cliente SSR quando disponível
+  let clientToUse = supabase;
+  if (typeof window !== 'undefined') {
+    try {
+      const { createClient: createBrowserClient } = await import('@/lib/supabase/client');
+      clientToUse = createBrowserClient();
+    } catch (e) {
+      // Se falhar, usa o cliente estático
+    }
+  }
+
+  const { data, error } = await clientToUse
     .from('profiles')
     .select('*')
     .eq('id', user.id)
     .single();
 
   if (error) {
-    // Se o perfil não existe (código PGRST116), retornar null em vez de lançar erro
+    // Se o perfil não existe (código PGRST116), criar automaticamente
     if (error.code === 'PGRST116') {
       console.log('⚠️ [getCurrentProfile] Perfil não encontrado para user_id:', user.id);
-      return null;
+      console.log('💾 [getCurrentProfile] Criando perfil automaticamente...');
+      
+      try {
+        const { data: newProfile, error: createError } = await clientToUse
+          .from('profiles')
+          .insert({
+            id: user.id,
+            email: user.email || '',
+            full_name: user.user_metadata?.full_name || '',
+          })
+          .select()
+          .single();
+        
+        if (createError) {
+          console.error('❌ [getCurrentProfile] Erro ao criar perfil:', createError);
+          throw createError;
+        }
+        
+        console.log('✅ [getCurrentProfile] Perfil criado automaticamente:', newProfile.id);
+        return newProfile;
+      } catch (createErr: any) {
+        console.error('❌ [getCurrentProfile] Falha ao criar perfil:', createErr);
+        throw createErr;
+      }
     }
     console.error('❌ [getCurrentProfile] Erro ao buscar perfil:', error);
     throw error;
@@ -680,7 +802,9 @@ export async function getUserPrompts(workspaceId?: string) {
   if (!profile) throw new Error('Perfil do usuário não encontrado');
 
   // Buscar prompts usando o profile.id como user_id, opcionalmente filtrando por workspace
-  let query = supabase
+  const clientToUse = await getSupabaseClient();
+
+  let query = clientToUse
     .from('prompts')
     .select('*')
     .eq('user_id', profile.id)
@@ -733,8 +857,10 @@ export async function deletePrompt(promptId: string) {
 
   console.log('🗑️ [deletePrompt] Deletando prompt:', promptId);
 
+  const clientToUse = await getSupabaseClient();
+
   // Primeiro, verificar se existe profile para este usuário
-  const { data: profile, error: profileError } = await supabase
+  const { data: profile, error: profileError } = await clientToUse
     .from('profiles')
     .select('id')
     .eq('id', user.id)
@@ -750,7 +876,7 @@ export async function deletePrompt(promptId: string) {
   }
 
   // Soft delete - marcar como inativo
-  const { error } = await supabase
+  const { error } = await clientToUse
     .from('prompts')
     .update({ is_active: false })
     .eq('id', promptId)
@@ -778,8 +904,10 @@ export async function getPrompt(promptId: string) {
 
   console.log('🔍 [getPrompt] Buscando prompt:', promptId, 'para user_id:', user.id);
 
+  const clientToUse = await getSupabaseClient();
+
   // Primeiro, verificar se existe profile para este usuário
-  const { data: profile, error: profileError } = await supabase
+  const { data: profile, error: profileError } = await clientToUse
     .from('profiles')
     .select('id')
     .eq('id', user.id)
@@ -798,7 +926,7 @@ export async function getPrompt(promptId: string) {
   console.log('✅ [getPrompt] Profile encontrado:', profile.id);
 
   // Buscar prompt usando profile.id como user_id
-  const { data: prompt, error: promptError } = await supabase
+  const { data: prompt, error: promptError } = await clientToUse
     .from('prompts')
     .select('*')
     .eq('id', promptId)
@@ -810,10 +938,10 @@ export async function getPrompt(promptId: string) {
 
   // Buscar relacionamentos
   const [examples, variaveis, ferramentas, fluxos] = await Promise.all([
-    supabase.from('few_shot_examples').select('*').eq('prompt_id', promptId).order('order_index'),
-    supabase.from('variaveis_dinamicas').select('*').eq('prompt_id', promptId).order('order_index'),
-    supabase.from('ferramentas').select('*').eq('prompt_id', promptId).order('order_index'),
-    supabase.from('fluxos').select('*').eq('prompt_id', promptId).order('order_index'),
+    clientToUse.from('few_shot_examples').select('*').eq('prompt_id', promptId).order('order_index'),
+    clientToUse.from('variaveis_dinamicas').select('*').eq('prompt_id', promptId).order('order_index'),
+    clientToUse.from('ferramentas').select('*').eq('prompt_id', promptId).order('order_index'),
+    clientToUse.from('fluxos').select('*').eq('prompt_id', promptId).order('order_index'),
   ]);
 
   // Montar PromptData
@@ -955,10 +1083,12 @@ export async function getPromptVersions(promptId: string) {
   // OTIMIZAÇÃO: Usar getCurrentProfile e verificar ownership em uma query só
   const profile = await getCurrentProfile();
   if (!profile) throw new Error('Perfil do usuário não encontrado');
+
+  const clientToUse = await getSupabaseClient();
   
   // OTIMIZAÇÃO: Buscar versões direto (RLS do Supabase garante ownership)
   // Se necessário, RLS já filtra por user_id automaticamente
-  const { data, error } = await supabase
+  const { data, error } = await clientToUse
     .from('prompt_versions')
     .select('*, prompts!inner(user_id)')
     .eq('prompts.user_id', profile.id)
@@ -1010,8 +1140,10 @@ export async function getPromptVersion(versionId: string): Promise<PromptVersion
 
   console.log('🔍 [getPromptVersion] Buscando versão pública:', versionId);
 
+  const clientToUse = await getSupabaseClient();
+
   // Buscar versão (sem autenticação necessária para compartilhamento público)
-  const { data: version, error: versionError } = await supabase
+  const { data: version, error: versionError } = await clientToUse
     .from('prompt_versions')
     .select('*')
     .eq('id', versionId)
@@ -1027,7 +1159,7 @@ export async function getPromptVersion(versionId: string): Promise<PromptVersion
   }
 
   // Buscar prompt relacionado para obter dados completos
-  const { data: prompt, error: promptError } = await supabase
+  const { data: prompt, error: promptError } = await clientToUse
     .from('prompts')
     .select('*')
     .eq('id', version.prompt_id)
@@ -1362,6 +1494,7 @@ export async function getUserDocuments() {
 // WORKSPACES
 // =====================================================
 
+
 /**
  * Obtém todos os workspaces do usuário atual
  */
@@ -1371,7 +1504,16 @@ export async function getUserWorkspaces(): Promise<Workspace[]> {
 
   console.log('🔍 [getUserWorkspaces] Buscando workspaces para user_id:', user.id);
 
-  const { data, error } = await supabase
+  const clientToUse = await getSupabaseClient();
+
+  // Verificar sessão antes de fazer a query
+  const { data: { session }, error: sessionError } = await clientToUse.auth.getSession();
+  if (sessionError || !session) {
+    console.error('❌ [getUserWorkspaces] Sessão inválida:', sessionError);
+    throw new Error('Sessão de autenticação inválida. Por favor, faça login novamente.');
+  }
+
+  const { data, error } = await clientToUse
     .from('workspaces')
     .select('*')
     .eq('user_id', user.id)
@@ -1380,7 +1522,14 @@ export async function getUserWorkspaces(): Promise<Workspace[]> {
     .order('created_at', { ascending: false });
 
   if (error) {
-    console.error('❌ [getUserWorkspaces] Erro ao buscar workspaces:', error);
+    console.error('❌ [getUserWorkspaces] Erro ao buscar workspaces:', {
+      error,
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint,
+      user_id: user.id
+    });
     throw error;
   }
 
@@ -1395,24 +1544,45 @@ export async function getDefaultWorkspace(): Promise<Workspace | null> {
   const user = await getCurrentUser();
   if (!user) throw new Error('Usuário não autenticado');
 
-  const { data, error } = await supabase
+  const clientToUse = await getSupabaseClient();
+
+  // Primeiro tentar buscar workspace padrão
+  const { data, error } = await clientToUse
     .from('workspaces')
     .select('*')
     .eq('user_id', user.id)
     .eq('is_active', true)
     .eq('is_default', true)
-    .single();
+    .maybeSingle();
 
   if (error) {
-    if (error.code === 'PGRST116') {
-      // Nenhum workspace padrão encontrado, criar um
-      return await createDefaultWorkspace();
+    // Se for erro de não encontrado, tentar criar
+    if (error.code === 'PGRST116' || error.message?.includes('No rows')) {
+      console.log('ℹ️ [getDefaultWorkspace] Nenhum workspace padrão encontrado, criando...');
+      try {
+        return await createDefaultWorkspace();
+      } catch (createError: any) {
+        console.error('❌ [getDefaultWorkspace] Erro ao criar workspace padrão:', createError);
+        throw createError;
+      }
     }
     console.error('❌ [getDefaultWorkspace] Erro ao buscar workspace padrão:', error);
     throw error;
   }
 
-  return data as Workspace;
+  // Se encontrou, retornar
+  if (data) {
+    return data as Workspace;
+  }
+
+  // Se não encontrou (data é null), criar um novo
+  console.log('ℹ️ [getDefaultWorkspace] Nenhum workspace padrão encontrado (data null), criando...');
+  try {
+    return await createDefaultWorkspace();
+  } catch (createError: any) {
+    console.error('❌ [getDefaultWorkspace] Erro ao criar workspace padrão:', createError);
+    throw createError;
+  }
 }
 
 /**
@@ -1422,10 +1592,59 @@ async function createDefaultWorkspace(): Promise<Workspace> {
   const user = await getCurrentUser();
   if (!user) throw new Error('Usuário não autenticado');
 
-  const { data, error } = await supabase
+  const clientToUse = await getSupabaseClient();
+
+  // Verificar sessão antes de inserir
+  const { data: { session }, error: sessionError } = await clientToUse.auth.getSession();
+  if (sessionError || !session) {
+    console.error('❌ [createDefaultWorkspace] Sessão inválida:', sessionError);
+    throw new Error('Sessão de autenticação inválida. Por favor, faça login novamente.');
+  }
+
+  console.log('💾 [createDefaultWorkspace] Criando workspace padrão para user_id:', user.id);
+  console.log('💾 [createDefaultWorkspace] Session user_id:', session.user.id);
+  console.log('💾 [createDefaultWorkspace] Verificando se user_id corresponde à sessão...');
+
+  // Verificar se o user.id corresponde ao session.user.id
+  if (user.id !== session.user.id) {
+    console.error('❌ [createDefaultWorkspace] user.id não corresponde a session.user.id!', {
+      user_id: user.id,
+      session_user_id: session.user.id
+    });
+    throw new Error('Inconsistência entre usuário e sessão. Por favor, faça login novamente.');
+  }
+
+  // Verificar se já existe um workspace padrão antes de criar
+  const { data: existingWorkspace } = await clientToUse
+    .from('workspaces')
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('is_default', true)
+    .eq('is_active', true)
+    .maybeSingle();
+
+  if (existingWorkspace) {
+    console.log('ℹ️ [createDefaultWorkspace] Workspace padrão já existe:', existingWorkspace.id);
+    // Buscar o workspace completo
+    const { data: fullWorkspace, error: fetchError } = await clientToUse
+      .from('workspaces')
+      .select('*')
+      .eq('id', existingWorkspace.id)
+      .single();
+    
+    if (fetchError) {
+      console.error('❌ [createDefaultWorkspace] Erro ao buscar workspace existente:', fetchError);
+      throw fetchError;
+    }
+    
+    return fullWorkspace as Workspace;
+  }
+
+  console.log('💾 [createDefaultWorkspace] Inserindo novo workspace...');
+  const { data, error } = await clientToUse
     .from('workspaces')
     .insert({
-      user_id: user.id,
+      user_id: user.id, // Garantir que user_id corresponde ao auth.uid()
       name: 'Meu Workspace',
       description: 'Workspace padrão',
       is_active: true,
@@ -1435,8 +1654,27 @@ async function createDefaultWorkspace(): Promise<Workspace> {
     .single();
 
   if (error) {
-    console.error('❌ [createDefaultWorkspace] Erro ao criar workspace padrão:', error);
+    console.error('❌ [createDefaultWorkspace] Erro ao criar workspace padrão:', {
+      error,
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint,
+      user_id: user.id,
+      session_user_id: session.user.id,
+      error_name: error.name
+    });
+    
+    // Se for erro de RLS, dar mensagem mais clara
+    if (error.code === '42501' || error.message?.includes('row-level security')) {
+      throw new Error('Erro de permissão: A política RLS está bloqueando a criação do workspace. Verifique se o script SQL foi executado corretamente.');
+    }
+    
     throw error;
+  }
+
+  if (!data) {
+    throw new Error('Workspace criado mas nenhum dado retornado');
   }
 
   console.log('✅ [createDefaultWorkspace] Workspace padrão criado:', data.id);
@@ -1458,7 +1696,9 @@ export async function createWorkspace(name: string, description?: string): Promi
 
   console.log('💾 [createWorkspace] Criando workspace:', sanitizedName);
 
-  const { data, error } = await supabase
+  const clientToUse = await getSupabaseClient();
+
+  const { data, error } = await clientToUse
     .from('workspaces')
     .insert({
       user_id: user.id,
@@ -1508,7 +1748,9 @@ export async function updateWorkspace(workspaceId: string, updates: { name?: str
 
   console.log('💾 [updateWorkspace] Atualizando workspace:', workspaceId);
 
-  const { data, error } = await supabase
+  const clientToUse = await getSupabaseClient();
+
+  const { data, error } = await clientToUse
     .from('workspaces')
     .update(sanitizedUpdates)
     .eq('id', workspaceId)
@@ -1539,8 +1781,10 @@ export async function setDefaultWorkspace(workspaceId: string): Promise<void> {
 
   console.log('💾 [setDefaultWorkspace] Definindo workspace como padrão:', workspaceId);
 
+  const clientToUse = await getSupabaseClient();
+
   // Primeiro, desmarcar todos os outros workspaces padrão
-  const { error: unsetError } = await supabase
+  const { error: unsetError } = await clientToUse
     .from('workspaces')
     .update({ is_default: false })
     .eq('user_id', user.id)
@@ -1552,7 +1796,7 @@ export async function setDefaultWorkspace(workspaceId: string): Promise<void> {
   }
 
   // Depois, marcar o workspace selecionado como padrão
-  const { error: setError } = await supabase
+  const { error: setError } = await clientToUse
     .from('workspaces')
     .update({ is_default: true })
     .eq('id', workspaceId)
@@ -1578,8 +1822,10 @@ export async function deleteWorkspace(workspaceId: string): Promise<void> {
     throw new Error('ID de workspace inválido');
   }
 
+  const clientToUse = await getSupabaseClient();
+
   // Verificar se é o workspace padrão
-  const { data: workspace, error: fetchError } = await supabase
+  const { data: workspace, error: fetchError } = await clientToUse
     .from('workspaces')
     .select('is_default')
     .eq('id', workspaceId)
@@ -1598,7 +1844,7 @@ export async function deleteWorkspace(workspaceId: string): Promise<void> {
   console.log('🗑️ [deleteWorkspace] Deletando workspace:', workspaceId);
 
   // Soft delete - marcar como inativo
-  const { error } = await supabase
+  const { error } = await clientToUse
     .from('workspaces')
     .update({ is_active: false })
     .eq('id', workspaceId)

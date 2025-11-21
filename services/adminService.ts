@@ -3,7 +3,7 @@
  * Gerencia tenants, subscriptions e usuários admin
  */
 
-import { supabase } from './supabaseService';
+import { getSupabaseClient } from './supabaseService';
 
 export interface Tenant {
   id: string;
@@ -45,6 +45,7 @@ export interface UserWithSubscription {
  */
 export async function isAdmin(): Promise<boolean> {
   try {
+    const supabase = await getSupabaseClient();
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) return false;
 
@@ -68,41 +69,44 @@ export async function isAdmin(): Promise<boolean> {
  */
 export async function isSuperAdmin(): Promise<boolean> {
   try {
+    const supabase = await getSupabaseClient();
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) {
       console.log('⚠️ [isSuperAdmin] Nenhuma sessão ativa');
       return false;
     }
 
-    console.log('🔍 [isSuperAdmin] Verificando admin para user_id:', session.user.id);
-    console.log('🔍 [isSuperAdmin] Email do usuário:', session.user.email);
+    const userEmail = session.user.email?.toLowerCase().trim();
+    const userId = session.user.id;
 
-    // Verificar por email também (fallback)
-    const userEmail = session.user.email;
+    console.log('🔍 [isSuperAdmin] Verificando admin para user_id:', userId);
+    console.log('🔍 [isSuperAdmin] Email do usuário:', userEmail);
+
+    // PRIMEIRO: Verificar se o email é o admin master (fallback rápido)
     if (userEmail === 'brunocostaads23@gmail.com') {
       console.log('✅ [isSuperAdmin] Email corresponde ao admin master - verificando na tabela...');
-    }
+      
+      // Verificar na tabela primeiro
+      const { data: adminData, error: adminError } = await supabase
+        .from('admin_users')
+        .select('role, email, is_active')
+        .eq('user_id', userId)
+        .eq('is_active', true)
+        .maybeSingle();
 
-    const { data, error } = await supabase
-      .from('admin_users')
-      .select('role, email, is_active')
-      .eq('user_id', session.user.id)
-      .eq('is_active', true)
-      .maybeSingle();
+      if (adminData && adminData.role === 'super_admin') {
+        console.log('✅ [isSuperAdmin] Admin encontrado na tabela com role super_admin');
+        return true;
+      }
 
-    console.log('📋 [isSuperAdmin] Resultado da query:', { data, error });
-
-    if (error && error.code !== 'PGRST116') {
-      console.error('❌ [isSuperAdmin] Erro na query:', error);
-      // Se não encontrar na tabela mas o email for o admin master, retornar true (fallback)
-      if (userEmail === 'brunocostaads23@gmail.com') {
+      // Se não encontrou na tabela, tentar criar o registro
+      if (!adminData || adminError) {
         console.warn('⚠️ [isSuperAdmin] Admin não encontrado na tabela, mas email é admin master. Criando registro...');
-        // Tentar criar o registro de admin
         try {
           const { error: insertError } = await supabase
             .from('admin_users')
             .insert({
-              user_id: session.user.id,
+              user_id: userId,
               email: userEmail,
               role: 'super_admin',
               can_manage_tenants: true,
@@ -110,13 +114,39 @@ export async function isSuperAdmin(): Promise<boolean> {
               can_view_analytics: true,
               is_active: true,
             });
+          
           if (!insertError) {
             console.log('✅ [isSuperAdmin] Registro de admin criado automaticamente');
+            return true;
+          } else {
+            console.warn('⚠️ [isSuperAdmin] Erro ao criar registro (pode já existir):', insertError);
+            // Mesmo com erro de inserção, se o email for o admin master, retornar true
             return true;
           }
         } catch (createError) {
           console.error('❌ [isSuperAdmin] Erro ao criar registro de admin:', createError);
+          // Mesmo com erro, se o email for o admin master, retornar true como fallback
+          return true;
         }
+      }
+    }
+
+    // SEGUNDO: Verificar na tabela admin_users
+    const { data, error } = await supabase
+      .from('admin_users')
+      .select('role, email, is_active')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    console.log('📋 [isSuperAdmin] Resultado da query:', { data, error });
+
+    if (error && error.code !== 'PGRST116') {
+      console.error('❌ [isSuperAdmin] Erro na query:', error);
+      // Se o email for o admin master, retornar true mesmo com erro
+      if (userEmail === 'brunocostaads23@gmail.com') {
+        console.log('✅ [isSuperAdmin] Erro na query, mas email é admin master (fallback)');
+        return true;
       }
       return false;
     }
@@ -137,6 +167,20 @@ export async function isSuperAdmin(): Promise<boolean> {
   } catch (error: any) {
     console.error('❌ [isSuperAdmin] Erro ao verificar super admin:', error);
     console.error('❌ [isSuperAdmin] Stack:', error.stack);
+    
+    // Em caso de erro, verificar se o email é o admin master como último recurso
+    try {
+      const supabase = await getSupabaseClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const userEmail = session?.user?.email?.toLowerCase().trim();
+      if (userEmail === 'brunocostaads23@gmail.com') {
+        console.log('✅ [isSuperAdmin] Erro capturado, mas email é admin master (fallback final)');
+        return true;
+      }
+    } catch (fallbackError) {
+      console.error('❌ [isSuperAdmin] Erro no fallback:', fallbackError);
+    }
+    
     return false;
   }
 }
@@ -146,6 +190,7 @@ export async function isSuperAdmin(): Promise<boolean> {
  */
 export async function listTenants(): Promise<Tenant[]> {
   try {
+    const supabase = await getSupabaseClient();
     const { data, error } = await supabase
       .from('tenants')
       .select('*')
@@ -170,6 +215,7 @@ export async function createTenant(tenantData: {
   phone?: string;
 }): Promise<Tenant> {
   try {
+    const supabase = await getSupabaseClient();
     const { data, error } = await supabase
       .from('tenants')
       .insert({
@@ -198,6 +244,7 @@ export async function updateTenant(
   updates: Partial<Tenant>
 ): Promise<Tenant> {
   try {
+    const supabase = await getSupabaseClient();
     const { data, error } = await supabase
       .from('tenants')
       .update(updates)
@@ -218,6 +265,7 @@ export async function updateTenant(
  */
 export async function listSubscriptions(): Promise<any[]> {
   try {
+    const supabase = await getSupabaseClient();
     const { data, error } = await supabase
       .from('subscriptions')
       .select(`
@@ -250,6 +298,7 @@ export async function updateSubscription(
   }
 ): Promise<any> {
   try {
+    const supabase = await getSupabaseClient();
     const { data, error } = await supabase
       .from('subscriptions')
       .update(updates)
@@ -277,6 +326,7 @@ export async function createSubscription(
   tenantId?: string
 ): Promise<any> {
   try {
+    const supabase = await getSupabaseClient();
     const plan = await supabase
       .from('plans')
       .select('*')
@@ -336,6 +386,7 @@ export async function createSubscription(
  */
 export async function listUsers(): Promise<UserWithSubscription[]> {
   try {
+    const supabase = await getSupabaseClient();
     // Query otimizada: Busca profiles e subscriptions em uma única requisição
     // Limitado a 50 usuários mais recentes para evitar sobrecarga
     const { data: profiles, error } = await supabase
@@ -393,6 +444,7 @@ export async function createUserWithPremium(userData: {
   fullName: string;
 }): Promise<{ userId: string; message: string }> {
   try {
+    const supabase = await getSupabaseClient();
     console.log('🔐 [Admin] Criando usuário com premium:', userData.email);
 
     // 1. Criar usuário no Supabase Auth
@@ -480,6 +532,7 @@ export async function changeUserPlan(
   newPlanType: 'trial' | 'premium'
 ): Promise<{ message: string }> {
   try {
+    const supabase = await getSupabaseClient();
     console.log(`🔄 [Admin] Alterando plano do usuário ${userId} para ${newPlanType}`);
 
     // 1. Buscar o plano desejado
@@ -551,6 +604,7 @@ export async function getAdminStats(): Promise<{
   totalTenants: number;
 }> {
   try {
+    const supabase = await getSupabaseClient();
     // Executa queries de contagem em paralelo sem baixar os dados
     const [
       { count: totalUsers },

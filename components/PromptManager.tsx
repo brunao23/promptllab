@@ -1179,55 +1179,121 @@ export default function PromptManager() {
     // Carregar dados iniciais
     useEffect(() => {
         const loadInitialData = async () => {
+            console.log('🔄 [PromptManager] Iniciando carregamento de dados...');
             setIsLoadingData(true);
             try {
-                // Carregar workspace padrão e prompts em paralelo
-                const [defaultWorkspace, allPrompts] = await Promise.all([
-                    getDefaultWorkspace(),
-                    getUserPrompts()
-                ]);
+                // Primeiro verificar se há sessão
+                console.log('🔍 [PromptManager] Verificando sessão...');
+                const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+                
+                if (sessionError) {
+                    console.error('❌ [PromptManager] Erro ao verificar sessão:', sessionError);
+                    setError('Erro de autenticação. Por favor, faça login novamente.');
+                    setIsLoadingData(false);
+                    return;
+                }
+                
+                if (!session) {
+                    console.warn('⚠️ [PromptManager] Nenhuma sessão encontrada. Redirecionando para login...');
+                    setError('Sessão não encontrada. Por favor, faça login.');
+                    setIsLoadingData(false);
+                    // Redirecionar para login após um breve delay
+                    setTimeout(() => {
+                        window.location.href = '/login';
+                    }, 2000);
+                    return;
+                }
+                
+                console.log('✅ [PromptManager] Sessão encontrada:', session.user.email);
+                
+                // Verificar se o perfil existe, criar se necessário
+                console.log('👤 [PromptManager] Verificando perfil do usuário...');
+                try {
+                    const profile = await getCurrentProfile();
+                    if (profile) {
+                        console.log('✅ [PromptManager] Perfil encontrado:', profile.full_name || profile.email);
+                    } else {
+                        console.warn('⚠️ [PromptManager] Perfil não encontrado');
+                    }
+                } catch (profileErr: any) {
+                    console.error('❌ [PromptManager] Erro ao verificar perfil:', profileErr);
+                }
+                
+                // Carregar workspace padrão
+                console.log('📁 [PromptManager] Carregando workspace padrão...');
+                let defaultWorkspace;
+                try {
+                    defaultWorkspace = await getDefaultWorkspace();
+                    if (defaultWorkspace) {
+                        console.log('✅ [PromptManager] Workspace padrão encontrado:', defaultWorkspace.id);
+                        setCurrentWorkspaceId(defaultWorkspace.id);
+                    } else {
+                        console.warn('⚠️ [PromptManager] Nenhum workspace padrão encontrado');
+                    }
+                } catch (workspaceErr: any) {
+                    console.error('❌ [PromptManager] Erro ao carregar workspace:', workspaceErr);
+                    setError(`Erro ao carregar workspace: ${workspaceErr.message}`);
+                }
 
+                // Carregar prompts do workspace padrão
                 if (defaultWorkspace) {
-                    setCurrentWorkspaceId(defaultWorkspace.id);
-                    
-                    // Carregar prompts do workspace padrão
-                    const workspacePrompts = await getUserPrompts(defaultWorkspace.id);
-                    
-                    if (workspacePrompts && workspacePrompts.length > 0) {
-                        const latestPrompt = workspacePrompts[0];
-                        setCurrentPromptId(latestPrompt.id);
+                    console.log('📄 [PromptManager] Carregando prompts do workspace...');
+                    try {
+                        const workspacePrompts = await getUserPrompts(defaultWorkspace.id);
+                        console.log('✅ [PromptManager] Prompts carregados:', workspacePrompts?.length || 0);
                         
-                        // Carregar prompt completo e versões em paralelo
-                        const [promptResult, versions] = await Promise.all([
-                            getPrompt(latestPrompt.id),
-                            getPromptVersions(latestPrompt.id)
-                        ]);
-                        
-                        setFormData(promptResult.promptData);
-                        setVersionHistory(versions);
-                        
-                        if (versions && versions.length > 0) {
-                            const latestVersion = versions[0];
-                            setActiveVersion(latestVersion);
+                        if (workspacePrompts && workspacePrompts.length > 0) {
+                            const latestPrompt = workspacePrompts[0];
+                            console.log('📄 [PromptManager] Carregando último prompt:', latestPrompt.id);
+                            setCurrentPromptId(latestPrompt.id);
                             
-                            // Carregar mensagens apenas se necessário (lazy)
-                            getChatMessages(latestVersion.id).then(messages => {
-                                if (messages && messages.length > 0) {
-                                    setChatMessages(messages);
+                            // Carregar prompt completo e versões em paralelo
+                            try {
+                                const [promptResult, versions] = await Promise.all([
+                                    getPrompt(latestPrompt.id),
+                                    getPromptVersions(latestPrompt.id)
+                                ]);
+                                
+                                console.log('✅ [PromptManager] Prompt carregado com', versions?.length || 0, 'versões');
+                                setFormData(promptResult.promptData);
+                                setVersionHistory(versions);
+                                
+                                if (versions && versions.length > 0) {
+                                    const latestVersion = versions[0];
+                                    setActiveVersion(latestVersion);
+                                    
+                                    // Carregar mensagens apenas se necessário (lazy)
+                                    getChatMessages(latestVersion.id).then(messages => {
+                                        if (messages && messages.length > 0) {
+                                            console.log('✅ [PromptManager] Mensagens carregadas:', messages.length);
+                                            setChatMessages(messages);
+                                        }
+                                    }).catch(err => {
+                                        console.error('❌ [PromptManager] Erro ao carregar mensagens:', err);
+                                    });
+                                    
+                                    if (latestVersion.content) {
+                                        await startChat(latestVersion.content);
+                                    }
                                 }
-                            }).catch(err => {
-                                console.error('Erro ao carregar mensagens:', err);
-                            });
-                            
-                            if (latestVersion.content) {
-                                await startChat(latestVersion.content);
+                            } catch (promptErr: any) {
+                                console.error('❌ [PromptManager] Erro ao carregar prompt:', promptErr);
+                                setError(`Erro ao carregar prompt: ${promptErr.message}`);
                             }
+                        } else {
+                            console.log('ℹ️ [PromptManager] Nenhum prompt encontrado no workspace');
                         }
+                    } catch (promptsErr: any) {
+                        console.error('❌ [PromptManager] Erro ao carregar prompts:', promptsErr);
+                        setError(`Erro ao carregar prompts: ${promptsErr.message}`);
                     }
                 }
+                
+                console.log('✅ [PromptManager] Carregamento concluído');
             } catch (err: any) {
-                console.error('Erro ao carregar dados iniciais:', err);
-                setError(err.message || 'Erro ao carregar dados');
+                console.error('❌ [PromptManager] Erro GERAL ao carregar dados iniciais:', err);
+                console.error('❌ [PromptManager] Stack:', err.stack);
+                setError(err.message || 'Erro ao carregar dados. Por favor, recarregue a página.');
             } finally {
                 setIsLoadingData(false);
             }
@@ -1250,6 +1316,42 @@ export default function PromptManager() {
                     <div className="text-center px-4">
                         <p className="text-white/90 font-medium text-sm sm:text-base md:text-lg">Carregando seus prompts...</p>
                         <p className="text-white/50 text-xs sm:text-sm mt-1 sm:mt-2">Aguarde um momento</p>
+                        <button
+                            onClick={() => window.location.reload()}
+                            className="mt-4 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-sm"
+                        >
+                            Se demorar muito, clique aqui para recarregar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // Mostrar erro crítico se houver
+    if (error && error.includes('login')) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white p-4">
+                <h2 className="text-2xl font-bold mb-4 text-red-400">❌ Erro de Autenticação</h2>
+                <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-6 max-w-2xl w-full">
+                    <p className="text-red-300 mb-6">{error}</p>
+                    <div className="space-y-3">
+                        <button
+                            onClick={() => {
+                                localStorage.clear();
+                                sessionStorage.clear();
+                                window.location.href = '/login';
+                            }}
+                            className="w-full px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium"
+                        >
+                            💣 Limpar Tudo e Fazer Login Novamente
+                        </button>
+                        <button
+                            onClick={() => window.location.reload()}
+                            className="w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium"
+                        >
+                            🔄 Recarregar Página
+                        </button>
                     </div>
                 </div>
             </div>
@@ -1267,7 +1369,15 @@ export default function PromptManager() {
             onDownload={handleDownloadExplanation}
         />
         <PasteModal isOpen={isPasteModalOpen} onClose={() => setIsPasteModalOpen(false)} onConfirm={handlePasteConfirm} />
-        <input type="file" ref={fileInputRef} onChange={handleFileSelected} className="hidden" accept=".txt,.md,.json" />
+        <input 
+            type="file" 
+            ref={fileInputRef} 
+            onChange={handleFileSelected} 
+            className="hidden" 
+            accept=".txt,.md,.json"
+            aria-label="Importar prompt de arquivo (TXT, MD, JSON)"
+            title="Importar prompt de arquivo"
+        />
 
         {/* Desktop Layout - Grid 3 Colunas Fixas */}
         <div className="hidden lg:grid lg:grid-cols-12 gap-4 xl:gap-5 2xl:gap-6">

@@ -31,12 +31,15 @@ export const PasteModal: React.FC<PasteModalProps> = ({ isOpen, onClose, onConfi
                     </button>
                 </div>
                 <p className="text-sm text-white/60 mb-3">Cole abaixo o texto do prompt que você deseja testar ou otimizar.</p>
+                <label htmlFor="paste-prompt-textarea" className="sr-only">Cole o texto do prompt aqui</label>
                 <textarea
+                    id="paste-prompt-textarea"
                     className="w-full h-64 p-4 bg-white/5 text-white/80 border border-white/10 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-none font-mono text-sm"
                     placeholder="Cole seu prompt aqui..."
                     value={text}
                     onChange={(e) => setText(e.target.value)}
                     autoFocus
+                    aria-label="Campo para colar o texto do prompt"
                 />
                 <div className="flex justify-end space-x-3 mt-6">
                     <button onClick={onClose} className="px-4 py-2 text-white/80 hover:bg-white/10 rounded-lg transition-colors font-medium">
